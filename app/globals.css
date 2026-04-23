@@ -17,17 +17,16 @@
   body {
     background: var(--surface-soft);
     color: var(--ink);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-    font-feature-settings: "tnum" 1, "cv11" 1;
-  }
-
-  /* valores tabulares alinhados a direita */
-  .tabular-nums {
-    font-variant-numeric: tabular-nums;
+    font-feature-settings: "ss01" 1, "cv11" 1;
   }
 }
 
 @layer utilities {
+  /* Alinhamento tabular de decimais - essencial em research */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -35,5 +34,17 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: var(--line);
     border-radius: 4px;
+  }
+
+  /* Sombra suave a direita de coluna sticky para separar da area rolavel */
+  .sticky-shadow-right::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 12px;
+    pointer-events: none;
+    background: linear-gradient(to right, rgba(9, 5, 2, 0.06), transparent);
   }
 }

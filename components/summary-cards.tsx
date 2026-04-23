@@ -1,58 +1,78 @@
 "use client";
 
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDate, formatNumber } from "@/lib/format";
+import { formatDateLong, formatNumber } from "@/lib/format";
 import type { SummaryStats } from "@/lib/queries";
-import { Building2, FileText, Database, Clock } from "lucide-react";
+import { Building2, FileText, Database, Clock, type LucideIcon } from "lucide-react";
 
 interface Props {
   stats: SummaryStats | null;
   isLoading: boolean;
 }
 
+type CardItem = {
+  label: string;
+  value: string;
+  Icon: LucideIcon;
+  // Se true, usa fonte display (serif) para o valor - bom para numeros grandes e datas.
+  displayFont: boolean;
+};
+
 export function SummaryCards({ stats, isLoading }: Props) {
-  const items = [
+  const items: CardItem[] = [
     {
-      title: "Empresas cobertas",
+      label: "EMPRESAS COBERTAS",
       value: stats ? formatNumber(stats.empresasCount) : "",
       Icon: Building2,
+      displayFont: true,
     },
     {
-      title: "Relatorios (30d)",
+      label: "RELATÓRIOS (30D)",
       value: stats ? formatNumber(stats.relatorios30d) : "",
       Icon: FileText,
+      displayFont: true,
     },
     {
-      title: "Metricas armazenadas",
+      label: "MÉTRICAS ARMAZENADAS",
       value: stats ? formatNumber(stats.metricasTotal) : "",
       Icon: Database,
+      displayFont: true,
     },
     {
-      title: "Ultima atualizacao",
-      value: stats ? formatDate(stats.ultimaAtualizacao) : "",
+      label: "ÚLTIMA ATUALIZAÇÃO",
+      value: stats ? formatDateLong(stats.ultimaAtualizacao) : "",
       Icon: Clock,
+      displayFont: true,
     },
   ];
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {items.map(({ title, value, Icon }) => (
-        <Card key={title}>
-          <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-            <CardTitle>{title}</CardTitle>
-            <Icon className="h-4 w-4 text-brand" />
-          </CardHeader>
-          <CardContent>
+      {items.map(({ label, value, Icon, displayFont }) => (
+        <div
+          key={label}
+          className="group rounded-lg border border-line bg-surface-soft p-6 hover:border-brand-soft/60 transition-colors"
+        >
+          <div className="flex items-start justify-between">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-ink/60 font-medium">
+              {label}
+            </div>
+            <Icon className="w-4 h-4 text-ink/25 group-hover:text-brand-soft transition-colors" />
+          </div>
+          <div className="mt-4 leading-none">
             {isLoading || !stats ? (
-              <Skeleton className="h-7 w-24" />
-            ) : (
-              <div className="text-2xl font-semibold text-ink tabular-nums">
+              <Skeleton className="h-9 w-24" />
+            ) : displayFont ? (
+              <span className="font-display text-4xl text-ink tabular">
                 {value}
-              </div>
+              </span>
+            ) : (
+              <span className="font-mono text-3xl text-ink tabular">
+                {value}
+              </span>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ))}
     </div>
   );

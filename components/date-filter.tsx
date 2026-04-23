@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import type { PeriodoFilter } from "@/types/research";
 
 interface Props {
@@ -14,26 +8,34 @@ interface Props {
   onChange: (value: PeriodoFilter) => void;
 }
 
-const OPTIONS: Array<{ value: PeriodoFilter; label: string }> = [
-  { value: "7d", label: "Ultimos 7 dias" },
-  { value: "30d", label: "Ultimos 30 dias" },
-  { value: "90d", label: "Ultimos 90 dias" },
+const OPTIONS: { value: PeriodoFilter; label: string }[] = [
+  { value: "7d", label: "7d" },
+  { value: "30d", label: "30d" },
+  { value: "90d", label: "90d" },
   { value: "all", label: "Tudo" },
 ];
 
 export function DateFilter({ value, onChange }: Props) {
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as PeriodoFilter)}>
-      <SelectTrigger className="min-w-[160px]">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {OPTIONS.map((o) => (
-          <SelectItem key={o.value} value={o.value}>
-            {o.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="flex items-center gap-1 rounded-md bg-surface p-1">
+      {OPTIONS.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              "px-3 h-8 rounded text-[11px] font-medium uppercase tracking-[0.08em] transition",
+              active
+                ? "bg-navy text-surface-soft"
+                : "text-ink/60 hover:text-ink"
+            )}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }

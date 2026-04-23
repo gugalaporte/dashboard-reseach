@@ -1,22 +1,22 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+// O consumidor controla o container com overflow (necessario para sticky
+// cells funcionarem corretamente em scroll horizontal).
 export const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto scrollbar-thin">
-      <table
-        ref={ref}
-        className={cn("w-full caption-bottom text-sm border-collapse", className)}
-        {...props}
-      />
-    </div>
+    <table
+      ref={ref}
+      className={cn("w-full caption-bottom text-sm border-collapse", className)}
+      {...props}
+    />
   )
 );
 Table.displayName = "Table";
 
 export const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
   ({ className, ...props }, ref) => (
-    <thead ref={ref} className={cn("sticky top-0 z-10 bg-navy text-surface-soft", className)} {...props} />
+    <thead ref={ref} className={cn("sticky top-0 z-30 bg-navy text-surface-soft", className)} {...props} />
   )
 );
 TableHeader.displayName = "TableHeader";

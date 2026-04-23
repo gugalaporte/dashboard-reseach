@@ -57,6 +57,11 @@ const config: Config = {
           foreground: "#F1F1F1",
         },
       },
+      fontFamily: {
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        display: ["var(--font-fraunces)", "Georgia", "serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+      },
       borderRadius: {
         lg: "0.625rem",
         md: "0.5rem",

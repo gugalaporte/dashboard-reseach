@@ -9,14 +9,11 @@ Next.js 14 · TypeScript · Tailwind · shadcn/ui · @tanstack/react-table · @s
 
 ## Setup
 
-```bash
-cp .env.local.example .env.local
-# edite .env.local com a chave ANON do Supabase (nao use service_role no frontend)
-npm install
-npm run dev
-```
+1. `cp .env.local.example .env.local` e cole a **anon key** (não use service_role).
+2. As RLS policies de leitura já estão aplicadas nas tabelas.
+3. `npm run dev`
 
-Abre em <http://localhost:3000>.
+Sem SQL manual. A agregação é feita no cliente a partir de `dados_estruturados` + `stock_guide`.
 
 ### Variáveis de ambiente
 
@@ -25,64 +22,17 @@ Abre em <http://localhost:3000>.
 | `NEXT_PUBLIC_SUPABASE_URL` | URL do projeto (`https://liyqnjsphrqudkgxhcup.supabase.co`) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Chave `anon` (pública). **Nunca** use `service_role` aqui. |
 
-## SQL necessário no Supabase
-
-Rode isto uma vez no SQL Editor. Cria a view que o dashboard consome.
-
-```sql
-CREATE OR REPLACE VIEW v_research_latest AS
-WITH ranked AS (
-  SELECT
-    empresa, fonte, metrica, periodo, valor, unidade, data_relatorio, pdf_id,
-    ROW_NUMBER() OVER (
-      PARTITION BY empresa, fonte, metrica
-      ORDER BY data_relatorio DESC,
-               CASE WHEN periodo ~ 'E$' THEN 1 ELSE 0 END DESC,
-               periodo DESC
-    ) AS rn
-  FROM dados_estruturados
-)
-SELECT
-  empresa,
-  fonte,
-  MAX(data_relatorio) FILTER (WHERE rn = 1) AS data_relatorio,
-  MAX(valor)   FILTER (WHERE metrica='Target Price'   AND rn=1) AS target_price,
-  MAX(unidade) FILTER (WHERE metrica='Target Price'   AND rn=1) AS target_ccy,
-  MAX(valor)   FILTER (WHERE metrica='P/E'            AND rn=1) AS pe,
-  MAX(valor)   FILTER (WHERE metrica='EV/EBITDA'      AND rn=1) AS ev_ebitda,
-  MAX(valor)   FILTER (WHERE metrica='Dividend Yield' AND rn=1) AS dy,
-  MAX(valor)   FILTER (WHERE metrica='RoIC'           AND rn=1) AS roic,
-  MAX(valor)   FILTER (WHERE metrica='Revenue'        AND rn=1) AS revenue,
-  MAX(valor)   FILTER (WHERE metrica='EBITDA'         AND rn=1) AS ebitda,
-  MAX(valor)   FILTER (WHERE metrica='Net Debt'       AND rn=1) AS net_debt,
-  MAX(valor)   FILTER (WHERE metrica='Net Income'     AND rn=1) AS net_income
-FROM ranked
-GROUP BY empresa, fonte;
-```
-
-### Policies mínimas (se RLS estiver ligado)
-
-```sql
--- Leitura pública das três tabelas + view
-ALTER TABLE dados_estruturados ENABLE ROW LEVEL SECURITY;
-ALTER TABLE stock_guide ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pdf_documents ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "anon read" ON dados_estruturados FOR SELECT TO anon USING (true);
-CREATE POLICY "anon read" ON stock_guide        FOR SELECT TO anon USING (true);
-CREATE POLICY "anon read" ON pdf_documents      FOR SELECT TO anon USING (true);
--- Views herdam dos tables base.
-```
-
 ## Arquitetura
 
 ```
 app/
-  layout.tsx          -- root, fonte do sistema, bg surface-soft
+  layout.tsx          -- root
   page.tsx            -- dashboard (cards + filtros + tabela + drawer)
   globals.css         -- paleta em CSS vars + scrollbar
 components/
   research-table.tsx  -- TanStack, colunas memoizadas, zebra, sort
+  metric-cell.tsx     -- valor em cima + (periodo · data) subordinado
+  rating-cell.tsx     -- badge colorido + data abaixo
   company-search.tsx  -- combobox multi com <Command>
   source-filter.tsx   -- Select de fonte
   date-filter.tsx     -- Select de periodo (7/30/90/tudo)
@@ -91,27 +41,56 @@ components/
   ui/*                -- primitivas shadcn (button, badge, table, ...)
 lib/
   supabase.ts         -- createClient com anon key
-  queries.ts          -- getResearch, getEmpresas, getSummaryStats, ...
-  format.ts           -- pt-BR: money, millions, pct, multiple
+  queries.ts          -- getResearch, getEmpresas, getSummaryStats, buildRows, FONTES, Cell, ResearchRow
+  format.ts           -- pt-BR: formatValue (money/millions/mult/pct) + formatDateShort
   utils.ts            -- cn()
 types/
-  research.ts         -- ResearchRow, StockGuideRow, Fonte, ...
+  research.ts         -- MetricaRow, PdfDoc, PeriodoFilter (usados no drawer)
 ```
+
+### Modelo de dados do frontend
+
+Em `lib/queries.ts`:
+
+```ts
+type Cell = {
+  value: number;
+  date: string | null;
+  periodo?: string | null;
+  unidade?: string | null;
+  pdf_id?: number | null;
+};
+
+type ResearchRow = {
+  empresa: string;
+  fonte: 'BTG Pactual' | 'Bradesco BBI' | 'Safra';
+  rating?: { value: string; date: string | null };
+  price?:  { value: number; date: string | null };
+  target?: Cell & { ccy: string };
+  pe?: Cell; ev_ebitda?: Cell; dy?: Cell; roic?: Cell;
+  revenue?: Cell; ebitda?: Cell; net_debt?: Cell; net_income?: Cell;
+};
+```
+
+Cada célula numérica carrega seu próprio `date`/`periodo` — o `MetricCell` renderiza o valor com a data subordinada logo abaixo.
 
 ## Como adicionar uma nova métrica
 
-1. **SQL** — adicione a coluna no agregado da view:
-   ```sql
-   MAX(valor) FILTER (WHERE metrica='NomeNoBanco' AND rn=1) AS nome_coluna
-   ```
-2. **Tipo** — em `types/research.ts`, adicione em `ResearchLatestRow`:
-   ```ts
-   nome_coluna: number | null;
-   ```
-3. **Tabela** — em `components/research-table.tsx`, crie uma coluna nova no array memoizado `columns` com o formatter certo (`formatMultiple`, `formatPct`, `formatMillions`...).
+1. Em `lib/queries.ts#buildRows`, adicione no objeto de retorno: `nova_metrica: pick('Nome No Banco')`.
+2. Em `ResearchRow`, adicione o campo: `nova_metrica?: Cell`.
+3. Em `components/research-table.tsx`, adicione uma coluna nova no array memoizado `columns` com o formatter certo (`mult`, `pct`, `millions`, `money`).
+
+## Migração: view descontinuada
+
+A versão anterior do projeto usava `public.v_research_latest`. Agora a agregação roda no cliente. Para limpar:
+
+```sql
+DROP VIEW IF EXISTS public.v_research_latest;
+```
 
 ## Notas sobre a base real (abril/2026)
 
-- 3 fontes populadas: **BTG Pactual**, **Bradesco BBI**, **Safra** (sem Itaú BBA).
-- `stock_guide` tem schema *wide* próprio: `source_bank`, `report_date`, `price_date`, `ticker`, `rating`, `price`, `pe_{2025..2027}`, `ev_ebitda_{2025..2027}`, `div_yield_{2025..2027}_pct`. O join no cliente usa apenas `rating` — `target_price` vem de `v_research_latest`.
-- Ratings existentes: `Outperform`, `Neutral`, `Underperform`, `Not Rated`, `Under Review`, `n.a.`. Mapeamento de cor em `research-table.tsx#ratingClass`.
+- 3 fontes populadas: **BTG Pactual**, **Bradesco BBI**, **Safra**.
+- Ratings existentes: `Outperform`, `Neutral`, `Underperform`, `Not Rated`, `Under Review`, `n.a.`. Cor: Outperform→verde, Underperform→vermelho, resto→cinza (neutro).
+- `stock_guide` serve como **fallback** para P/E, EV/EBITDA e Div. Yield quando `dados_estruturados` não tem a métrica — com preferência 2026 > 2027 > 2025.
+- Empresas sem nenhum registro em `dados_estruturados` mas com `stock_guide` ainda aparecem na tabela (rating + preço + fallbacks preenchidos, resto `—`).
