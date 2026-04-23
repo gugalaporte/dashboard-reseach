@@ -75,7 +75,7 @@ export function CompanyDrawer({ empresa, consenso, onClose }: Props) {
 
   return (
     <Sheet open={!!empresa} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-[560px] max-w-none bg-surface-soft border-l border-line p-0">
+      <SheetContent className="w-[760px] max-w-[92vw] bg-surface-soft border-l border-line p-0">
         {/* Header editorial */}
         <SheetHeader className="px-8 py-6 border-b border-line bg-surface-soft">
           <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium">

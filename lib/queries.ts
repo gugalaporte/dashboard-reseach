@@ -23,13 +23,22 @@ export type Cell = {
   pdf_id?: number | null;
 };
 
+// Celula de target: extende Cell com moeda, upside opcional vindo do banco
+// e flags de fallback (quando a linha pega target de outra corretora).
+export type TargetCell = Cell & {
+  ccy: string;
+  upside?: number | null;
+  is_fallback?: boolean;
+  fallback_source?: Fonte;
+};
+
 // Linha consumida pela tabela. Cada metrica vira uma celula opcional.
 export type ResearchRow = {
   empresa: string;
   fonte: Fonte;
   rating?: { value: string; date: string | null };
   price?: { value: number; date: string | null };
-  target?: Cell & { ccy: string };
+  target?: TargetCell;
   pe?: Cell;
   ev_ebitda?: Cell;
   dy?: Cell;
@@ -69,6 +78,9 @@ type StockGuideRow = {
   div_yield_2026_pct: number | null;
   div_yield_2027_pct: number | null;
   div_yield_2025_pct: number | null;
+  // Novas colunas: TP e upside ja vem calculados do stock_guide.
+  target_price: number | null;
+  upside: number | null;
 };
 
 // Principal: busca tudo em 2 selects e agrega no TS.
@@ -89,7 +101,8 @@ export async function getResearch(): Promise<ResearchRow[]> {
         "ticker,source_bank,rating,price,report_date,price_date,pdf_id," +
           "pe_2026,pe_2027,pe_2025," +
           "ev_ebitda_2026,ev_ebitda_2027,ev_ebitda_2025," +
-          "div_yield_2026_pct,div_yield_2027_pct,div_yield_2025_pct"
+          "div_yield_2026_pct,div_yield_2027_pct,div_yield_2025_pct," +
+          "target_price,upside"
       )
       .in("ticker", tickers)
       .returns<StockGuideRow[]>(),
@@ -199,6 +212,32 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
     const sg = sgLatest.get(k);
     const tp = pickLatest(byMetric["Target Price"] ?? []);
 
+    // Prioridade do target:
+    //   1) stock_guide.target_price (dados novos, padronizados e recentes)
+    //   2) dados_estruturados.Target Price (legado, usado pelo BTG que
+    //      nao esta no stock_guide, e como reforco se SG nao tem)
+    const target: TargetCell | undefined =
+      sg?.target_price != null
+        ? {
+            value: Number(sg.target_price),
+            ccy: "R$",
+            date: sg.report_date,
+            periodo: null,
+            unidade: "R$",
+            pdf_id: sg.pdf_id,
+            upside: sg.upside != null ? Number(sg.upside) : null,
+          }
+        : tp
+          ? {
+              value: Number(tp.valor),
+              ccy: tp.unidade ?? "R$",
+              date: tp.data_relatorio,
+              periodo: tp.periodo,
+              unidade: tp.unidade,
+              pdf_id: tp.pdf_id,
+            }
+          : undefined;
+
     out.push({
       empresa,
       fonte,
@@ -209,16 +248,7 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
         sg?.price != null
           ? { value: Number(sg.price), date: sg.price_date }
           : undefined,
-      target: tp
-        ? {
-            value: Number(tp.valor),
-            ccy: tp.unidade ?? "R$",
-            date: tp.data_relatorio,
-            periodo: tp.periodo,
-            unidade: tp.unidade,
-            pdf_id: tp.pdf_id,
-          }
-        : undefined,
+      target,
       pe: pick("P/E") ?? sgFallback(sg, "pe"),
       ev_ebitda: pick("EV/EBITDA") ?? sgFallback(sg, "ev_ebitda"),
       dy: pick("Dividend Yield") ?? sgFallback(sg, "dy"),
@@ -230,10 +260,52 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
     });
   }
 
+  // Fallback de target por corretora (pos-processamento).
+  // Quando uma linha de Safra nao tem target mas o BBI tem, herda do BBI
+  // mantendo a flag is_fallback para o UI sinalizar a origem.
+  // Motivacao: PDF do Safra tem paginas com texto rotacionado/vetorial que
+  // nao foi extraido (~62 tickers NULL no banco inteiro).
+  applyTargetFallback(out, "Safra", "Bradesco BBI");
+
   return out.sort(
     (a, b) =>
       a.empresa.localeCompare(b.empresa) || a.fonte.localeCompare(b.fonte)
   );
+}
+
+// Preenche target NULL de linhas de `missingFonte` com o target de `sourceFonte`
+// (mesmo ticker), marcando is_fallback. Calcula upside so se precos forem
+// comparaveis (mesma moeda E ambos presentes).
+function applyTargetFallback(
+  rows: ResearchRow[],
+  missingFonte: Fonte,
+  sourceFonte: Fonte
+): void {
+  const byTickerSource = new Map<string, ResearchRow>();
+  for (const r of rows) {
+    if (r.fonte === sourceFonte && r.target) {
+      byTickerSource.set(r.empresa, r);
+    }
+  }
+  for (const r of rows) {
+    if (r.fonte !== missingFonte) continue;
+    if (r.target) continue;
+    const src = byTickerSource.get(r.empresa);
+    if (!src?.target) continue;
+    const srcTarget = src.target;
+    // Recalcula upside contra o preco da LINHA ATUAL (Safra), nao do BBI,
+    // para refletir o upside implicito no preco mostrado naquela linha.
+    const localUpside =
+      r.price?.value != null && srcTarget.ccy === "R$"
+        ? ((srcTarget.value - r.price.value) / r.price.value) * 100
+        : null;
+    r.target = {
+      ...srcTarget,
+      is_fallback: true,
+      fallback_source: sourceFonte,
+      upside: localUpside,
+    };
+  }
 }
 
 // Data mais recente observada em qualquer celula da linha.
