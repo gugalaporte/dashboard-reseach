@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import type { MetricaRow, PdfDoc } from "@/types/research";
 import { canonicalMetricId, extractYear, type MetricId } from "./metrics";
-import { deriveNetIncome } from "./derive-metrics";
+import { deriveNetIncomeFromEPS } from "./derive-metrics";
 
 // Fontes (corretoras) presentes na base.
 export const FONTES = ["BTG Pactual", "Bradesco BBI", "Safra"] as const;
@@ -29,6 +29,8 @@ export type Cell = {
   derived?: boolean;
   formula?: string;
   priceDate?: string;
+  // Banco ancora usado na derivacao de Net Income (EPS cross-anchor).
+  anchorBank?: string;
 };
 
 // Celula de target: extende Cell com moeda, upside opcional vindo do banco
@@ -73,11 +75,6 @@ type MetricRow = {
   pdf_id: number | null;
 };
 
-type TickerSharesRow = {
-  ticker: string;
-  shares_outstanding: number;
-};
-
 type StockGuideRow = {
   ticker: string;
   source_bank: Fonte;
@@ -100,14 +97,12 @@ type StockGuideRow = {
   upside: number | null;
 };
 
-// Principal: busca tudo em 3 selects e agrega no TS.
+// Principal: busca tudo em 2 selects e agrega no TS.
 // Filtra no banco pelos tickers permitidos (ALLOWED_TICKERS) para nao trafegar
 // dados de empresas que nao serao exibidas.
-// ticker_shares e opcional: se a tabela nao existe ou retorna erro, seguimos
-// sem derivar nada (linhas sem NI publicado ficam vazias como antes).
 export async function getResearch(): Promise<ResearchRow[]> {
   const tickers = ALLOWED_TICKERS as unknown as string[];
-  const [mRes, gRes, sRes] = await Promise.all([
+  const [mRes, gRes] = await Promise.all([
     supabase
       .from("dados_estruturados")
       .select("empresa,fonte,metrica,periodo,valor,unidade,data_relatorio,pdf_id")
@@ -125,20 +120,10 @@ export async function getResearch(): Promise<ResearchRow[]> {
       )
       .in("ticker", tickers)
       .returns<StockGuideRow[]>(),
-    supabase
-      .from("ticker_shares")
-      .select("ticker,shares_outstanding")
-      .in("ticker", tickers)
-      .returns<TickerSharesRow[]>(),
   ]);
   if (mRes.error) throw mRes.error;
   if (gRes.error) throw gRes.error;
-  // Erro silencioso em ticker_shares: tabela pode nao existir ainda.
-  const sharesMap = new Map<string, number>();
-  if (!sRes.error && sRes.data) {
-    for (const s of sRes.data) sharesMap.set(s.ticker, Number(s.shares_outstanding));
-  }
-  return buildRows(mRes.data ?? [], gRes.data ?? [], sharesMap);
+  return buildRows(mRes.data ?? [], gRes.data ?? []);
 }
 
 // Escolhe leitura mais recente: (1) maior data_relatorio,
@@ -206,11 +191,106 @@ function sgFallback(
   return undefined;
 }
 
-function buildRows(
-  metrics: MetricRow[],
-  guide: StockGuideRow[],
-  sharesByTicker: Map<string, number>
-): ResearchRow[] {
+// Ancora cross-casa: (ticker, ano) com NI publicado em R$ (nao US$) + P/E + preco
+// do stock_guide. Preferencia: BTG Pactual, depois Bradesco BBI.
+type NetIncomeAnchor = {
+  ni: number;
+  pe: number;
+  price: number;
+  bank: Fonte;
+};
+
+const ANCHOR_YEARS = ["2026", "2027", "2025"] as const;
+const ANCHOR_ORDER: Fonte[] = ["BTG Pactual", "Bradesco BBI"];
+
+function peForYear(sg: StockGuideRow, year: string): number | null {
+  if (year === "2025") return sg.pe_2025;
+  if (year === "2026") return sg.pe_2026;
+  if (year === "2027") return sg.pe_2027;
+  return null;
+}
+
+// Filtro leve: exclui linhas de NI claramente em US$ (evita ancora errada).
+function isNiR$Mn(r: MetricRow): boolean {
+  const u = (r.unidade ?? "").toLowerCase();
+  if (u.includes("us$") || u.includes("usd") || u.includes("dólar") || u.includes("dolar"))
+    return false;
+  return true;
+}
+
+// Escolhe a linha de NI cuja data_relatorio fica mais proxima de report_date do guide.
+function pickNIByClosestReport(
+  niRows: MetricRow[],
+  anchorReportDate: string | null
+): MetricRow | undefined {
+  const filtered = niRows.filter(isNiR$Mn);
+  if (filtered.length === 0) return undefined;
+  if (!anchorReportDate) return pickLatest(filtered);
+  const t0 = new Date(anchorReportDate).getTime();
+  let best: MetricRow | undefined;
+  let bestDiff = Infinity;
+  for (const r of filtered) {
+    const d = r.data_relatorio ? new Date(r.data_relatorio).getTime() : NaN;
+    if (Number.isNaN(d)) continue;
+    const diff = Math.abs(d - t0);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = r;
+    }
+  }
+  return best ?? pickLatest(filtered);
+}
+
+function tryAnchorForTickerYear(
+  ticker: string,
+  fonte: Fonte,
+  year: string,
+  byPair: Map<string, MetricRow[]>,
+  sgLatest: Map<string, StockGuideRow>
+): NetIncomeAnchor | null {
+  const sg = sgLatest.get(`${ticker}|${fonte}`);
+  if (!sg || sg.price == null || sg.price <= 0) return null;
+  const pe = peForYear(sg, year);
+  if (pe == null || pe <= 0) return null;
+  const arr = byPair.get(`${ticker}|${fonte}`) ?? [];
+  const niCandidates = arr.filter(
+    (r) =>
+      canonicalMetricId(r.metrica) === "net_income" && extractYear(r.periodo) === year
+  );
+  const niRow = pickNIByClosestReport(niCandidates, sg.report_date);
+  if (!niRow) return null;
+  return {
+    ni: Number(niRow.valor),
+    pe: Number(pe),
+    price: Number(sg.price),
+    bank: fonte,
+  };
+}
+
+// Mapa `ticker|ano` (ex. PETR4|2026) -> ancora. Montado antes do loop de linhas.
+function buildNetIncomeAnchorMap(
+  byPair: Map<string, MetricRow[]>,
+  sgLatest: Map<string, StockGuideRow>
+): Map<string, NetIncomeAnchor> {
+  const map = new Map<string, NetIncomeAnchor>();
+  const tickers = ALLOWED_TICKERS as unknown as string[];
+  for (const ticker of tickers) {
+    for (const year of ANCHOR_YEARS) {
+      const k = `${ticker}|${year}`;
+      if (map.has(k)) continue;
+      for (const fonte of ANCHOR_ORDER) {
+        const a = tryAnchorForTickerYear(ticker, fonte, year, byPair, sgLatest);
+        if (a) {
+          map.set(k, a);
+          break;
+        }
+      }
+    }
+  }
+  return map;
+}
+
+function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] {
   // agrupa dados_estruturados por (empresa, fonte)
   const byPair = new Map<string, MetricRow[]>();
   for (const r of metrics) {
@@ -226,6 +306,8 @@ function buildRows(
     if (!prev || (g.report_date ?? "") > (prev.report_date ?? ""))
       sgLatest.set(k, g);
   }
+
+  const netIncomeAnchorMap = buildNetIncomeAnchorMap(byPair, sgLatest);
 
   // uniao das chaves (empresa x fonte pode existir so no stock_guide)
   const keys = new Set<string>();
@@ -317,35 +399,38 @@ function buildRows(
       }
     }
 
-    // Derivacao de Net Income.
-    // Para cada ano onde temos P/E mas NAO temos NI publicado, tenta calcular
-    // usando NI = preco_report × acoes / P/E. Usa SEMPRE o preco do report
-    // (sg.price / sg.price_date), nunca o preco live do Yahoo.
-    // Resultado fica marcado com derived=true pra UI distinguir visualmente.
-    const shares = sharesByTicker.get(empresa) ?? null;
+    // Derivacao de Net Income (EPS como ponte entre casas).
+    // NI linha = NI_ancora × (EPS_linha / EPS_ancora), com EPS = Preço/P/E.
+    // Preço e P/E da linha atual vêm do stock_guide daquela fonte; âncora vem
+    // de netIncomeAnchorMap (BTG primeiro, senão BBI). Nunca usa preço Yahoo.
     const peBucket = byMetricYear["pe"];
     const niBucket = (byMetricYear["net_income"] ??= {});
     if (peBucket && sg) {
       for (const year of Object.keys(peBucket)) {
         if (niBucket[year]) continue; // ja temos NI publicado
         const peCell = peBucket[year];
-        const derived = deriveNetIncome({
+        const anchor = netIncomeAnchorMap.get(`${empresa}|${year}`) ?? null;
+        const derived = deriveNetIncomeFromEPS({
           publishedNI: null,
+          anchorNI: anchor?.ni ?? null,
+          anchorPE: anchor?.pe ?? null,
+          anchorPrice: anchor?.price ?? null,
+          anchorBank: anchor?.bank ?? null,
+          pe: peCell?.value ?? null,
           priceAtReport: sg.price != null ? Number(sg.price) : null,
           priceDate: sg.price_date,
-          pe: peCell?.value ?? null,
-          sharesOutstanding: shares,
         });
-        if (!derived) continue;
+        if (!derived?.derived) continue;
         niBucket[year] = {
           value: derived.value,
           date: sg.report_date,
           periodo: year,
-          unidade: "BRL",
+          unidade: "R$ M",
           pdf_id: sg.pdf_id,
           derived: true,
           formula: derived.formula,
           priceDate: derived.priceDate,
+          anchorBank: derived.anchorBank,
         };
       }
     }

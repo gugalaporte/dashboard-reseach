@@ -14,6 +14,7 @@ export function MetricCell({
   derived,
   formula,
   priceDate,
+  anchorBank,
 }: {
   value?: number | null;
   date?: string | null;
@@ -23,6 +24,7 @@ export function MetricCell({
   derived?: boolean;
   formula?: string;
   priceDate?: string;
+  anchorBank?: string;
 }) {
   if (value == null)
     return <span className="text-line/60 font-mono">–</span>;
@@ -30,12 +32,17 @@ export function MetricCell({
     .filter(Boolean)
     .join(" · ");
 
-  // Tooltip nativo HTML (sem dep). So aparece quando derivado.
-  const tooltip = derived
-    ? `Derivado · ${formula ?? "calculado"}${
-        priceDate ? ` · preco em ${formatDateShort(priceDate)}` : ""
-      }. Nao publicado pela corretora.`
-    : undefined;
+  // Tooltip nativo HTML (sem dep). So aparece quando derivado via EPS-ancora.
+  const tooltip =
+    derived && anchorBank
+      ? `Derivado de ${anchorBank} via EPS: NI ${anchorBank} × (EPS casa / EPS ${anchorBank}) em ${
+          priceDate ? formatDateShort(priceDate) : "—"
+        }. Nao publicado pela corretora.`
+      : derived
+        ? `Derivado · ${formula ?? "calculado"}${
+            priceDate ? ` em ${formatDateShort(priceDate)}` : ""
+          }. Nao publicado pela corretora.`
+        : undefined;
 
   return (
     <div

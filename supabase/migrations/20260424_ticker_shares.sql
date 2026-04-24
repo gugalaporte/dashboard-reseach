@@ -1,6 +1,6 @@
 -- Armazena acoes em circulacao por ticker.
--- Populado via scripts/backfill-shares.ts (back-calculo a partir de P/E + NI + price).
--- Nao e atualizado automaticamente: rodar o script manualmente.
+-- Tabela legada: antes era alimentada por script de backfill de acoes. O app
+-- deixou de usar; Net Income e derivado via ancora cross-casa (ver lib/derive-metrics).
 create table if not exists public.ticker_shares (
   ticker text primary key,
   shares_outstanding numeric not null,

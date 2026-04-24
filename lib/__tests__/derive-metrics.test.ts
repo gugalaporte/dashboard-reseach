@@ -1,88 +1,92 @@
 import { describe, it, expect } from "vitest";
-import { deriveNetIncome } from "../derive-metrics";
+import { deriveNetIncomeFromEPS } from "../derive-metrics";
 
-describe("deriveNetIncome", () => {
-  it("retorna valor publicado sem flag de derivado", () => {
-    const r = deriveNetIncome({
-      publishedNI: 900_000_000,
-      priceAtReport: 31.65,
-      priceDate: "2026-04-13",
-      pe: 17.5,
-      sharesOutstanding: 509_000_000,
+describe("deriveNetIncomeFromEPS", () => {
+  it("publicado retorna direto sem derivado", () => {
+    const r = deriveNetIncomeFromEPS({
+      publishedNI: 900,
+      anchorNI: 100,
+      anchorPE: 10,
+      anchorPrice: 50,
+      anchorBank: "BTG Pactual",
+      pe: 20,
+      priceAtReport: 80,
+      priceDate: "2026-01-15",
     });
     expect(r?.derived).toBe(false);
     expect(r?.source).toBe("published");
-    expect(r?.value).toBe(900_000_000);
+    expect(r?.value).toBe(900);
   });
 
-  it("calcula NI quando publicado e null (caso feliz ALOS3 BBI)", () => {
-    // marketCap = 31.65 * 509_000_000 = 16.109.850.000
-    // NI = 16.109.850.000 / 17.5 = 920.562.857,14
-    const r = deriveNetIncome({
+  it("cross-anchor feliz (ex: PETR4 BBI derivado de BTG)", () => {
+    // eps_anchor = 50/10 = 5, eps_other = 80/20 = 4 → NI = 100 * 4/5 = 80
+    const r = deriveNetIncomeFromEPS({
       publishedNI: null,
-      priceAtReport: 31.65,
-      priceDate: "2026-04-13",
-      pe: 17.5,
-      sharesOutstanding: 509_000_000,
+      anchorNI: 100,
+      anchorPE: 10,
+      anchorPrice: 50,
+      anchorBank: "BTG Pactual",
+      pe: 20,
+      priceAtReport: 80,
+      priceDate: "2026-01-15",
     });
     expect(r?.derived).toBe(true);
-    expect(r?.source).toBe("calculated");
-    expect(r?.priceDate).toBe("2026-04-13");
-    expect(r?.value).toBeGreaterThan(920_000_000);
-    expect(r?.value).toBeLessThan(921_000_000);
+    expect(r?.anchorBank).toBe("BTG Pactual");
+    expect(r?.value).toBeCloseTo(80, 6);
   });
 
-  it("null quando P/E e null", () => {
-    const r = deriveNetIncome({
+  it("null quando anchorNI e null", () => {
+    const r = deriveNetIncomeFromEPS({
       publishedNI: null,
-      priceAtReport: 31.65,
-      priceDate: "2026-04-13",
-      pe: null,
-      sharesOutstanding: 509_000_000,
+      anchorNI: null,
+      anchorPE: 10,
+      anchorPrice: 50,
+      anchorBank: "BTG Pactual",
+      pe: 20,
+      priceAtReport: 80,
+      priceDate: "2026-01-15",
     });
     expect(r).toBeNull();
   });
 
-  it("null quando shares e null", () => {
-    const r = deriveNetIncome({
+  it("null quando anchorPE e zero", () => {
+    const r = deriveNetIncomeFromEPS({
       publishedNI: null,
-      priceAtReport: 31.65,
-      priceDate: "2026-04-13",
-      pe: 17.5,
-      sharesOutstanding: null,
+      anchorNI: 100,
+      anchorPE: 0,
+      anchorPrice: 50,
+      anchorBank: "BTG Pactual",
+      pe: 20,
+      priceAtReport: 80,
+      priceDate: "2026-01-15",
     });
     expect(r).toBeNull();
   });
 
-  it("null quando P/E e zero (evita Infinity)", () => {
-    const r = deriveNetIncome({
+  it("null quando P/E da linha e zero", () => {
+    const r = deriveNetIncomeFromEPS({
       publishedNI: null,
-      priceAtReport: 31.65,
-      priceDate: "2026-04-13",
+      anchorNI: 100,
+      anchorPE: 10,
+      anchorPrice: 50,
+      anchorBank: "BTG Pactual",
       pe: 0,
-      sharesOutstanding: 509_000_000,
-    });
-    expect(r).toBeNull();
-  });
-
-  it("null quando P/E e negativo", () => {
-    const r = deriveNetIncome({
-      publishedNI: null,
-      priceAtReport: 31.65,
-      priceDate: "2026-04-13",
-      pe: -5,
-      sharesOutstanding: 509_000_000,
+      priceAtReport: 80,
+      priceDate: "2026-01-15",
     });
     expect(r).toBeNull();
   });
 
   it("null quando priceAtReport e null", () => {
-    const r = deriveNetIncome({
+    const r = deriveNetIncomeFromEPS({
       publishedNI: null,
+      anchorNI: 100,
+      anchorPE: 10,
+      anchorPrice: 50,
+      anchorBank: "BTG Pactual",
+      pe: 20,
       priceAtReport: null,
-      priceDate: null,
-      pe: 17.5,
-      sharesOutstanding: 509_000_000,
+      priceDate: "2026-01-15",
     });
     expect(r).toBeNull();
   });

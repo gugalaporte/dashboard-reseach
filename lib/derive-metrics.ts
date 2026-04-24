@@ -1,39 +1,48 @@
-// Derivacao de metricas a partir de identidades contabeis.
-// Hoje so Net Income. Outros podem ser adicionados seguindo o mesmo padrao.
+// Derivacao de Net Income por ancora cross-casa (EPS como ponte).
+// NI_B = NI_A × (EPS_B / EPS_A), com EPS = Preço / P/E na data do report.
 
-// Resultado de uma derivacao (ou de um valor ja publicado).
-// - derived=false: valor veio publicado no relatorio, sem calculo.
-// - derived=true: valor calculado via formula. Inputs usados ficam em formula/priceDate.
 export type DerivedValue = {
   value: number;
   derived: boolean;
   source?: "published" | "calculated";
-  formula?: string; // label humano pra tooltip.
+  formula?: string;
   priceDate?: string;
+  anchorBank?: string;
 };
 
-// Net Income = Market Cap / P/E = (Preco no report × Acoes) / P/E.
-// Retorna null quando nao da pra publicar valor (NI nulo e algum input faltando).
-// Nunca divide por zero: P/E<=0 -> null.
-export function deriveNetIncome(args: {
+export function deriveNetIncomeFromEPS(args: {
   publishedNI: number | null;
+  anchorNI: number | null;
+  anchorPE: number | null;
+  anchorPrice: number | null;
+  anchorBank: string | null;
+  pe: number | null;
   priceAtReport: number | null;
   priceDate: string | null;
-  pe: number | null;
-  sharesOutstanding: number | null;
 }): DerivedValue | null {
   if (args.publishedNI != null) {
     return { value: args.publishedNI, derived: false, source: "published" };
   }
+  if (
+    args.anchorNI == null ||
+    args.anchorPE == null ||
+    args.anchorPrice == null ||
+    args.anchorBank == null
+  )
+    return null;
+  if (args.anchorPE <= 0 || args.anchorPrice <= 0) return null;
   if (args.pe == null || args.pe <= 0) return null;
-  if (args.priceAtReport == null) return null;
-  if (args.sharesOutstanding == null) return null;
-  const marketCap = args.priceAtReport * args.sharesOutstanding;
+  if (args.priceAtReport == null || args.priceAtReport <= 0) return null;
+
+  const epsOther = args.priceAtReport / args.pe;
+  const epsAnchor = args.anchorPrice / args.anchorPE;
+
   return {
-    value: marketCap / args.pe,
+    value: args.anchorNI * (epsOther / epsAnchor),
     derived: true,
     source: "calculated",
-    formula: "Preco no report × Acoes / P/E",
+    formula: `NI ${args.anchorBank} × (EPS casa / EPS ${args.anchorBank})`,
     priceDate: args.priceDate ?? undefined,
+    anchorBank: args.anchorBank,
   };
 }

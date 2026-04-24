@@ -184,6 +184,7 @@ export function ResearchTable({
                 derived={c?.derived}
                 formula={c?.formula}
                 priceDate={c?.priceDate}
+                anchorBank={c?.anchorBank}
               />
             );
           },
