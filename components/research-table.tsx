@@ -37,12 +37,11 @@ const SOURCE_STYLE: Record<
   Safra: { border: "border-[#B8860B]", text: "text-[#B8860B]", label: "SAFRA" },
 };
 
-// Larguras fixas das colunas sticky (empresa + ticker). Em px, sem derivar de fonte.
+// Largura fixa da coluna sticky (empresa). Em px, sem derivar de fonte.
 const W_EMPRESA = 110;
-const W_TICKER = 90;
 
 // IDs das colunas "base" (nao-metricas). Usado para saber onde comeca cada grupo de metrica.
-const BASE_COLUMN_IDS = ["empresa", "ticker", "fonte", "rating", "price", "target"] as const;
+const BASE_COLUMN_IDS = ["empresa", "fonte", "rating", "price", "target"] as const;
 
 interface Props {
   data: ResearchRow[];
@@ -76,16 +75,6 @@ export function ResearchTable({
         header: "Empresa",
         cell: ({ row }) => (
           <span className="font-display text-[15px] text-ink">
-            {row.original.empresa}
-          </span>
-        ),
-      },
-      {
-        id: "ticker",
-        header: "Ticker",
-        accessorFn: (r) => r.empresa,
-        cell: ({ row }) => (
-          <span className="inline-flex items-center h-6 px-2 rounded-sm bg-navy/5 border border-navy/10 font-mono text-[11px] tracking-wide text-navy">
             {row.original.empresa}
           </span>
         ),
@@ -211,17 +200,14 @@ export function ResearchTable({
     getSortedRowModel: getSortedRowModel(),
   });
 
-  // Classes posicionais por column id (sticky para Empresa/Ticker).
+  // Classes posicionais por column id (sticky so para Empresa).
   function stickyClass(colId: string): string {
     if (colId === "empresa")
       return "sticky left-0 z-[1] bg-inherit sticky-shadow-right";
-    if (colId === "ticker") return "sticky z-[1] bg-inherit";
     return "";
   }
   function stickyStyle(colId: string): React.CSSProperties | undefined {
     if (colId === "empresa") return { minWidth: W_EMPRESA, width: W_EMPRESA };
-    if (colId === "ticker")
-      return { left: W_EMPRESA, minWidth: W_TICKER, width: W_TICKER };
     return undefined;
   }
 
@@ -242,7 +228,7 @@ export function ResearchTable({
                 .map((h) => {
                   const sort = h.column.getIsSorted();
                   const id = h.column.id;
-                  const isSticky = id === "empresa" || id === "ticker";
+                  const isSticky = id === "empresa";
                   return (
                     <TableHead
                       key={h.id}
@@ -373,7 +359,7 @@ export function ResearchTable({
                   >
                     {row.getVisibleCells().map((c) => {
                       const id = c.column.id;
-                      const isSticky = id === "empresa" || id === "ticker";
+                      const isSticky = id === "empresa";
                       // Separador visual antes do primeiro ano de cada metrica.
                       const isFirstYearOfMetric = selectedMetrics.some(
                         (mid) => id === `${mid}_${years[0]}`

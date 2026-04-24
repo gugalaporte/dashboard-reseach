@@ -1,11 +1,14 @@
 import { cn } from "@/lib/utils";
 import { formatDateShort } from "@/lib/format";
+import { classifyRating } from "@/lib/rating";
 
 // Dot + label em uppercase pequeno - estilo terminal, sem badge solido.
+// Cor da bolinha segue o bucket (bullish/bearish/neutral/unknown).
 function dotClass(rating: string): string {
-  if (rating === "Outperform") return "bg-emerald-600";
-  if (rating === "Underperform") return "bg-red-600";
-  if (rating === "Neutral") return "bg-ink/40";
+  const bucket = classifyRating(rating);
+  if (bucket === "bullish") return "bg-emerald-600";
+  if (bucket === "bearish") return "bg-red-600";
+  if (bucket === "neutral") return "bg-ink/40";
   return "bg-ink/20"; // Not Rated, Under Review, n.a.
 }
 

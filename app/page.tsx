@@ -6,9 +6,14 @@ import { CompanySearch, CompanyChips } from "@/components/company-search";
 import { SourceFilter } from "@/components/source-filter";
 import { DateFilter } from "@/components/date-filter";
 import { MetricsSelector } from "@/components/metrics-selector";
-import { SummaryCards } from "@/components/summary-cards";
 import { ResearchTable } from "@/components/research-table";
 import { CompanyDrawer } from "@/components/company-drawer";
+import {
+  SummaryCards,
+  type SummaryData,
+  type RatingFilterBucket,
+} from "@/components/summary-cards";
+import { classifyRating } from "@/lib/rating";
 import {
   detectYears,
   getEmpresas,
@@ -40,12 +45,15 @@ export default function DashboardPage() {
   const [empresas, setEmpresas] = React.useState<string[]>([]);
   const [fonte, setFonte] = React.useState<string | undefined>();
   const [periodo, setPeriodo] = React.useState<PeriodoFilter>("all");
+  // Bucket de rating ativo (clicando no summary card). null = sem filtro.
+  const [ratingBucket, setRatingBucket] =
+    React.useState<RatingFilterBucket | null>(null);
 
   const [empresasOpts, setEmpresasOpts] = React.useState<string[]>([]);
   const [allRows, setAllRows] = React.useState<ResearchRow[]>([]);
+  // stats ainda e usado apenas pela "Ultima atualizacao" do header superior.
   const [stats, setStats] = React.useState<SummaryStats | null>(null);
   const [loadingTable, setLoadingTable] = React.useState(true);
-  const [loadingStats, setLoadingStats] = React.useState(true);
 
   const [selectedEmpresa, setSelectedEmpresa] = React.useState<string | null>(
     null
@@ -58,8 +66,7 @@ export default function DashboardPage() {
   React.useEffect(() => {
     getSummaryStats()
       .then(setStats)
-      .catch((e) => console.error("stats:", e))
-      .finally(() => setLoadingStats(false));
+      .catch((e) => console.error("stats:", e));
 
     getEmpresas()
       .then(setEmpresasOpts)
@@ -77,13 +84,15 @@ export default function DashboardPage() {
     return allRows.filter((r) => {
       if (empresas.length > 0 && !empresas.includes(r.empresa)) return false;
       if (fonte && r.fonte !== fonte) return false;
+      if (ratingBucket && classifyRating(r.rating?.value) !== ratingBucket)
+        return false;
       if (minDate) {
         const d = latestActivityDate(r);
         if (!d || d < minDate) return false;
       }
       return true;
     });
-  }, [allRows, empresas, fonte, periodo]);
+  }, [allRows, empresas, fonte, periodo, ratingBucket]);
 
   // Consenso do drawer: todas as rows da empresa selecionada.
   const consensoDrawer = React.useMemo(
@@ -110,14 +119,40 @@ export default function DashboardPage() {
     [allRows, selectedMetrics]
   );
 
+  // Dados dos summary cards. empresas/metricas vem do stats global (DB),
+  // bullish/neutral contam recomendacoes (1 por par empresa+banco) em allRows.
+  const summary: SummaryData | null = React.useMemo(() => {
+    if (!stats) return null;
+    let bullish = 0;
+    let neutral = 0;
+    let bearish = 0;
+    for (const r of allRows) {
+      const bucket = classifyRating(r.rating?.value);
+      if (bucket === "bullish") bullish++;
+      else if (bucket === "neutral") neutral++;
+      else if (bucket === "bearish") bearish++;
+    }
+    return {
+      empresasCount: stats.empresasCount,
+      metricasTotal: stats.metricasTotal,
+      bullishCount: bullish,
+      neutralCount: neutral,
+      bearishCount: bearish,
+    };
+  }, [stats, allRows]);
+
   function clearFilters() {
     setEmpresas([]);
     setFonte(undefined);
     setPeriodo("all");
+    setRatingBucket(null);
   }
 
   const hasFilters =
-    empresas.length > 0 || fonte !== undefined || periodo !== "all";
+    empresas.length > 0 ||
+    fonte !== undefined ||
+    periodo !== "all" ||
+    ratingBucket !== null;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -144,7 +179,7 @@ export default function DashboardPage() {
               </span>
             </div>
           </div>
-          <div className="text-right leading-tight">
+          <div className="flex flex-col items-center text-center leading-tight">
             <div className="text-[10px] uppercase tracking-[0.18em] text-surface-soft/60">
               Última atualização
             </div>
@@ -199,9 +234,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <main className="flex-1 mx-auto max-w-[1600px] w-full px-8 py-8 space-y-8">
-        <SummaryCards stats={stats} isLoading={loadingStats} />
-
+      <main className="flex-1 mx-auto max-w-[1600px] w-full px-8 py-8 space-y-6">
+        <SummaryCards
+          data={summary}
+          isLoading={loadingTable && !summary}
+          activeBucket={ratingBucket}
+          onBucketChange={setRatingBucket}
+        />
         <ResearchTable
           data={rows}
           isLoading={loadingTable}
