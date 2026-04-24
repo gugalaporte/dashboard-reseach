@@ -17,6 +17,7 @@ import {
   type ResearchRow,
 } from "@/lib/queries";
 import { formatDateLong } from "@/lib/format";
+import { useLivePrices } from "@/lib/use-live-prices";
 import type { PeriodoFilter } from "@/types/research";
 
 // Converte periodo filtro em data minima (ISO yyyy-mm-dd).
@@ -81,6 +82,16 @@ export default function DashboardPage() {
         : [],
     [allRows, selectedEmpresa]
   );
+
+  // Tickers unicos visiveis no dashboard. Usamos allRows (nao as filtradas)
+  // para o mapa persistir mesmo quando o usuario filtra por fonte/periodo.
+  const uniqueTickers = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const r of allRows) set.add(r.empresa);
+    return Array.from(set);
+  }, [allRows]);
+
+  const { prices: livePrices } = useLivePrices(uniqueTickers);
 
   function clearFilters() {
     setEmpresas([]);
@@ -168,6 +179,7 @@ export default function DashboardPage() {
           data={rows}
           isLoading={loadingTable}
           onRowClick={(r) => setSelectedEmpresa(r.empresa)}
+          livePrices={livePrices}
         />
       </main>
 
@@ -175,6 +187,7 @@ export default function DashboardPage() {
         empresa={selectedEmpresa}
         consenso={consensoDrawer}
         onClose={() => setSelectedEmpresa(null)}
+        livePrices={livePrices}
       />
     </div>
   );

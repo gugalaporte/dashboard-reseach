@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getHistoricoEmpresa, getPdfsEmpresa } from "@/lib/queries";
 import type { ResearchRow } from "@/lib/queries";
 import type { MetricaRow, PdfDoc } from "@/types/research";
+import type { LivePricesMap } from "@/lib/use-live-prices";
 import { formatDateLong, formatDateShort, formatNumber, formatValue } from "@/lib/format";
 import { FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,9 +21,11 @@ interface Props {
   empresa: string | null;
   consenso: ResearchRow[];
   onClose: () => void;
+  // Cotacoes em tempo real. Indefinido/ausente -> usa fallback do banco.
+  livePrices?: LivePricesMap;
 }
 
-export function CompanyDrawer({ empresa, consenso, onClose }: Props) {
+export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props) {
   const [hist, setHist] = React.useState<MetricaRow[]>([]);
   const [pdfs, setPdfs] = React.useState<PdfDoc[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -99,7 +102,7 @@ export function CompanyDrawer({ empresa, consenso, onClose }: Props) {
           <Tabs defaultValue="metricas" className="flex flex-col">
             <TabsList className="mx-8 mt-6">
               <TabsTrigger value="metricas">Métricas</TabsTrigger>
-              <TabsTrigger value="consenso">Consenso</TabsTrigger>
+              <TabsTrigger value="consenso">Stock Guide</TabsTrigger>
               <TabsTrigger value="pdfs">Relatórios</TabsTrigger>
             </TabsList>
 
@@ -175,83 +178,123 @@ export function CompanyDrawer({ empresa, consenso, onClose }: Props) {
                   Sem cobertura de consenso disponível.
                 </div>
               ) : (
-                <div className="rounded-md border border-line overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-navy text-surface-soft/80 text-[10px] uppercase tracking-[0.14em]">
-                      <tr>
-                        <th className="text-left px-3 py-2 font-medium">Casa</th>
-                        <th className="text-left px-3 py-2 font-medium">
-                          Rating
-                        </th>
-                        <th className="text-right px-3 py-2 font-medium">
-                          Preço
-                        </th>
-                        <th className="text-right px-3 py-2 font-medium">
-                          Target
-                        </th>
-                        <th className="text-right px-3 py-2 font-medium">
-                          Upside
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {consenso.map((c, idx) => {
-                        const price = c.price?.value ?? null;
-                        const target = c.target;
-                        const upside =
-                          price != null && target && target.ccy === "R$"
-                            ? ((target.value - price) / price) * 100
+                <>
+                  {/* Destaque: preco atual unico (Yahoo) quando disponivel. */}
+                  {empresa && livePrices?.get(empresa) && (
+                    <div className="mb-4 flex items-baseline gap-3 rounded-md border border-line bg-surface-soft px-4 py-3">
+                      <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium">
+                        Preço atual
+                      </span>
+                      <span className="font-mono tabular text-lg text-ink">
+                        {formatValue(
+                          livePrices.get(empresa)!.price,
+                          "money",
+                          livePrices.get(empresa)!.currency === "BRL"
+                            ? "R$"
+                            : livePrices.get(empresa)!.currency
+                        )}
+                      </span>
+                      <span className="text-[10px] text-ink/40">
+                        Yahoo · delayed ~15min ·{" "}
+                        {new Date(
+                          livePrices.get(empresa)!.asOf
+                        ).toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  <div className="rounded-md border border-line overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-navy text-surface-soft/80 text-[10px] uppercase tracking-[0.14em]">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-medium">Casa</th>
+                          <th className="text-left px-3 py-2 font-medium">
+                            Rating
+                          </th>
+                          <th className="text-right px-3 py-2 font-medium">
+                            Preço
+                          </th>
+                          <th className="text-right px-3 py-2 font-medium">
+                            Target
+                          </th>
+                          <th className="text-right px-3 py-2 font-medium">
+                            Upside
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {consenso.map((c, idx) => {
+                          // Preco efetivo: live > preco historico da casa.
+                          const live = empresa
+                            ? livePrices?.get(empresa) ?? null
                             : null;
-                        return (
-                          <tr
-                            key={c.fonte}
-                            className={cn(
-                              "border-t border-line/60",
-                              idx % 2 === 1 && "bg-surface/40"
-                            )}
-                          >
-                            <td className="px-3 py-2 font-medium text-ink">
-                              {c.fonte}
-                            </td>
-                            <td className="px-3 py-2 text-ink/80">
-                              {c.rating?.value ?? (
-                                <span className="text-line/60 font-mono">–</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-right font-mono tabular">
-                              {price != null ? (
-                                formatValue(price, "money", "R$")
-                              ) : (
-                                <span className="text-line/60">–</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-right font-mono tabular">
-                              {target ? (
-                                formatValue(target.value, "money", target.ccy)
-                              ) : (
-                                <span className="text-line/60">–</span>
-                              )}
-                            </td>
-                            <td
+                          const price = live?.price ?? c.price?.value ?? null;
+                          const priceIsLive = live != null;
+                          const target = c.target;
+                          const upside =
+                            price != null && target && target.ccy === "R$"
+                              ? ((target.value - price) / price) * 100
+                              : null;
+                          return (
+                            <tr
+                              key={c.fonte}
                               className={cn(
-                                "px-3 py-2 text-right font-mono tabular",
-                                upside == null
-                                  ? "text-line/60"
-                                  : upside >= 0
-                                    ? "text-emerald-700"
-                                    : "text-red-700"
+                                "border-t border-line/60",
+                                idx % 2 === 1 && "bg-surface/40"
                               )}
                             >
-                              {upside != null
-                                ? `${upside >= 0 ? "+" : ""}${upside.toFixed(1)}%`
-                                : "–"}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              <td className="px-3 py-2 font-medium text-ink">
+                                {c.fonte}
+                              </td>
+                              <td className="px-3 py-2 text-ink/80">
+                                {c.rating?.value ?? (
+                                  <span className="text-line/60 font-mono">
+                                    –
+                                  </span>
+                                )}
+                              </td>
+                              <td
+                                className={cn(
+                                  "px-3 py-2 text-right font-mono tabular",
+                                  priceIsLive && "text-brand"
+                                )}
+                              >
+                                {price != null ? (
+                                  formatValue(price, "money", "R$")
+                                ) : (
+                                  <span className="text-line/60">–</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono tabular">
+                                {target ? (
+                                  formatValue(target.value, "money", target.ccy)
+                                ) : (
+                                  <span className="text-line/60">–</span>
+                                )}
+                              </td>
+                              <td
+                                className={cn(
+                                  "px-3 py-2 text-right font-mono tabular",
+                                  upside == null
+                                    ? "text-line/60"
+                                    : upside >= 0
+                                      ? "text-emerald-700"
+                                      : "text-red-700"
+                                )}
+                              >
+                                {upside != null
+                                  ? `${upside >= 0 ? "+" : ""}${upside.toFixed(1)}%`
+                                  : "–"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </TabsContent>
 

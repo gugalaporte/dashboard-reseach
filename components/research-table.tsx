@@ -24,6 +24,7 @@ import { RatingCell } from "@/components/rating-cell";
 import { TargetCell } from "@/components/target-cell";
 import { cn } from "@/lib/utils";
 import type { ResearchRow } from "@/lib/queries";
+import type { LivePricesMap } from "@/lib/use-live-prices";
 
 // Cores outline por corretora (borda + texto, sem fundo preenchido).
 const SOURCE_STYLE: Record<
@@ -63,9 +64,17 @@ interface Props {
   data: ResearchRow[];
   isLoading: boolean;
   onRowClick?: (row: ResearchRow) => void;
+  // Mapa ticker -> cotacao atual (Yahoo). Undefined se ainda nao carregou;
+  // ticker ausente no mapa = sem cotacao live -> usar fallback do banco.
+  livePrices?: LivePricesMap;
 }
 
-export function ResearchTable({ data, isLoading, onRowClick }: Props) {
+export function ResearchTable({
+  data,
+  isLoading,
+  onRowClick,
+  livePrices,
+}: Props) {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "empresa", desc: false },
   ]);
@@ -130,25 +139,55 @@ export function ResearchTable({ data, isLoading, onRowClick }: Props) {
       {
         id: "price",
         header: "Preço",
-        accessorFn: (r) => r.price?.value ?? null,
-        cell: ({ row }) => (
-          <MetricCell
-            value={row.original.price?.value}
-            date={row.original.price?.date}
-            format="money"
-          />
-        ),
+        // Ordenacao usa o valor efetivo (live quando existir).
+        accessorFn: (r) => {
+          const live = livePrices?.get(r.empresa)?.price;
+          return live ?? r.price?.value ?? null;
+        },
+        cell: ({ row }) => {
+          const live = livePrices?.get(row.original.empresa);
+          // Live disponivel -> mostra preco do Yahoo + sub "ao vivo · HH:MM"
+          if (live) {
+            const hhmm = new Date(live.asOf).toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+            return (
+              <MetricCell
+                value={live.price}
+                date={null}
+                periodo={`ao vivo · ${hhmm}`}
+                ccy={live.currency === "BRL" ? "R$" : live.currency}
+                format="money"
+              />
+            );
+          }
+          // Fallback: preco historico do banco.
+          return (
+            <MetricCell
+              value={row.original.price?.value}
+              date={row.original.price?.date}
+              format="money"
+            />
+          );
+        },
       },
       {
         id: "target",
         header: "Target",
         accessorFn: (r) => r.target?.value ?? null,
-        cell: ({ row }) => (
-          <TargetCell
-            target={row.original.target}
-            priceValue={row.original.price?.value ?? null}
-          />
-        ),
+        cell: ({ row }) => {
+          // Upside vs preco atual: usa live quando existir, senao preco da casa.
+          const live = livePrices?.get(row.original.empresa)?.price;
+          const effectivePrice = live ?? row.original.price?.value ?? null;
+          // Quando ha live, ignora o upside pre-calculado do banco (que usa
+          // preco historico) e deixa o TargetCell recalcular com o preco atual.
+          const target =
+            live != null && row.original.target
+              ? { ...row.original.target, upside: null }
+              : row.original.target;
+          return <TargetCell target={target} priceValue={effectivePrice} />;
+        },
       },
       {
         id: "pe",
@@ -255,7 +294,7 @@ export function ResearchTable({ data, isLoading, onRowClick }: Props) {
         ),
       },
     ],
-    []
+    [livePrices]
   );
 
   const table = useReactTable({
