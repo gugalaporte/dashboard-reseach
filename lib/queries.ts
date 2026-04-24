@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import type { MetricaRow, PdfDoc } from "@/types/research";
 import { canonicalMetricId, extractYear, type MetricId } from "./metrics";
+import { deriveNetIncome } from "./derive-metrics";
 
 // Fontes (corretoras) presentes na base.
 export const FONTES = ["BTG Pactual", "Bradesco BBI", "Safra"] as const;
@@ -16,12 +17,18 @@ export const ALLOWED_TICKERS = [
 ] as const;
 
 // Celula generica de metrica: valor + metadados de origem.
+// Flags opcionais `derived`/`formula`/`priceDate` sinalizam que a celula nao
+// veio publicada no relatorio e sim calculada (ver lib/derive-metrics.ts).
+// UI usa pra mudar estilo e mostrar tooltip explicativo.
 export type Cell = {
   value: number;
   date: string | null;
   periodo?: string | null;
   unidade?: string | null;
   pdf_id?: number | null;
+  derived?: boolean;
+  formula?: string;
+  priceDate?: string;
 };
 
 // Celula de target: extende Cell com moeda, upside opcional vindo do banco
@@ -66,6 +73,11 @@ type MetricRow = {
   pdf_id: number | null;
 };
 
+type TickerSharesRow = {
+  ticker: string;
+  shares_outstanding: number;
+};
+
 type StockGuideRow = {
   ticker: string;
   source_bank: Fonte;
@@ -88,12 +100,14 @@ type StockGuideRow = {
   upside: number | null;
 };
 
-// Principal: busca tudo em 2 selects e agrega no TS.
+// Principal: busca tudo em 3 selects e agrega no TS.
 // Filtra no banco pelos tickers permitidos (ALLOWED_TICKERS) para nao trafegar
 // dados de empresas que nao serao exibidas.
+// ticker_shares e opcional: se a tabela nao existe ou retorna erro, seguimos
+// sem derivar nada (linhas sem NI publicado ficam vazias como antes).
 export async function getResearch(): Promise<ResearchRow[]> {
   const tickers = ALLOWED_TICKERS as unknown as string[];
-  const [mRes, gRes] = await Promise.all([
+  const [mRes, gRes, sRes] = await Promise.all([
     supabase
       .from("dados_estruturados")
       .select("empresa,fonte,metrica,periodo,valor,unidade,data_relatorio,pdf_id")
@@ -111,10 +125,20 @@ export async function getResearch(): Promise<ResearchRow[]> {
       )
       .in("ticker", tickers)
       .returns<StockGuideRow[]>(),
+    supabase
+      .from("ticker_shares")
+      .select("ticker,shares_outstanding")
+      .in("ticker", tickers)
+      .returns<TickerSharesRow[]>(),
   ]);
   if (mRes.error) throw mRes.error;
   if (gRes.error) throw gRes.error;
-  return buildRows(mRes.data ?? [], gRes.data ?? []);
+  // Erro silencioso em ticker_shares: tabela pode nao existir ainda.
+  const sharesMap = new Map<string, number>();
+  if (!sRes.error && sRes.data) {
+    for (const s of sRes.data) sharesMap.set(s.ticker, Number(s.shares_outstanding));
+  }
+  return buildRows(mRes.data ?? [], gRes.data ?? [], sharesMap);
 }
 
 // Escolhe leitura mais recente: (1) maior data_relatorio,
@@ -182,7 +206,11 @@ function sgFallback(
   return undefined;
 }
 
-function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] {
+function buildRows(
+  metrics: MetricRow[],
+  guide: StockGuideRow[],
+  sharesByTicker: Map<string, number>
+): ResearchRow[] {
   // agrupa dados_estruturados por (empresa, fonte)
   const byPair = new Map<string, MetricRow[]>();
   for (const r of metrics) {
@@ -219,8 +247,7 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
 
     // Prioridade do target:
     //   1) stock_guide.target_price (dados novos, padronizados e recentes)
-    //   2) dados_estruturados.Target Price (legado, usado pelo BTG que
-    //      nao esta no stock_guide, e como reforco se SG nao tem)
+    //   2) dados_estruturados.Target Price (fallback legado quando SG nao tem)
     const target: TargetCell | undefined =
       sg?.target_price != null
         ? {
@@ -287,6 +314,39 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
             pdf_id: sg.pdf_id,
           };
         }
+      }
+    }
+
+    // Derivacao de Net Income.
+    // Para cada ano onde temos P/E mas NAO temos NI publicado, tenta calcular
+    // usando NI = preco_report × acoes / P/E. Usa SEMPRE o preco do report
+    // (sg.price / sg.price_date), nunca o preco live do Yahoo.
+    // Resultado fica marcado com derived=true pra UI distinguir visualmente.
+    const shares = sharesByTicker.get(empresa) ?? null;
+    const peBucket = byMetricYear["pe"];
+    const niBucket = (byMetricYear["net_income"] ??= {});
+    if (peBucket && sg) {
+      for (const year of Object.keys(peBucket)) {
+        if (niBucket[year]) continue; // ja temos NI publicado
+        const peCell = peBucket[year];
+        const derived = deriveNetIncome({
+          publishedNI: null,
+          priceAtReport: sg.price != null ? Number(sg.price) : null,
+          priceDate: sg.price_date,
+          pe: peCell?.value ?? null,
+          sharesOutstanding: shares,
+        });
+        if (!derived) continue;
+        niBucket[year] = {
+          value: derived.value,
+          date: sg.report_date,
+          periodo: year,
+          unidade: "BRL",
+          pdf_id: sg.pdf_id,
+          derived: true,
+          formula: derived.formula,
+          priceDate: derived.priceDate,
+        };
       }
     }
 

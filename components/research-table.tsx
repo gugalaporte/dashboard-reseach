@@ -181,6 +181,9 @@ export function ResearchTable({
                 value={c?.value}
                 date={c?.date ?? null}
                 format={def.format}
+                derived={c?.derived}
+                formula={c?.formula}
+                priceDate={c?.priceDate}
               />
             );
           },
