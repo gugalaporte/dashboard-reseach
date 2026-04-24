@@ -5,10 +5,12 @@ import Image from "next/image";
 import { CompanySearch, CompanyChips } from "@/components/company-search";
 import { SourceFilter } from "@/components/source-filter";
 import { DateFilter } from "@/components/date-filter";
+import { MetricsSelector } from "@/components/metrics-selector";
 import { SummaryCards } from "@/components/summary-cards";
 import { ResearchTable } from "@/components/research-table";
 import { CompanyDrawer } from "@/components/company-drawer";
 import {
+  detectYears,
   getEmpresas,
   getResearch,
   getSummaryStats,
@@ -18,6 +20,11 @@ import {
 } from "@/lib/queries";
 import { formatDateLong } from "@/lib/format";
 import { useLivePrices } from "@/lib/use-live-prices";
+import {
+  DEFAULT_METRICS,
+  YEARS_PER_METRIC,
+  type MetricId,
+} from "@/lib/metrics";
 import type { PeriodoFilter } from "@/types/research";
 
 // Converte periodo filtro em data minima (ISO yyyy-mm-dd).
@@ -43,6 +50,10 @@ export default function DashboardPage() {
   const [selectedEmpresa, setSelectedEmpresa] = React.useState<string | null>(
     null
   );
+
+  // Metricas selecionadas pelo usuario (1..3). Default: P/E, EV/EBITDA, DY.
+  const [selectedMetrics, setSelectedMetrics] =
+    React.useState<MetricId[]>(DEFAULT_METRICS);
 
   React.useEffect(() => {
     getSummaryStats()
@@ -92,6 +103,12 @@ export default function DashboardPage() {
   }, [allRows]);
 
   const { prices: livePrices } = useLivePrices(uniqueTickers);
+
+  // Anos dinamicos a partir das rows + metricas selecionadas (ex.: ["2026","2027","2028"]).
+  const years = React.useMemo(
+    () => detectYears(allRows, selectedMetrics, YEARS_PER_METRIC),
+    [allRows, selectedMetrics]
+  );
 
   function clearFilters() {
     setEmpresas([]);
@@ -170,6 +187,16 @@ export default function DashboardPage() {
             />
           </div>
         )}
+        {/* Segunda linha: seletor de metricas (max 3). Separada para caber as pills. */}
+        <div className="mx-auto max-w-[1600px] px-8 pb-3 flex items-center gap-3">
+          <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium shrink-0">
+            Métricas ({selectedMetrics.length}/3)
+          </span>
+          <MetricsSelector
+            value={selectedMetrics}
+            onChange={setSelectedMetrics}
+          />
+        </div>
       </div>
 
       <main className="flex-1 mx-auto max-w-[1600px] w-full px-8 py-8 space-y-8">
@@ -180,6 +207,8 @@ export default function DashboardPage() {
           isLoading={loadingTable}
           onRowClick={(r) => setSelectedEmpresa(r.empresa)}
           livePrices={livePrices}
+          selectedMetrics={selectedMetrics}
+          years={years}
         />
       </main>
 

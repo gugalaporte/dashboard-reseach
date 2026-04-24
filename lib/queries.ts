@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import type { MetricaRow, PdfDoc } from "@/types/research";
+import { canonicalMetricId, extractYear, type MetricId } from "./metrics";
 
 // Fontes (corretoras) presentes na base.
 export const FONTES = ["BTG Pactual", "Bradesco BBI", "Safra"] as const;
@@ -33,6 +34,9 @@ export type TargetCell = Cell & {
 };
 
 // Linha consumida pela tabela. Cada metrica vira uma celula opcional.
+// byMetricYear: matriz metrica canonica (id) x ano ("2026") -> Cell.
+// Usada pelas colunas dinamicas da tabela principal. Quando varios aliases
+// da mesma metrica tem valor para o mesmo ano, vence o mais recente.
 export type ResearchRow = {
   empresa: string;
   fonte: Fonte;
@@ -47,6 +51,7 @@ export type ResearchRow = {
   ebitda?: Cell;
   net_debt?: Cell;
   net_income?: Cell;
+  byMetricYear?: Partial<Record<MetricId, Record<string, Cell>>>;
 };
 
 // Linha bruta vinda do Supabase (dados_estruturados).
@@ -238,6 +243,53 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
             }
           : undefined;
 
+    // byMetricYear: metrica canonica -> ano -> Cell. Vence o mais recente quando
+    // ha duplicatas (aliases diferentes com o mesmo ano).
+    const byMetricYear: Partial<Record<MetricId, Record<string, Cell>>> = {};
+    for (const r of arr) {
+      const id = canonicalMetricId(r.metrica);
+      if (!id) continue;
+      const year = extractYear(r.periodo);
+      if (!year) continue;
+      const bucket = (byMetricYear[id] ??= {});
+      const existing = bucket[year];
+      const existingDate = existing?.date ?? "";
+      const thisDate = r.data_relatorio ?? "";
+      if (!existing || thisDate > existingDate) {
+        bucket[year] = cell(r)!;
+      }
+    }
+
+    // Fallback de stock_guide quando a metrica nao existe em dados_estruturados.
+    // Cobre apenas P/E, EV/EBITDA e DY (unicas colunas wide no stock_guide).
+    if (sg) {
+      const sgMap: Array<[MetricId, keyof StockGuideRow, string, string]> = [
+        ["pe", "pe_2025", "2025", "x"],
+        ["pe", "pe_2026", "2026", "x"],
+        ["pe", "pe_2027", "2027", "x"],
+        ["ev_ebitda", "ev_ebitda_2025", "2025", "x"],
+        ["ev_ebitda", "ev_ebitda_2026", "2026", "x"],
+        ["ev_ebitda", "ev_ebitda_2027", "2027", "x"],
+        ["dy", "div_yield_2025_pct", "2025", "%"],
+        ["dy", "div_yield_2026_pct", "2026", "%"],
+        ["dy", "div_yield_2027_pct", "2027", "%"],
+      ];
+      for (const [mid, key, year, unit] of sgMap) {
+        const v = sg[key] as number | null;
+        if (v == null) continue;
+        const bucket = (byMetricYear[mid] ??= {});
+        if (!bucket[year]) {
+          bucket[year] = {
+            value: Number(v),
+            date: sg.report_date,
+            periodo: year,
+            unidade: unit,
+            pdf_id: sg.pdf_id,
+          };
+        }
+      }
+    }
+
     out.push({
       empresa,
       fonte,
@@ -257,6 +309,7 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
       ebitda: pick("EBITDA"),
       net_debt: pick("Net Debt"),
       net_income: pick("Net Income"),
+      byMetricYear,
     });
   }
 
@@ -306,6 +359,41 @@ function applyTargetFallback(
       upside: localUpside,
     };
   }
+}
+
+// Decide os N anos exibidos nas sub-colunas dinamicas.
+// Estrategia: pega anos >= ano atual (estimativas), conta frequencia entre
+// TODAS as linhas (nas metricas selecionadas), ordena por ano asc e pega os N.
+// Se nao tiver anos futuros suficientes, completa com os anos mais frequentes.
+export function detectYears(
+  rows: ResearchRow[],
+  metrics: MetricId[],
+  count: number
+): string[] {
+  const freq = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.byMetricYear) continue;
+    for (const mid of metrics) {
+      const bucket = r.byMetricYear[mid];
+      if (!bucket) continue;
+      for (const year of Object.keys(bucket)) {
+        freq.set(year, (freq.get(year) ?? 0) + 1);
+      }
+    }
+  }
+  const currentYear = new Date().getFullYear();
+  // Prioriza anos futuros (estimativas). Ordem ascendente para manter 2026,2027,2028.
+  const future = [...freq.keys()]
+    .filter((y) => Number(y) >= currentYear)
+    .sort();
+  const picked = future.slice(0, count);
+  if (picked.length === count) return picked;
+  // Completa com os anos mais frequentes restantes.
+  const rest = [...freq.entries()]
+    .filter(([y]) => !picked.includes(y))
+    .sort((a, b) => b[1] - a[1])
+    .map(([y]) => y);
+  return [...picked, ...rest].slice(0, count);
 }
 
 // Data mais recente observada em qualquer celula da linha.
