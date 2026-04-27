@@ -5,18 +5,20 @@ import YahooFinance from "yahoo-finance2";
 // suppressNotices evita o aviso de survey do mantenedor a cada boot.
 const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
 
-// Cotacoes em tempo real (delayed ~15min para B3) via Yahoo Finance.
-// Rodamos server-side porque Yahoo exige cookie/crumb + CORS bloqueia browser.
-// yahoo-finance2 resolve o handshake sozinho; so precisamos usar sufixo .SA.
+// Cotacoes Yahoo (B3: delayed ~15min). Usamos fechamento do ultimo pregão
+// completo em horário de pregão; fora do pregão, o preço regular já reflete
+// o fechamento do dia. Rodamos server-side (cookie/crumb + sem CORS no browser).
 
 export type LiveQuote = {
   ticker: string; // ex.: "AXIA3"
   price: number;
   currency: string; // geralmente "BRL"
-  asOf: string; // ISO timestamp
+  asOf: string; // ISO (timestamp de referencia do quote Yahoo)
+  /** true = preço é regularMarketPreviousClose (pregão anterior ainda aberto). */
+  isPreviousSessionClose?: boolean;
 };
 
-// TTL curto: suficiente para "tempo real" de dashboard sem bombardear Yahoo.
+// TTL curto: refresh periodico sem bombardear Yahoo.
 const CACHE_TTL_MS = 60_000;
 
 type CacheEntry = { quote: LiveQuote; expires: number };
@@ -61,9 +63,59 @@ export async function getLiveQuotes(
   type RawQuote = {
     symbol?: unknown;
     regularMarketPrice?: unknown;
+    regularMarketPreviousClose?: unknown;
     regularMarketTime?: unknown;
+    marketState?: unknown;
     currency?: unknown;
   };
+
+  function pickSessionClose(q: RawQuote, nowMs: number): Omit<LiveQuote, "ticker" | "currency"> | null {
+    const state = String(q.marketState ?? "").toUpperCase();
+    const cur =
+      typeof q.regularMarketPrice === "number" && Number.isFinite(q.regularMarketPrice)
+        ? q.regularMarketPrice
+        : null;
+    const prev =
+      typeof q.regularMarketPreviousClose === "number" &&
+      Number.isFinite(q.regularMarketPreviousClose)
+        ? q.regularMarketPreviousClose
+        : null;
+
+    const rmt = q.regularMarketTime;
+    const asOfMs =
+      rmt instanceof Date
+        ? rmt.getTime()
+        : typeof rmt === "number"
+          ? rmt * 1000
+          : nowMs;
+
+    // Em pregão (ou pré): o "ultimo fechamento" publicado é o do pregão anterior.
+    const intraday =
+      state === "REGULAR" || state === "PRE" || state === "PREPRE" || state === "OPEN";
+
+    if (intraday && prev != null) {
+      return {
+        price: prev,
+        asOf: new Date(asOfMs).toISOString(),
+        isPreviousSessionClose: true,
+      };
+    }
+    if (cur != null) {
+      return {
+        price: cur,
+        asOf: new Date(asOfMs).toISOString(),
+        isPreviousSessionClose: false,
+      };
+    }
+    if (prev != null) {
+      return {
+        price: prev,
+        asOf: new Date(asOfMs).toISOString(),
+        isPreviousSessionClose: false,
+      };
+    }
+    return null;
+  }
 
   try {
     // quote() tem overloads complicados que fazem o TS narrowar p/ never;
@@ -74,27 +126,16 @@ export async function getLiveQuotes(
       : [quotes as RawQuote];
 
     for (const q of list) {
-      if (
-        !q ||
-        typeof q.symbol !== "string" ||
-        typeof q.regularMarketPrice !== "number"
-      ) {
-        continue;
-      }
+      if (!q || typeof q.symbol !== "string") continue;
       const ticker = fromYahooSymbol(q.symbol);
-      const rmt = q.regularMarketTime;
-      // regularMarketTime as vezes vem como Date (lib converte), as vezes number.
-      const asOfMs =
-        rmt instanceof Date
-          ? rmt.getTime()
-          : typeof rmt === "number"
-            ? rmt * 1000
-            : now;
+      const picked = pickSessionClose(q, now);
+      if (!picked) continue;
       const live: LiveQuote = {
         ticker,
-        price: q.regularMarketPrice,
+        price: picked.price,
         currency: typeof q.currency === "string" ? q.currency : "BRL",
-        asOf: new Date(asOfMs).toISOString(),
+        asOf: picked.asOf,
+        isPreviousSessionClose: picked.isPreviousSessionClose,
       };
       result.set(ticker, live);
       cache.set(ticker, { quote: live, expires: now + CACHE_TTL_MS });

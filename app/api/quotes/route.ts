@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getLiveQuotes } from "@/lib/yahoo-quotes";
 
 // API Route: GET /api/quotes?tickers=AXIA3,PETR4
-// Retorna { "AXIA3": {price, currency, asOf}, ... }
+// Retorna { "AXIA3": { price, currency, asOf, isPreviousSessionClose? }, ... }
+// Preço = fechamento do último pregão relevante (ver lib/yahoo-quotes.ts).
 // Node runtime (nao Edge): yahoo-finance2 usa cookies/tough-cookie.
 
 export const runtime = "nodejs";
@@ -27,10 +28,22 @@ export async function GET(req: Request) {
 
   const quotes = await getLiveQuotes(tickers);
 
-  const out: Record<string, { price: number; currency: string; asOf: string }> =
-    {};
+  const out: Record<
+    string,
+    {
+      price: number;
+      currency: string;
+      asOf: string;
+      isPreviousSessionClose?: boolean;
+    }
+  > = {};
   for (const [t, q] of quotes) {
-    out[t] = { price: q.price, currency: q.currency, asOf: q.asOf };
+    out[t] = {
+      price: q.price,
+      currency: q.currency,
+      asOf: q.asOf,
+      ...(q.isPreviousSessionClose ? { isPreviousSessionClose: true } : {}),
+    };
   }
 
   return NextResponse.json(out, {

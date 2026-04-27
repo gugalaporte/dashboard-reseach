@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import type { MetricaRow, PdfDoc } from "@/types/research";
 import { canonicalMetricId, extractYear, type MetricId } from "./metrics";
-import { deriveNetIncomeFromEPS } from "./derive-metrics";
+import { deriveEPSFromPriceAndPE, deriveNetIncomeFromEPS } from "./derive-metrics";
 
 // Fontes (corretoras) presentes na base.
 export const FONTES = ["BTG Pactual", "Bradesco BBI", "Safra"] as const;
@@ -31,6 +31,8 @@ export type Cell = {
   priceDate?: string;
   // Banco ancora usado na derivacao de Net Income (EPS cross-anchor).
   anchorBank?: string;
+  // Metadados do tooltip quando EPS veio de preço/P/E do stock_guide.
+  epsDerivation?: { reportPrice: number; pe: number; peDate: string };
 };
 
 // Celula de target: extende Cell com moeda, upside opcional vindo do banco
@@ -218,6 +220,33 @@ function isNiR$Mn(r: MetricRow): boolean {
   return true;
 }
 
+// EPS publicado deve ser BRL (mesma regra de exclusao de FX que NI).
+function isEpsPublishedBrl(unidade: string | null | undefined): boolean {
+  const u = (unidade ?? "").toLowerCase();
+  if (u.includes("us$") || u.includes("usd") || u.includes("dólar") || u.includes("dolar"))
+    return false;
+  return true;
+}
+
+// Gap entre data do EPS e report_date do guide; "true" = dentro de 30 dias.
+function epsWithin30OfReport(
+  epsDate: string | null | undefined,
+  reportDate: string | null | undefined
+): boolean {
+  if (!reportDate || !epsDate) return true;
+  const a = new Date(epsDate).getTime();
+  const b = new Date(reportDate).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b)) return true;
+  return Math.abs(a - b) <= 30 * 86400000;
+}
+
+// Mantemos EPS estruturado em R$; se ambas as datas existem, exige gap <= 30d.
+function keepPublishedEps(c: Cell, reportDate: string | null): boolean {
+  if (!isEpsPublishedBrl(c.unidade)) return false;
+  if (c.date && reportDate) return epsWithin30OfReport(c.date, reportDate);
+  return true;
+}
+
 // Escolhe a linha de NI cuja data_relatorio fica mais proxima de report_date do guide.
 function pickNIByClosestReport(
   niRows: MetricRow[],
@@ -396,6 +425,45 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
             pdf_id: sg.pdf_id,
           };
         }
+      }
+    }
+
+    // EPS derivado do stock_guide quando nao ha EPS publicado em R$ alinhado ao report.
+    const peForEps = byMetricYear["pe"];
+    if (peForEps && sg) {
+      const epsBucket = (byMetricYear["eps"] ??= {});
+      const reportDate = sg.report_date;
+      for (const year of Object.keys(peForEps)) {
+        const existing = epsBucket[year];
+        if (existing && keepPublishedEps(existing, reportDate)) continue;
+
+        const peCell = peForEps[year];
+        if (peCell == null || peCell.value == null || peCell.value <= 0) continue;
+        if (sg.price == null || Number(sg.price) <= 0) continue;
+
+        const derived = deriveEPSFromPriceAndPE({
+          publishedEPS: null,
+          priceAtReport: Number(sg.price),
+          pe: peCell.value,
+          peDate: reportDate ?? "",
+        });
+        if (!derived.derived || Number.isNaN(derived.value)) continue;
+
+        epsBucket[year] = {
+          value: derived.value,
+          date: reportDate,
+          periodo: year,
+          unidade: "R$",
+          pdf_id: sg.pdf_id,
+          derived: true,
+          formula: derived.formula,
+          priceDate: derived.priceDate,
+          epsDerivation: {
+            reportPrice: Number(sg.price),
+            pe: peCell.value,
+            peDate: reportDate ?? "",
+          },
+        };
       }
     }
 

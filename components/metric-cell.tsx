@@ -1,4 +1,9 @@
-import { formatDateShort, formatValue, type Format } from "@/lib/format";
+import {
+  formatDateShort,
+  formatNumber,
+  formatValue,
+  type Format,
+} from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // Celula de metrica: valor principal em cima (mono tabular), subtitulo com
@@ -15,6 +20,7 @@ export function MetricCell({
   formula,
   priceDate,
   anchorBank,
+  epsDerivedInfo,
 }: {
   value?: number | null;
   date?: string | null;
@@ -25,6 +31,8 @@ export function MetricCell({
   formula?: string;
   priceDate?: string;
   anchorBank?: string;
+  /** Tooltip especifico quando EPS veio de preço/P/E do report. */
+  epsDerivedInfo?: { reportPrice: number; pe: number; peDate: string };
 }) {
   if (value == null)
     return <span className="text-line/60 font-mono">–</span>;
@@ -32,9 +40,15 @@ export function MetricCell({
     .filter(Boolean)
     .join(" · ");
 
-  // Tooltip nativo HTML (sem dep). So aparece quando derivado via EPS-ancora.
-  const tooltip =
-    derived && anchorBank
+  // Tooltip nativo HTML (sem dep).
+  const tooltip = epsDerivedInfo
+    ? `EPS derivado: Preço no report (R$ ${formatNumber(epsDerivedInfo.reportPrice, 2)}) / P/E (${formatNumber(
+        epsDerivedInfo.pe,
+        1
+      )}x) em ${
+        epsDerivedInfo.peDate ? formatDateShort(epsDerivedInfo.peDate) : "—"
+      }. Nao publicado pela corretora.`
+    : derived && anchorBank
       ? `Derivado de ${anchorBank} via EPS: NI ${anchorBank} × (EPS casa / EPS ${anchorBank}) em ${
           priceDate ? formatDateShort(priceDate) : "—"
         }. Nao publicado pela corretora.`

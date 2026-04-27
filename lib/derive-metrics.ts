@@ -46,3 +46,37 @@ export function deriveNetIncomeFromEPS(args: {
     anchorBank: args.anchorBank,
   };
 }
+
+// EPS ausente em dados_estruturados: aproxima por preço e P/E do mesmo report.
+export function deriveEPSFromPriceAndPE({
+  publishedEPS,
+  priceAtReport,
+  pe,
+  peDate,
+}: {
+  publishedEPS?: number | null;
+  priceAtReport: number;
+  pe: number;
+  peDate: string;
+}): { value: number; derived: boolean; formula?: string; priceDate?: string } {
+  if (publishedEPS != null) return { value: publishedEPS, derived: false };
+  if (!priceAtReport || !pe) return { value: NaN, derived: false };
+  return {
+    value: priceAtReport / pe,
+    derived: true,
+    formula: "Preço no report / P/E",
+    priceDate: peDate,
+  };
+}
+
+// P/E implicito com preço de fechamento (Yahoo) e EPS (publicado ou derivado).
+export function deriveCurrentPE({
+  eps,
+  livePrice,
+}: {
+  eps: number;
+  livePrice: number;
+}): number | null {
+  if (!eps || !livePrice) return null;
+  return livePrice / eps;
+}

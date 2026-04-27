@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { deriveNetIncomeFromEPS } from "../derive-metrics";
+import {
+  deriveCurrentPE,
+  deriveEPSFromPriceAndPE,
+  deriveNetIncomeFromEPS,
+} from "../derive-metrics";
 
 describe("deriveNetIncomeFromEPS", () => {
   it("publicado retorna direto sem derivado", () => {
@@ -89,5 +93,38 @@ describe("deriveNetIncomeFromEPS", () => {
       priceDate: "2026-01-15",
     });
     expect(r).toBeNull();
+  });
+});
+
+describe("deriveEPSFromPriceAndPE", () => {
+  it("EPS publicado retorna valor e derived=false", () => {
+    const r = deriveEPSFromPriceAndPE({
+      publishedEPS: 3.5,
+      priceAtReport: 45.83,
+      pe: 9.5,
+      peDate: "2026-01-10",
+    });
+    expect(r.derived).toBe(false);
+    expect(r.value).toBe(3.5);
+  });
+
+  it("EPS null com preço e P/E válidos deriva price/pe", () => {
+    const r = deriveEPSFromPriceAndPE({
+      publishedEPS: null,
+      priceAtReport: 45.83,
+      pe: 9.5,
+      peDate: "2026-01-10",
+    });
+    expect(r.derived).toBe(true);
+    expect(r.value).toBeCloseTo(45.83 / 9.5, 6);
+    expect(r.formula).toBe("Preço no report / P/E");
+  });
+});
+
+describe("deriveCurrentPE", () => {
+  it("ITUB4 exemplo: eps 4.82 e live 44.37 → ~9.2x", () => {
+    const pe = deriveCurrentPE({ eps: 4.82, livePrice: 44.37 });
+    expect(pe).not.toBeNull();
+    expect(pe!).toBeCloseTo(9.2, 1);
   });
 });

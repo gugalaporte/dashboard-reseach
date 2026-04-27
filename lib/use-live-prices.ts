@@ -2,13 +2,15 @@
 
 import * as React from "react";
 
-// Hook que busca cotacoes em tempo real (via /api/quotes) e revalida
-// periodicamente. Trata lista estavel: so refaz fetch se conjunto mudar.
+// Hook que busca fechamentos Yahoo (via /api/quotes) e revalida periodicamente.
+// Trata lista estavel: so refaz fetch se conjunto mudar.
 
 export type LivePrice = {
   price: number;
   currency: string;
   asOf: string; // ISO
+  /** Ver lib/yahoo-quotes: true durante pregão = fechamento do pregão anterior. */
+  isPreviousSessionClose?: boolean;
 };
 
 export type LivePricesMap = Map<string, LivePrice>;

@@ -24,7 +24,9 @@ import { RatingCell } from "@/components/rating-cell";
 import { TargetCell } from "@/components/target-cell";
 import { cn } from "@/lib/utils";
 import type { ResearchRow } from "@/lib/queries";
-import type { LivePricesMap } from "@/lib/use-live-prices";
+import { deriveCurrentPE } from "@/lib/derive-metrics";
+import { formatDateShort, formatValue } from "@/lib/format";
+import type { LivePrice, LivePricesMap } from "@/lib/use-live-prices";
 import { getMetricDef, type MetricId } from "@/lib/metrics";
 
 // Cores outline por corretora (borda + texto, sem fundo preenchido).
@@ -42,6 +44,12 @@ const W_EMPRESA = 110;
 
 // IDs das colunas "base" (nao-metricas). Usado para saber onde comeca cada grupo de metrica.
 const BASE_COLUMN_IDS = ["empresa", "fonte", "rating", "price", "target"] as const;
+
+// Subtitulo da cotacao Yahoo (fechamento, nao intraday).
+function yahooCloseSubtitle(q: LivePrice): string {
+  if (q.isPreviousSessionClose) return "últ. fech.";
+  return `fech. ${formatDateShort(q.asOf)}`;
+}
 
 interface Props {
   data: ResearchRow[];
@@ -124,15 +132,11 @@ export function ResearchTable({
         cell: ({ row }) => {
           const live = livePrices?.get(row.original.empresa);
           if (live) {
-            const hhmm = new Date(live.asOf).toLocaleTimeString("pt-BR", {
-              hour: "2-digit",
-              minute: "2-digit",
-            });
             return (
               <MetricCell
                 value={live.price}
                 date={null}
-                periodo={`ao vivo · ${hhmm}`}
+                periodo={yahooCloseSubtitle(live)}
                 ccy={live.currency === "BRL" ? "R$" : live.currency}
                 format="money"
               />
@@ -185,10 +189,68 @@ export function ResearchTable({
                 formula={c?.formula}
                 priceDate={c?.priceDate}
                 anchorBank={c?.anchorBank}
+                epsDerivedInfo={mid === "eps" ? c?.epsDerivation : undefined}
               />
             );
           },
         });
+        // P/E com ultimo fechamento Yahoo / EPS (publicado ou derivado).
+        if (mid === "pe") {
+          metricCols.push({
+            id: `pe_live_${year}`,
+            header: "Atual",
+            accessorFn: (r) => {
+              const eps = r.byMetricYear?.eps?.[year]?.value;
+              const closePx = livePrices?.get(r.empresa)?.price;
+              return deriveCurrentPE({
+                eps: eps ?? NaN,
+                livePrice: closePx ?? NaN,
+              });
+            },
+            cell: ({ row }) => {
+              const peReport = row.original.byMetricYear?.pe?.[year];
+              const epsCell = row.original.byMetricYear?.eps?.[year];
+              const yahoo = livePrices?.get(row.original.empresa);
+              const closePx = yahoo?.price;
+              const epsVal = epsCell?.value;
+              const current =
+                epsVal != null && !Number.isNaN(epsVal) && closePx != null
+                  ? deriveCurrentPE({ eps: epsVal, livePrice: closePx })
+                  : null;
+              if (current == null) {
+                return (
+                  <span className="text-line/60 font-mono tabular text-[13px]">—</span>
+                );
+              }
+              const reportPe = peReport?.value;
+              const toneClass =
+                reportPe != null && reportPe > 0
+                  ? current < reportPe
+                    ? "text-green-600"
+                    : current > reportPe
+                      ? "text-red-600"
+                      : "text-ink"
+                  : "text-ink";
+              return (
+                <div
+                  className="flex flex-col leading-tight items-end"
+                  title="P/E com último fechamento Yahoo / EPS"
+                >
+                  <span
+                    className={cn("font-mono tabular text-[13px]", toneClass)}
+                  >
+                    {formatValue(current, "mult")}
+                  </span>
+                  {yahoo && (
+                    <span className="text-[10px] font-light tracking-tight text-ink/50 mt-1 tabular">
+                      {yahooCloseSubtitle(yahoo)}
+                    </span>
+                  )}
+                </div>
+              );
+            },
+          });
+        }
       }
     }
 
@@ -262,10 +324,11 @@ export function ResearchTable({
               {/* Agrupadores: 1 por metrica selecionada, colSpan=years.length */}
               {selectedMetrics.map((mid) => {
                 const def = getMetricDef(mid);
+                const span = mid === "pe" ? years.length * 2 : years.length;
                 return (
                   <TableHead
                     key={`group_${mid}`}
-                    colSpan={years.length}
+                    colSpan={span}
                     className={cn(
                       "h-10 text-[11px] uppercase tracking-[0.14em] font-medium",
                       "bg-navy text-surface-soft border-b border-ink/40",
@@ -281,13 +344,13 @@ export function ResearchTable({
             {selectedMetrics.length > 0 && (
               <tr>
                 {selectedMetrics.flatMap((mid) =>
-                  years.map((year, yIdx) => {
+                  years.flatMap((year, yIdx) => {
                     const h = leafHeaders.find(
                       (x) => x.column.id === `${mid}_${year}`
                     );
-                    if (!h) return null;
+                    if (!h) return [];
                     const sort = h.column.getIsSorted();
-                    return (
+                    const headPe = (
                       <TableHead
                         key={h.id}
                         onClick={h.column.getToggleSortingHandler()}
@@ -309,6 +372,34 @@ export function ResearchTable({
                         </span>
                       </TableHead>
                     );
+                    if (mid !== "pe") return [headPe];
+                    const hLive = leafHeaders.find(
+                      (x) => x.column.id === `pe_live_${year}`
+                    );
+                    const sortLive = hLive?.column.getIsSorted();
+                    const headLive = hLive ? (
+                      <TableHead
+                        key={hLive.id}
+                        onClick={hLive.column.getToggleSortingHandler()}
+                        title="P/E com último fechamento / EPS"
+                        className={cn(
+                          "group h-9 text-[10px] uppercase tracking-[0.12em] font-medium text-surface-soft/70",
+                          "bg-navy border-b border-ink/40 select-none cursor-pointer text-center"
+                        )}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          atual
+                          {sortLive === "asc" ? (
+                            <ArrowUp className="h-3 w-3 opacity-100" />
+                          ) : sortLive === "desc" ? (
+                            <ArrowDown className="h-3 w-3 opacity-100" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                          )}
+                        </span>
+                      </TableHead>
+                    ) : null;
+                    return [headPe, headLive].filter(Boolean) as React.ReactElement[];
                   })
                 )}
               </tr>

@@ -21,7 +21,7 @@ interface Props {
   empresa: string | null;
   consenso: ResearchRow[];
   onClose: () => void;
-  // Cotacoes em tempo real. Indefinido/ausente -> usa fallback do banco.
+  // Fechamento Yahoo (ultimo pregão). Ausente -> fallback preço do banco.
   livePrices?: LivePricesMap;
 }
 
@@ -179,11 +179,11 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
                 </div>
               ) : (
                 <>
-                  {/* Destaque: preco atual unico (Yahoo) quando disponivel. */}
+                  {/* Destaque: ultimo fechamento Yahoo quando disponivel. */}
                   {empresa && livePrices?.get(empresa) && (
                     <div className="mb-4 flex items-baseline gap-3 rounded-md border border-line bg-surface-soft px-4 py-3">
                       <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium">
-                        Preço atual
+                        Últ. fechamento
                       </span>
                       <span className="font-mono tabular text-lg text-ink">
                         {formatValue(
@@ -196,12 +196,9 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
                       </span>
                       <span className="text-[10px] text-ink/40">
                         Yahoo · delayed ~15min ·{" "}
-                        {new Date(
-                          livePrices.get(empresa)!.asOf
-                        ).toLocaleTimeString("pt-BR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {livePrices.get(empresa)!.isPreviousSessionClose
+                          ? "pregão anterior"
+                          : formatDateShort(livePrices.get(empresa)!.asOf)}
                       </span>
                     </div>
                   )}
@@ -226,12 +223,12 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
                       </thead>
                       <tbody>
                         {consenso.map((c, idx) => {
-                          // Preco efetivo: live > preco historico da casa.
-                          const live = empresa
+                          // Preco efetivo: fechamento Yahoo > preco historico da casa.
+                          const yClose = empresa
                             ? livePrices?.get(empresa) ?? null
                             : null;
-                          const price = live?.price ?? c.price?.value ?? null;
-                          const priceIsLive = live != null;
+                          const price = yClose?.price ?? c.price?.value ?? null;
+                          const priceIsLive = yClose != null;
                           const target = c.target;
                           const upside =
                             price != null && target && target.ccy === "R$"
