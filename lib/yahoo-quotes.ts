@@ -147,3 +147,100 @@ export async function getLiveQuotes(
 
   return result;
 }
+
+// --- Fechamento diário Yahoo na (ou antes da) data do relatório (EPS quando guide sem preço) ---
+
+const HIST_CACHE = new Map<string, { price: number; expires: number }>();
+const HIST_TTL_MS = 6 * 60 * 60 * 1000; // 6h: dados históricos estáveis
+
+function candleDayIsoUtc(date: unknown): string {
+  const d = date instanceof Date ? date : new Date(String(date));
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+/** Último pregão com data <= reportIso (yyyy-mm-dd), usando close do candle. */
+function pickCloseOnOrBefore(
+  quotes: Array<{ date?: unknown; close?: unknown; adjclose?: unknown }>,
+  reportIso: string
+): number | null {
+  let bestDay = "";
+  let bestClose: number | null = null;
+  for (const q of quotes) {
+    const day = candleDayIsoUtc(q.date);
+    if (!day || day > reportIso) continue;
+    const c =
+      typeof q.close === "number" && Number.isFinite(q.close)
+        ? q.close
+        : typeof q.adjclose === "number" && Number.isFinite(q.adjclose)
+          ? q.adjclose
+          : null;
+    if (c == null) continue;
+    if (day >= bestDay) {
+      bestDay = day;
+      bestClose = c;
+    }
+  }
+  return bestClose;
+}
+
+export async function getCloseOnOrBeforeReportDate(
+  ticker: string,
+  reportIsoDate: string
+): Promise<number | null> {
+  const key = `${ticker}|${reportIsoDate}`;
+  const hit = HIST_CACHE.get(key);
+  if (hit && hit.expires > Date.now()) return hit.price;
+
+  const sym = toYahooSymbol(ticker);
+  const end = new Date(reportIsoDate + "T12:00:00.000Z");
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - 45);
+
+  try {
+    const chart = (await yahooFinance.chart(sym, {
+      period1: start,
+      period2: new Date(end.getTime() + 5 * 86400000),
+      interval: "1d",
+    })) as {
+      quotes?: Array<{ date?: unknown; close?: unknown; adjclose?: unknown }>;
+    };
+    const quotes = chart.quotes ?? [];
+    const price = pickCloseOnOrBefore(quotes, reportIsoDate);
+    if (price != null) {
+      HIST_CACHE.set(key, { price, expires: Date.now() + HIST_TTL_MS });
+    }
+    return price;
+  } catch (err) {
+    console.error("[yahoo-quotes] chart report-date", ticker, reportIsoDate, err);
+    return null;
+  }
+}
+
+export async function batchGetClosesForReportDates(
+  pairs: { ticker: string; reportDate: string }[]
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  const uniq: { ticker: string; reportDate: string }[] = [];
+  const seen = new Set<string>();
+  for (const p of pairs) {
+    const k = `${p.ticker}|${p.reportDate}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    uniq.push(p);
+  }
+  const BATCH = 5;
+  for (let i = 0; i < uniq.length; i += BATCH) {
+    const slice = uniq.slice(i, i + BATCH);
+    const rows = await Promise.all(
+      slice.map(async (p) => {
+        const px = await getCloseOnOrBeforeReportDate(p.ticker, p.reportDate);
+        return { k: `${p.ticker}|${p.reportDate}`, px };
+      })
+    );
+    for (const { k, px } of rows) {
+      if (px != null) map.set(k, px);
+    }
+  }
+  return map;
+}

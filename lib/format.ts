@@ -4,6 +4,20 @@
 const DASH = "–"; // en-dash (mais fino que em-dash)
 const PT = "pt-BR";
 
+/**
+ * ISO só-data (yyyy-mm-dd) do Postgres/Supabase: evitar `new Date("2026-04-14")`
+ * que vira meia-noite UTC e aparece com 1 dia a menos no Brasil.
+ * Strings com hora (ex.: Yahoo asOf) seguem o parse nativo.
+ */
+export function parseDisplayDate(d: string): Date {
+  const t = d.trim();
+  const m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) {
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
+  return new Date(t);
+}
+
 export type Format = "money" | "millions" | "mult" | "pct";
 
 export function isNil(v: unknown): v is null | undefined {
@@ -51,7 +65,7 @@ export function formatDateShort(d: string): string {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-  }).format(new Date(d));
+  }).format(parseDisplayDate(d));
 }
 
 // Data longa ex.: "22 abr 2026" (sem ponto no mes abreviado).
@@ -62,7 +76,7 @@ export function formatDateLong(d: string | null | undefined): string {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(new Date(d));
+  }).format(parseDisplayDate(d));
   return s.replace(/\./g, "");
 }
 
@@ -70,7 +84,7 @@ export function formatDateLong(d: string | null | undefined): string {
 export function formatDate(v: string | null | undefined): string {
   if (!v) return DASH;
   try {
-    return new Date(v).toLocaleDateString(PT);
+    return parseDisplayDate(v).toLocaleDateString(PT);
   } catch {
     return DASH;
   }

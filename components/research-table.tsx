@@ -23,9 +23,9 @@ import { MetricCell } from "@/components/metric-cell";
 import { RatingCell } from "@/components/rating-cell";
 import { TargetCell } from "@/components/target-cell";
 import { cn } from "@/lib/utils";
-import type { ResearchRow } from "@/lib/queries";
 import { deriveCurrentPE } from "@/lib/derive-metrics";
 import { formatDateShort, formatValue } from "@/lib/format";
+import { FONTE_SHORT_LABEL, type ResearchRow } from "@/lib/queries";
 import type { LivePrice, LivePricesMap } from "@/lib/use-live-prices";
 import { getMetricDef, type MetricId } from "@/lib/metrics";
 
@@ -34,9 +34,27 @@ const SOURCE_STYLE: Record<
   string,
   { border: string; text: string; label: string }
 > = {
-  "BTG Pactual": { border: "border-[#1B61B6]", text: "text-[#1B61B6]", label: "BTG" },
-  "Bradesco BBI": { border: "border-[#C0392B]", text: "text-[#C0392B]", label: "BBI" },
-  Safra: { border: "border-[#B8860B]", text: "text-[#B8860B]", label: "SAFRA" },
+  "BTG Pactual": {
+    border: "border-[#1B61B6]",
+    text: "text-[#1B61B6]",
+    label: FONTE_SHORT_LABEL["BTG Pactual"],
+  },
+  "Bradesco BBI": {
+    border: "border-[#C0392B]",
+    text: "text-[#C0392B]",
+    label: FONTE_SHORT_LABEL["Bradesco BBI"],
+  },
+  Safra: {
+    border: "border-[#B8860B]",
+    text: "text-[#B8860B]",
+    label: FONTE_SHORT_LABEL.Safra,
+  },
+  // Laranja Itaú (marca aproximada para contraste no tema claro).
+  "Itaú BBA": {
+    border: "border-[#EC7000]",
+    text: "text-[#EC7000]",
+    label: FONTE_SHORT_LABEL["Itaú BBA"],
+  },
 };
 
 // Largura fixa da coluna sticky (empresa). Em px, sem derivar de fonte.

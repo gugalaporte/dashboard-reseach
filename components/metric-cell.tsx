@@ -32,7 +32,12 @@ export function MetricCell({
   priceDate?: string;
   anchorBank?: string;
   /** Tooltip especifico quando EPS veio de preço/P/E do report. */
-  epsDerivedInfo?: { reportPrice: number; pe: number; peDate: string };
+  epsDerivedInfo?: {
+    reportPrice: number;
+    pe: number;
+    peDate: string;
+    usedYahooClose?: boolean;
+  };
 }) {
   if (value == null)
     return <span className="text-line/60 font-mono">–</span>;
@@ -42,12 +47,19 @@ export function MetricCell({
 
   // Tooltip nativo HTML (sem dep).
   const tooltip = epsDerivedInfo
-    ? `EPS derivado: Preço no report (R$ ${formatNumber(epsDerivedInfo.reportPrice, 2)}) / P/E (${formatNumber(
-        epsDerivedInfo.pe,
-        1
-      )}x) em ${
-        epsDerivedInfo.peDate ? formatDateShort(epsDerivedInfo.peDate) : "—"
-      }. Nao publicado pela corretora.`
+    ? epsDerivedInfo.usedYahooClose
+      ? `EPS derivado: Fechamento Yahoo até a data do relatório (R$ ${formatNumber(
+          epsDerivedInfo.reportPrice,
+          2
+        )}) / P/E (${formatNumber(epsDerivedInfo.pe, 1)}x) em ${
+          epsDerivedInfo.peDate ? formatDateShort(epsDerivedInfo.peDate) : "—"
+        }. Preço não constava no stock_guide. Nao publicado pela corretora.`
+      : `EPS derivado: Preço no report (R$ ${formatNumber(epsDerivedInfo.reportPrice, 2)}) / P/E (${formatNumber(
+          epsDerivedInfo.pe,
+          1
+        )}x) em ${
+          epsDerivedInfo.peDate ? formatDateShort(epsDerivedInfo.peDate) : "—"
+        }. Nao publicado pela corretora.`
     : derived && anchorBank
       ? `Derivado de ${anchorBank} via EPS: NI ${anchorBank} × (EPS casa / EPS ${anchorBank}) em ${
           priceDate ? formatDateShort(priceDate) : "—"

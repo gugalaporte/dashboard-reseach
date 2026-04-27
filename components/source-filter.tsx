@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { FONTES } from "@/lib/queries";
+import { FONTES, FONTE_SHORT_LABEL } from "@/lib/queries";
 
 interface Props {
   value: string | undefined;
@@ -13,7 +13,7 @@ const OPTIONS: { value: string | undefined; label: string }[] = [
   { value: undefined, label: "Todas" },
   ...FONTES.map((f) => ({
     value: f,
-    label: f === "BTG Pactual" ? "BTG" : f === "Bradesco BBI" ? "BBI" : "Safra",
+    label: FONTE_SHORT_LABEL[f],
   })),
 ];
 
@@ -24,7 +24,7 @@ export function SourceFilter({ value, onChange }: Props) {
         const active = value === opt.value;
         return (
           <button
-            key={opt.label}
+            key={opt.value ?? "__all__"}
             type="button"
             onClick={() => onChange(opt.value)}
             className={cn(

@@ -1,12 +1,9 @@
 import { cn } from "@/lib/utils";
 import { formatDateShort, formatValue } from "@/lib/format";
+import { FONTE_SHORT_LABEL } from "@/lib/queries";
 
-// Mapeia fonte completa -> label curto exibido no badge "via XXX".
-const SOURCE_LABEL: Record<string, string> = {
-  "Bradesco BBI": "BBI",
-  "BTG Pactual": "BTG",
-  Safra: "SAFRA",
-};
+// Fonte completa -> label curto no badge "via XXX" (mesmas chaves que FONTES).
+const SOURCE_LABEL: Record<string, string> = { ...FONTE_SHORT_LABEL };
 
 // Celula especializada para Target Price: mostra valor + upside inline.
 // Preferencia para o upside: (1) valor pre-calculado em target.upside;

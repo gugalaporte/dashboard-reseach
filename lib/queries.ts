@@ -1,11 +1,25 @@
+import { parseDisplayDate } from "./format";
 import { supabase } from "./supabase";
 import type { MetricaRow, PdfDoc } from "@/types/research";
 import { canonicalMetricId, extractYear, type MetricId } from "./metrics";
 import { deriveEPSFromPriceAndPE, deriveNetIncomeFromEPS } from "./derive-metrics";
 
-// Fontes (corretoras) presentes na base.
-export const FONTES = ["BTG Pactual", "Bradesco BBI", "Safra"] as const;
+// Fontes (corretoras) presentes na base (alinhado a dados_estruturados.fonte).
+export const FONTES = [
+  "BTG Pactual",
+  "Bradesco BBI",
+  "Safra",
+  "Itaú BBA",
+] as const;
 export type Fonte = (typeof FONTES)[number];
+
+// Label curto na tabela / filtros / badge "via XXX".
+export const FONTE_SHORT_LABEL: Record<Fonte, string> = {
+  "BTG Pactual": "BTG",
+  "Bradesco BBI": "Bradesco",
+  Safra: "SAFRA",
+  "Itaú BBA": "Itau",
+};
 
 // Whitelist de tickers exibidos no dashboard.
 // Qualquer empresa fora desta lista nao aparece na tabela nem nos filtros.
@@ -32,7 +46,13 @@ export type Cell = {
   // Banco ancora usado na derivacao de Net Income (EPS cross-anchor).
   anchorBank?: string;
   // Metadados do tooltip quando EPS veio de preço/P/E do stock_guide.
-  epsDerivation?: { reportPrice: number; pe: number; peDate: string };
+  epsDerivation?: {
+    reportPrice: number;
+    pe: number;
+    peDate: string;
+    /** true quando price veio do Yahoo (guide sem preço na data do report). */
+    usedYahooClose?: boolean;
+  };
 };
 
 // Celula de target: extende Cell com moeda, upside opcional vindo do banco
@@ -77,7 +97,7 @@ type MetricRow = {
   pdf_id: number | null;
 };
 
-type StockGuideRow = {
+export type StockGuideRow = {
   ticker: string;
   source_bank: Fonte;
   rating: string | null;
@@ -99,10 +119,11 @@ type StockGuideRow = {
   upside: number | null;
 };
 
-// Principal: busca tudo em 2 selects e agrega no TS.
-// Filtra no banco pelos tickers permitidos (ALLOWED_TICKERS) para nao trafegar
-// dados de empresas que nao serao exibidas.
-export async function getResearch(): Promise<ResearchRow[]> {
+// Bruto Supabase (sem Yahoo). Usado pela rota GET /api/research no servidor.
+export async function loadResearchRaw(): Promise<{
+  metrics: MetricRow[];
+  guide: StockGuideRow[];
+}> {
   const tickers = ALLOWED_TICKERS as unknown as string[];
   const [mRes, gRes] = await Promise.all([
     supabase
@@ -125,7 +146,38 @@ export async function getResearch(): Promise<ResearchRow[]> {
   ]);
   if (mRes.error) throw mRes.error;
   if (gRes.error) throw gRes.error;
-  return buildRows(mRes.data ?? [], gRes.data ?? []);
+  return { metrics: mRes.data ?? [], guide: gRes.data ?? [] };
+}
+
+// Pares (ticker, data) para buscar fechamento Yahoo quando o guide nao tem preço.
+export function collectYahooReportClosePairs(
+  guide: StockGuideRow[]
+): { ticker: string; reportDate: string }[] {
+  const seen = new Set<string>();
+  const out: { ticker: string; reportDate: string }[] = [];
+  for (const g of guide) {
+    if (g.price != null && Number(g.price) > 0) continue;
+    if (!g.report_date) continue;
+    const hasPe = [g.pe_2025, g.pe_2026, g.pe_2027].some(
+      (v) => v != null && Number(v) > 0
+    );
+    if (!hasPe) continue;
+    const k = `${g.ticker}|${g.report_date}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({ ticker: g.ticker, reportDate: g.report_date });
+  }
+  return out;
+}
+
+// Principal no browser: delega ao servidor (Yahoo + build em Node).
+export async function getResearch(): Promise<ResearchRow[]> {
+  const res = await fetch("/api/research", { cache: "no-store" });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => res.statusText);
+    throw new Error(`getResearch: ${res.status} ${msg}`);
+  }
+  return res.json() as Promise<ResearchRow[]>;
 }
 
 // Escolhe leitura mais recente: (1) maior data_relatorio,
@@ -203,7 +255,7 @@ type NetIncomeAnchor = {
 };
 
 const ANCHOR_YEARS = ["2026", "2027", "2025"] as const;
-const ANCHOR_ORDER: Fonte[] = ["BTG Pactual", "Bradesco BBI"];
+const ANCHOR_ORDER: Fonte[] = ["BTG Pactual", "Bradesco BBI", "Itaú BBA"];
 
 function peForYear(sg: StockGuideRow, year: string): number | null {
   if (year === "2025") return sg.pe_2025;
@@ -234,8 +286,8 @@ function epsWithin30OfReport(
   reportDate: string | null | undefined
 ): boolean {
   if (!reportDate || !epsDate) return true;
-  const a = new Date(epsDate).getTime();
-  const b = new Date(reportDate).getTime();
+  const a = parseDisplayDate(epsDate).getTime();
+  const b = parseDisplayDate(reportDate).getTime();
   if (Number.isNaN(a) || Number.isNaN(b)) return true;
   return Math.abs(a - b) <= 30 * 86400000;
 }
@@ -255,11 +307,11 @@ function pickNIByClosestReport(
   const filtered = niRows.filter(isNiR$Mn);
   if (filtered.length === 0) return undefined;
   if (!anchorReportDate) return pickLatest(filtered);
-  const t0 = new Date(anchorReportDate).getTime();
+  const t0 = parseDisplayDate(anchorReportDate).getTime();
   let best: MetricRow | undefined;
   let bestDiff = Infinity;
   for (const r of filtered) {
-    const d = r.data_relatorio ? new Date(r.data_relatorio).getTime() : NaN;
+    const d = r.data_relatorio ? parseDisplayDate(r.data_relatorio).getTime() : NaN;
     if (Number.isNaN(d)) continue;
     const diff = Math.abs(d - t0);
     if (diff < bestDiff) {
@@ -319,7 +371,28 @@ function buildNetIncomeAnchorMap(
   return map;
 }
 
-function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] {
+// Preço do report: stock_guide.price; se vazio, fechamento Yahoo até report_date (map key ticker|yyyy-mm-dd).
+function resolvePriceAtReport(
+  sg: StockGuideRow,
+  empresa: string,
+  yahooReportClose: Map<string, number>
+): { price: number; fromYahoo: boolean } | null {
+  if (sg.price != null && Number(sg.price) > 0) {
+    return { price: Number(sg.price), fromYahoo: false };
+  }
+  const rd = sg.report_date;
+  if (!rd) return null;
+  const y = yahooReportClose.get(`${empresa}|${rd}`);
+  if (y != null && Number.isFinite(y) && y > 0) return { price: y, fromYahoo: true };
+  return null;
+}
+
+// Agrega linhas do dashboard (usado em GET /api/research no servidor).
+export function buildRows(
+  metrics: MetricRow[],
+  guide: StockGuideRow[],
+  yahooReportClose: Map<string, number> = new Map()
+): ResearchRow[] {
   // agrupa dados_estruturados por (empresa, fonte)
   const byPair = new Map<string, MetricRow[]>();
   for (const r of metrics) {
@@ -439,11 +512,13 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
 
         const peCell = peForEps[year];
         if (peCell == null || peCell.value == null || peCell.value <= 0) continue;
-        if (sg.price == null || Number(sg.price) <= 0) continue;
+
+        const atReport = resolvePriceAtReport(sg, empresa, yahooReportClose);
+        if (!atReport) continue;
 
         const derived = deriveEPSFromPriceAndPE({
           publishedEPS: null,
-          priceAtReport: Number(sg.price),
+          priceAtReport: atReport.price,
           pe: peCell.value,
           peDate: reportDate ?? "",
         });
@@ -459,9 +534,10 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
           formula: derived.formula,
           priceDate: derived.priceDate,
           epsDerivation: {
-            reportPrice: Number(sg.price),
+            reportPrice: atReport.price,
             pe: peCell.value,
             peDate: reportDate ?? "",
+            usedYahooClose: atReport.fromYahoo,
           },
         };
       }
@@ -469,8 +545,8 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
 
     // Derivacao de Net Income (EPS como ponte entre casas).
     // NI linha = NI_ancora × (EPS_linha / EPS_ancora), com EPS = Preço/P/E.
-    // Preço e P/E da linha atual vêm do stock_guide daquela fonte; âncora vem
-    // de netIncomeAnchorMap (BTG primeiro, senão BBI). Nunca usa preço Yahoo.
+    // Preço e P/E da linha atual vêm do stock_guide (ou Yahoo na data do report
+    // quando o guide nao tem preço); âncora vem de netIncomeAnchorMap.
     const peBucket = byMetricYear["pe"];
     const niBucket = (byMetricYear["net_income"] ??= {});
     if (peBucket && sg) {
@@ -478,6 +554,7 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
         if (niBucket[year]) continue; // ja temos NI publicado
         const peCell = peBucket[year];
         const anchor = netIncomeAnchorMap.get(`${empresa}|${year}`) ?? null;
+        const atReport = resolvePriceAtReport(sg, empresa, yahooReportClose);
         const derived = deriveNetIncomeFromEPS({
           publishedNI: null,
           anchorNI: anchor?.ni ?? null,
@@ -485,7 +562,7 @@ function buildRows(metrics: MetricRow[], guide: StockGuideRow[]): ResearchRow[] 
           anchorPrice: anchor?.price ?? null,
           anchorBank: anchor?.bank ?? null,
           pe: peCell?.value ?? null,
-          priceAtReport: sg.price != null ? Number(sg.price) : null,
+          priceAtReport: atReport?.price ?? null,
           priceDate: sg.price_date,
         });
         if (!derived?.derived) continue;
