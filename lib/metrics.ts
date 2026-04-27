@@ -15,38 +15,46 @@ export type MetricDef = {
 // IDs canonicos. Usados como chaves estaveis em estado (URL-safe).
 export type MetricId =
   | "pe"
+  | "eps"
   | "ev_ebitda"
   | "p_bv"
   | "dy"
-  | "nd_ebitda"
   | "roe"
   | "roic"
-  | "ebitda"
-  | "net_income"
-  | "revenue"
+  | "nd_ebitda"
   | "net_debt"
-  | "eps";
+  | "revenue"
+  | "ebitda"
+  | "net_income";
 
-// Ordem aqui define a ordem no seletor (UX).
-// Aliases foram extraidos via query distinct na tabela dados_estruturados.metrica.
+// Ordem = ordem no seletor (pills) e referencia de produto.
+// Aliases: nomes brutos em dados_estruturados.metrica (case-sensitive).
 export const METRICS: MetricDef[] = [
   { id: "pe", label: "P/E", aliases: ["P/E"], format: "mult" },
+  { id: "eps", label: "EPS", aliases: ["EPS"], format: "money" },
   { id: "ev_ebitda", label: "EV/EBITDA", aliases: ["EV/EBITDA"], format: "mult" },
   { id: "p_bv", label: "P/BV", aliases: ["P/BV", "P/BVPS"], format: "mult" },
   {
     id: "dy",
-    label: "Div. Yield",
+    label: "Dividend Yield",
     aliases: ["Dividend Yield", "Net dividend yield"],
     format: "pct",
   },
+  { id: "roe", label: "ROE", aliases: ["ROE"], format: "pct" },
+  { id: "roic", label: "ROIC", aliases: ["RoIC", "RoIC (EBIT)"], format: "pct" },
   {
     id: "nd_ebitda",
     label: "ND/EBITDA",
     aliases: ["Net Debt/EBITDA", "Net debt/EBITDA"],
     format: "mult",
   },
-  { id: "roe", label: "ROE", aliases: ["ROE"], format: "pct" },
-  { id: "roic", label: "RoIC", aliases: ["RoIC", "RoIC (EBIT)"], format: "pct" },
+  { id: "net_debt", label: "Net Debt", aliases: ["Net Debt"], format: "millions" },
+  {
+    id: "revenue",
+    label: "Revenue",
+    aliases: ["Revenue", "Revenues", "Net Revenue", "Net Revenues", "Net revenue"],
+    format: "millions",
+  },
   {
     id: "ebitda",
     label: "EBITDA",
@@ -59,14 +67,6 @@ export const METRICS: MetricDef[] = [
     aliases: ["Net Income", "Adjusted Net Income", "Net earnings"],
     format: "millions",
   },
-  {
-    id: "revenue",
-    label: "Revenue",
-    aliases: ["Revenue", "Revenues", "Net Revenue", "Net Revenues", "Net revenue"],
-    format: "millions",
-  },
-  { id: "net_debt", label: "Net Debt", aliases: ["Net Debt"], format: "millions" },
-  { id: "eps", label: "EPS", aliases: ["EPS"], format: "money" },
 ];
 
 // Map reverso: alias bruto -> id canonico. Construido uma vez.
@@ -103,7 +103,7 @@ export function extractYear(periodo: string | null | undefined): string | null {
 }
 
 // Metricas default ao abrir o dashboard (3 selecionadas).
-export const DEFAULT_METRICS: MetricId[] = ["pe", "ev_ebitda", "dy"];
+export const DEFAULT_METRICS: MetricId[] = ["pe", "eps", "ev_ebitda"];
 
 // Quantas metricas podem ser selecionadas simultaneamente.
 export const MAX_SELECTED_METRICS = 3;

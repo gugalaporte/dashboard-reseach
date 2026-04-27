@@ -12,6 +12,8 @@ const config: Config = {
       colors: {
         // Paleta Finacap (obrigatoria)
         ink: "#090502",
+        /** Texto secundario (ex.: coluna Setor). */
+        "ink-muted": "rgba(9, 5, 2, 0.55)",
         navy: "#030A1E",
         brand: {
           DEFAULT: "#1B61B6",

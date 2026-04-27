@@ -71,6 +71,8 @@ export type TargetCell = Cell & {
 export type ResearchRow = {
   empresa: string;
   fonte: Fonte;
+  /** Setor do stock_guide (ingles); UI traduz com lib/sector-labels. */
+  sector?: string | null;
   rating?: { value: string; date: string | null };
   price?: { value: number; date: string | null };
   target?: TargetCell;
@@ -117,6 +119,7 @@ export type StockGuideRow = {
   // Novas colunas: TP e upside ja vem calculados do stock_guide.
   target_price: number | null;
   upside: number | null;
+  sector: string | null;
 };
 
 // Bruto Supabase (sem Yahoo). Usado pela rota GET /api/research no servidor.
@@ -135,7 +138,7 @@ export async function loadResearchRaw(): Promise<{
     supabase
       .from("stock_guide")
       .select(
-        "ticker,source_bank,rating,price,report_date,price_date,pdf_id," +
+        "ticker,source_bank,rating,price,report_date,price_date,pdf_id,sector," +
           "pe_2026,pe_2027,pe_2025," +
           "ev_ebitda_2026,ev_ebitda_2027,ev_ebitda_2025," +
           "div_yield_2026_pct,div_yield_2027_pct,div_yield_2025_pct," +
@@ -583,6 +586,7 @@ export function buildRows(
     out.push({
       empresa,
       fonte,
+      sector: sg?.sector ?? null,
       rating: sg?.rating
         ? { value: sg.rating, date: sg.report_date }
         : undefined,

@@ -28,6 +28,7 @@ import { formatDateShort, formatValue } from "@/lib/format";
 import { FONTE_SHORT_LABEL, type ResearchRow } from "@/lib/queries";
 import type { LivePrice, LivePricesMap } from "@/lib/use-live-prices";
 import { getMetricDef, type MetricId } from "@/lib/metrics";
+import { sectorPt } from "@/lib/sector-labels";
 
 // Cores outline por corretora (borda + texto, sem fundo preenchido).
 const SOURCE_STYLE: Record<
@@ -61,7 +62,14 @@ const SOURCE_STYLE: Record<
 const W_EMPRESA = 110;
 
 // IDs das colunas "base" (nao-metricas). Usado para saber onde comeca cada grupo de metrica.
-const BASE_COLUMN_IDS = ["empresa", "fonte", "rating", "price", "target"] as const;
+const BASE_COLUMN_IDS = [
+  "empresa",
+  "setor",
+  "fonte",
+  "rating",
+  "price",
+  "target",
+] as const;
 
 // Subtitulo da cotacao Yahoo (fechamento, nao intraday).
 function yahooCloseSubtitle(q: LivePrice): string {
@@ -102,6 +110,20 @@ export function ResearchTable({
         cell: ({ row }) => (
           <span className="font-display text-[15px] text-ink">
             {row.original.empresa}
+          </span>
+        ),
+      },
+      {
+        id: "setor",
+        header: "SETOR",
+        accessorFn: (r) => sectorPt(r.sector),
+        cell: ({ row }) => (
+          <span
+            className={cn(
+              "block max-w-[140px] text-[10px] uppercase tracking-[0.14em] font-medium leading-snug text-ink-muted"
+            )}
+          >
+            {sectorPt(row.original.sector)}
           </span>
         ),
       },
