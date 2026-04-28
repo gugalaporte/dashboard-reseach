@@ -13,6 +13,25 @@ export const FONTES = [
 ] as const;
 export type Fonte = (typeof FONTES)[number];
 
+// Algumas cargas antigas chegaram com variação de encoding em "Itaú BBA".
+// Normalizamos para manter filtros/joins consistentes no dashboard.
+const FONTE_ALIASES: Record<string, Fonte> = {
+  "BTG Pactual": "BTG Pactual",
+  "Bradesco BBI": "Bradesco BBI",
+  Safra: "Safra",
+  "Itaú BBA": "Itaú BBA",
+  "Itaǧ BBA": "Itaú BBA",
+  "ItaÃº BBA": "Itaú BBA",
+  "Itau BBA": "Itaú BBA",
+};
+
+const FONTE_FILTER_VALUES = Object.keys(FONTE_ALIASES);
+
+function normalizeFonte(value: string | null | undefined): Fonte | null {
+  if (!value) return null;
+  return FONTE_ALIASES[value] ?? null;
+}
+
 // Label curto na tabela / filtros / badge "via XXX".
 export const FONTE_SHORT_LABEL: Record<Fonte, string> = {
   "BTG Pactual": "BTG",
@@ -132,7 +151,7 @@ export async function loadResearchRaw(): Promise<{
     supabase
       .from("dados_estruturados")
       .select("empresa,fonte,metrica,periodo,valor,unidade,data_relatorio,pdf_id")
-      .in("fonte", FONTES as unknown as string[])
+      .in("fonte", FONTE_FILTER_VALUES)
       .in("empresa", tickers)
       .returns<MetricRow[]>(),
     supabase
@@ -144,12 +163,29 @@ export async function loadResearchRaw(): Promise<{
           "div_yield_2026_pct,div_yield_2027_pct,div_yield_2025_pct," +
           "target_price,upside"
       )
+      .in("source_bank", FONTE_FILTER_VALUES)
       .in("ticker", tickers)
       .returns<StockGuideRow[]>(),
   ]);
   if (mRes.error) throw mRes.error;
   if (gRes.error) throw gRes.error;
-  return { metrics: mRes.data ?? [], guide: gRes.data ?? [] };
+  const metrics = (mRes.data ?? [])
+    .map((row) => {
+      const fonte = normalizeFonte(row.fonte);
+      if (!fonte) return null;
+      return { ...row, fonte };
+    })
+    .filter((row): row is MetricRow => row != null);
+
+  const guide = (gRes.data ?? [])
+    .map((row) => {
+      const fonte = normalizeFonte(row.source_bank);
+      if (!fonte) return null;
+      return { ...row, source_bank: fonte };
+    })
+    .filter((row): row is StockGuideRow => row != null);
+
+  return { metrics, guide };
 }
 
 // Pares (ticker, data) para buscar fechamento Yahoo quando o guide nao tem preço.
