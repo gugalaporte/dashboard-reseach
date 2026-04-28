@@ -22,6 +22,7 @@ export type MetricId =
   | "roe"
   | "roic"
   | "nd_ebitda"
+  | "net_dps"
   | "net_debt"
   | "revenue"
   | "ebitda"
@@ -48,6 +49,7 @@ export const METRICS: MetricDef[] = [
     aliases: ["Net Debt/EBITDA", "Net debt/EBITDA"],
     format: "mult",
   },
+  { id: "net_dps", label: "Net DPS", aliases: ["Net DPS"], format: "money" },
   { id: "net_debt", label: "Net Debt", aliases: ["Net Debt"], format: "millions" },
   {
     id: "revenue",

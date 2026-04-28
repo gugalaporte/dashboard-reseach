@@ -3,6 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import { CompanySearch, CompanyChips } from "@/components/company-search";
+import { SectorFilter } from "@/components/sector-filter";
 import { SourceFilter } from "@/components/source-filter";
 import { DateFilter } from "@/components/date-filter";
 import { MetricsSelector } from "@/components/metrics-selector";
@@ -31,6 +32,7 @@ import {
   type MetricId,
 } from "@/lib/metrics";
 import type { PeriodoFilter } from "@/types/research";
+import { sectorPt } from "@/lib/sector-labels";
 
 // Converte periodo filtro em data minima (ISO yyyy-mm-dd).
 function periodoToMinDate(p: PeriodoFilter): string | null {
@@ -43,6 +45,7 @@ function periodoToMinDate(p: PeriodoFilter): string | null {
 
 export default function DashboardPage() {
   const [empresas, setEmpresas] = React.useState<string[]>([]);
+  const [setor, setSetor] = React.useState<string | undefined>();
   const [fonte, setFonte] = React.useState<string | undefined>();
   const [periodo, setPeriodo] = React.useState<PeriodoFilter>("all");
   // Bucket de rating ativo (clicando no summary card). null = sem filtro.
@@ -83,6 +86,7 @@ export default function DashboardPage() {
     const minDate = periodoToMinDate(periodo);
     return allRows.filter((r) => {
       if (empresas.length > 0 && !empresas.includes(r.empresa)) return false;
+      if (setor && (r.sector ?? "") !== setor) return false;
       if (fonte && r.fonte !== fonte) return false;
       if (ratingBucket && classifyRating(r.rating?.value) !== ratingBucket)
         return false;
@@ -92,7 +96,16 @@ export default function DashboardPage() {
       }
       return true;
     });
-  }, [allRows, empresas, fonte, periodo, ratingBucket]);
+  }, [allRows, empresas, setor, fonte, periodo, ratingBucket]);
+
+  // Setores disponiveis a partir dos dados carregados.
+  const setoresOpts = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const r of allRows) {
+      if (r.sector) set.add(r.sector);
+    }
+    return Array.from(set).sort((a, b) => sectorPt(a).localeCompare(sectorPt(b)));
+  }, [allRows]);
 
   // Consenso do drawer: todas as rows da empresa selecionada.
   const consensoDrawer = React.useMemo(
@@ -143,6 +156,7 @@ export default function DashboardPage() {
 
   function clearFilters() {
     setEmpresas([]);
+    setSetor(undefined);
     setFonte(undefined);
     setPeriodo("all");
     setRatingBucket(null);
@@ -150,6 +164,7 @@ export default function DashboardPage() {
 
   const hasFilters =
     empresas.length > 0 ||
+    setor !== undefined ||
     fonte !== undefined ||
     periodo !== "all" ||
     ratingBucket !== null;
@@ -193,13 +208,14 @@ export default function DashboardPage() {
       {/* Barra de filtros em linha unica, sticky abaixo do header */}
       <div className="sticky top-16 z-30 bg-surface-soft border-b border-line">
         <div className="mx-auto max-w-[1600px] px-8 py-4 flex items-center gap-3">
-          <div className="flex-1 max-w-md">
+          <div className="w-[340px] shrink-0">
             <CompanySearch
               options={empresasOpts}
               selected={empresas}
               onChange={setEmpresas}
             />
           </div>
+          <SectorFilter options={setoresOpts} value={setor} onChange={setSetor} />
           <div className="h-6 w-px bg-line" />
           <SourceFilter value={fonte} onChange={setFonte} />
           <DateFilter value={periodo} onChange={setPeriodo} />
