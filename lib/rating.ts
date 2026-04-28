@@ -1,7 +1,7 @@
 // Agrupa os nomes que bancos diferentes usam para a mesma recomendacao.
 // Bullish  -> Outperform, Buy, Strong Buy, Overweight
 // Bearish  -> Underperform, Sell, Underweight
-// Neutral  -> Neutral, Hold, Market Perform
+// Neutral  -> Neutral, Hold, Market Perform, Neutral Weight
 export type RatingBucket = "bullish" | "bearish" | "neutral" | "unknown";
 
 export function classifyRating(
@@ -9,16 +9,26 @@ export function classifyRating(
 ): RatingBucket {
   if (!rating) return "unknown";
   const r = rating.trim().toLowerCase();
+  const normalized = r.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
   if (
-    r === "outperform" ||
-    r === "buy" ||
-    r === "strong buy" ||
-    r === "overweight"
+    normalized === "outperform" ||
+    normalized === "buy" ||
+    normalized === "strong buy" ||
+    normalized === "overweight"
   )
     return "bullish";
-  if (r === "underperform" || r === "sell" || r === "underweight")
+  if (
+    normalized === "underperform" ||
+    normalized === "sell" ||
+    normalized === "underweight"
+  )
     return "bearish";
-  if (r === "neutral" || r === "hold" || r === "market perform")
+  if (
+    normalized === "neutral" ||
+    normalized === "hold" ||
+    normalized === "market perform" ||
+    normalized === "neutral weight"
+  )
     return "neutral";
   return "unknown";
 }
