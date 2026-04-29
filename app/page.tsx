@@ -294,7 +294,10 @@ export default function DashboardPage() {
           years={years}
           portfolioTickers={PORTFOLIO_TICKERS as unknown as string[]}
         />
-        <ChangeFeed sectionId="mudancas-recentes" />
+        <ChangeFeed
+          sectionId="mudancas-recentes"
+          portfolioTickers={PORTFOLIO_TICKERS as unknown as string[]}
+        />
       </main>
 
       <CompanyDrawer

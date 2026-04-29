@@ -8,14 +8,16 @@ import { cn } from "@/lib/utils";
 import { formatDateLong, formatDateShort, formatNumber, formatValue, parseDisplayDate } from "@/lib/format";
 import { FONTES, FONTE_SHORT_LABEL } from "@/lib/queries";
 import { sectorPt } from "@/lib/sector-labels";
+import { CompanySearch } from "@/components/company-search";
+import { SectorFilter } from "@/components/sector-filter";
 import type { RevisionEvent, RevisionKindFilter, RevisionPeriodFilter } from "@/types/revisions";
 
 const PERIODS: RevisionPeriodFilter[] = ["24h", "7d", "30d", "90d"];
 const KIND_OPTIONS: Array<{ id: RevisionKindFilter; label: string }> = [
   { id: "all", label: "Todos" },
-  { id: "tp_raise", label: "Apenas elevações de Target" },
-  { id: "tp_cut", label: "Apenas cortes de Target" },
-  { id: "rating", label: "Apenas mudanças de rating" },
+  { id: "tp_raise", label: "Elevações de Target" },
+  { id: "tp_cut", label: "Cortes de Target" },
+  { id: "rating", label: "Mudanças de rating" },
 ];
 
 function relativeDateLabel(d: string): string {
@@ -91,17 +93,37 @@ function fileUrl(filePath: string | null): string | null {
 
 interface ChangeFeedProps {
   sectionId?: string;
+  portfolioTickers?: string[];
 }
 
-export function ChangeFeed({ sectionId }: ChangeFeedProps) {
+export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps) {
   const [period, setPeriod] = React.useState<RevisionPeriodFilter>("30d");
   const [kind, setKind] = React.useState<RevisionKindFilter>("all");
   const [fontes, setFontes] = React.useState<string[]>([]);
+  const [onlyPortfolio, setOnlyPortfolio] = React.useState(false);
+  const [empresas, setEmpresas] = React.useState<string[]>([]);
+  const [setor, setSetor] = React.useState<string | undefined>();
   const [rows, setRows] = React.useState<RevisionEvent[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [showCount, setShowCount] = React.useState(20);
   const [selected, setSelected] = React.useState<RevisionEvent | null>(null);
   const [timeline, setTimeline] = React.useState<RevisionEvent[]>([]);
+  const portfolioSet = React.useMemo(
+    () => new Set<string>(portfolioTickers.map((t) => t.toUpperCase())),
+    [portfolioTickers]
+  );
+  const empresasOpts = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) set.add((r.ticker ?? "").toUpperCase());
+    return Array.from(set).sort();
+  }, [rows]);
+  const setoresOpts = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) {
+      if (r.sector) set.add(r.sector);
+    }
+    return Array.from(set).sort((a, b) => sectorPt(a).localeCompare(sectorPt(b)));
+  }, [rows]);
 
   React.useEffect(() => {
     const qs = new URLSearchParams({
@@ -141,7 +163,16 @@ export function ChangeFeed({ sectionId }: ChangeFeedProps) {
       });
   }, [selected]);
 
-  const visible = rows.slice(0, showCount);
+  const filteredRows = React.useMemo(() => {
+    return rows.filter((r) => {
+      const ticker = (r.ticker ?? "").toUpperCase();
+      if (onlyPortfolio && !portfolioSet.has(ticker)) return false;
+      if (empresas.length > 0 && !empresas.includes(ticker)) return false;
+      if (setor && (r.sector ?? "") !== setor) return false;
+      return true;
+    });
+  }, [rows, onlyPortfolio, portfolioSet, empresas, setor]);
+  const visible = filteredRows.slice(0, showCount);
   const maxAbsPct = React.useMemo(
     () =>
       Math.max(
@@ -153,11 +184,11 @@ export function ChangeFeed({ sectionId }: ChangeFeedProps) {
   );
   const highlights = React.useMemo(
     () =>
-      [...rows]
+      [...filteredRows]
         .filter((r) => r.tp_change_pct != null)
         .sort((a, b) => Math.abs(b.tp_change_pct ?? 0) - Math.abs(a.tp_change_pct ?? 0))
         .slice(0, 3),
-    [rows]
+    [filteredRows]
   );
   const grouped = React.useMemo(() => {
     const map = new Map<string, RevisionEvent[]>();
@@ -175,8 +206,14 @@ export function ChangeFeed({ sectionId }: ChangeFeedProps) {
   return (
     <>
       <section id={sectionId} className="rounded-lg border border-line bg-surface-soft p-4 space-y-3">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium">
+          MUDANÇAS RECENTES
+        </div>
         <div className="flex flex-wrap items-center gap-3">
-          <h3 className="font-display text-xl text-ink mr-2">Mudanças Recentes</h3>
+          <div className="w-[340px] shrink-0">
+            <CompanySearch options={empresasOpts} selected={empresas} onChange={setEmpresas} />
+          </div>
+          <SectorFilter options={setoresOpts} value={setor} onChange={setSetor} />
           <div className="flex items-center gap-1 rounded-md bg-surface p-1">
             {PERIODS.map((p) => (
               <button
@@ -193,13 +230,28 @@ export function ChangeFeed({ sectionId }: ChangeFeedProps) {
             ))}
           </div>
           <div className="flex items-center gap-1 rounded-md bg-surface p-1">
+            <button
+              type="button"
+              onClick={() => setOnlyPortfolio((v) => !v)}
+              className={cn(
+                "px-3 h-8 rounded text-[11px] font-medium uppercase tracking-[0.08em] transition",
+                onlyPortfolio ? "bg-navy text-surface-soft" : "text-ink/60 hover:text-ink"
+              )}
+            >
+              Em carteira
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1 rounded-md bg-surface p-1">
             {KIND_OPTIONS.map((k) => (
               <button
                 key={k.id}
                 type="button"
                 onClick={() => setKind(k.id)}
                 className={cn(
-                  "px-3 h-8 rounded text-[11px] font-medium transition",
+                  "px-3 h-8 rounded text-[11px] font-medium uppercase tracking-[0.08em] transition",
                   kind === k.id ? "bg-navy text-surface-soft" : "text-ink/60 hover:text-ink"
                 )}
               >
@@ -207,15 +259,13 @@ export function ChangeFeed({ sectionId }: ChangeFeedProps) {
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="flex flex-wrap gap-1.5">
+          <div className="flex items-center gap-1 rounded-md bg-surface p-1">
           <button
             type="button"
             onClick={() => setFontes([])}
             className={cn(
-              "h-7 px-2 rounded border text-[10px] uppercase tracking-[0.12em]",
-              fontes.length === 0 ? "bg-navy text-surface-soft border-navy" : "border-line text-ink/70"
+              "px-3 h-8 rounded text-[11px] font-medium uppercase tracking-[0.08em] transition",
+              fontes.length === 0 ? "bg-navy text-surface-soft" : "text-ink/60 hover:text-ink"
             )}
           >
             Todas
@@ -226,13 +276,14 @@ export function ChangeFeed({ sectionId }: ChangeFeedProps) {
               type="button"
               onClick={() => toggleFonte(f)}
               className={cn(
-                "h-7 px-2 rounded border text-[10px] uppercase tracking-[0.12em]",
-                fontes.includes(f) ? "bg-navy text-surface-soft border-navy" : "border-line text-ink/70"
+                "px-3 h-8 rounded text-[11px] font-medium uppercase tracking-[0.08em] transition",
+                fontes.includes(f) ? "bg-navy text-surface-soft" : "text-ink/60 hover:text-ink"
               )}
             >
               {FONTE_SHORT_LABEL[f]}
             </button>
           ))}
+          </div>
         </div>
 
         {!loading && highlights.length > 0 && (
@@ -342,7 +393,7 @@ export function ChangeFeed({ sectionId }: ChangeFeedProps) {
           )}
         </div>
 
-        {!loading && rows.length > showCount && (
+        {!loading && filteredRows.length > showCount && (
           <div className="flex justify-center">
             <button
               type="button"
