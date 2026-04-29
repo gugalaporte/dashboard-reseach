@@ -48,6 +48,14 @@ export const ALLOWED_TICKERS = [
   "POMO4", "MRVE3", "BRBI11", "ITUB4", "PSSA3", "ITUB3", "INBR32", "CMIG4",
   "TIMS3", "EQTL3", "AXIA3", "ENGI11", "AXIA7", "VIVT3", "AXIA6",
   "GGBR4", "RDOR3", "ASAI3", "CEAB3", "BRAV3",
+  "ABEV3", "AURE3", "AZT73", "B3SA3", "BBSE3", "BBDC3", "BBDC4", "BRAP4",
+  "BRAS3", "BRKM5", "BPAC11", "CXTB3", "COGN3", "CSMG3", "CPLE3", "CSAN3",
+  "CPFE3", "CMIN3", "CURY3", "CYRE3", "CYRE4", "DIRR3", "EMBI3", "ENEV3",
+  "EGIE3", "FLRY3", "HAPV3", "HYPE3", "IGTI11", "IRBR3", "ISAE4", "ITSA4",
+  "JBNT1", "RENT3", "LRN3", "MGLU3", "YOI4", "BMF3", "BEEF3", "MOTV3",
+  "MULT3", "NTCO3", "PETR3", "PECV3", "PRIO3", "RADL3", "RAIL3", "SBSP3",
+  "SANB11", "SCNA3", "SMFT3", "JET1", "TOTS3", "UGPA3", "USIM5", "VAMO3",
+  "VIVA3",
 ] as const;
 
 // Celula generica de metrica: valor + metadados de origem.

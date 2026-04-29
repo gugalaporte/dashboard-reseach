@@ -34,6 +34,14 @@ import {
 import type { PeriodoFilter } from "@/types/research";
 import { sectorPt } from "@/lib/sector-labels";
 
+// Empresas da carteira do usuario.
+const PORTFOLIO_TICKERS = [
+  "PETR4", "SLCE3", "VBBR3", "GOAU3", "DXCO3", "GOAU4", "SUZB3", "VALE3",
+  "POSI3", "RAPT3", "LOGG3", "LREN3", "POMO3", "AZUL", "RAPT4", "ALOS3",
+  "POMO4", "MRVE3", "BRBI11", "ITUB4", "PSSA3", "ITUB3", "INBR32", "CMIG4",
+  "TIMS3", "EQTL3", "AXIA3", "ENGI11", "AXIA7", "VIVT3", "AXIA6",
+] as const;
+
 // Converte periodo filtro em data minima (ISO yyyy-mm-dd).
 function periodoToMinDate(p: PeriodoFilter): string | null {
   if (p === "all") return null;
@@ -45,6 +53,7 @@ function periodoToMinDate(p: PeriodoFilter): string | null {
 
 export default function DashboardPage() {
   const [empresas, setEmpresas] = React.useState<string[]>([]);
+  const [onlyPortfolio, setOnlyPortfolio] = React.useState(false);
   const [setor, setSetor] = React.useState<string | undefined>();
   const [fonte, setFonte] = React.useState<string | undefined>();
   const [periodo, setPeriodo] = React.useState<PeriodoFilter>("all");
@@ -65,6 +74,10 @@ export default function DashboardPage() {
   // Metricas selecionadas pelo usuario (1..3). Default: P/E, EV/EBITDA, DY.
   const [selectedMetrics, setSelectedMetrics] =
     React.useState<MetricId[]>(DEFAULT_METRICS);
+  const portfolioSet = React.useMemo(
+    () => new Set<string>(PORTFOLIO_TICKERS),
+    []
+  );
 
   React.useEffect(() => {
     getSummaryStats()
@@ -85,6 +98,7 @@ export default function DashboardPage() {
   const rows = React.useMemo(() => {
     const minDate = periodoToMinDate(periodo);
     return allRows.filter((r) => {
+      if (onlyPortfolio && !portfolioSet.has(r.empresa)) return false;
       if (empresas.length > 0 && !empresas.includes(r.empresa)) return false;
       if (setor && (r.sector ?? "") !== setor) return false;
       if (fonte && r.fonte !== fonte) return false;
@@ -96,7 +110,7 @@ export default function DashboardPage() {
       }
       return true;
     });
-  }, [allRows, empresas, setor, fonte, periodo, ratingBucket]);
+  }, [allRows, empresas, setor, fonte, periodo, ratingBucket, onlyPortfolio, portfolioSet]);
 
   // Setores disponiveis a partir dos dados carregados.
   const setoresOpts = React.useMemo(() => {
@@ -139,20 +153,23 @@ export default function DashboardPage() {
     let bullish = 0;
     let neutral = 0;
     let bearish = 0;
+    const portfolioInCoverage = new Set<string>();
     for (const r of allRows) {
       const bucket = classifyRating(r.rating?.value);
       if (bucket === "bullish") bullish++;
       else if (bucket === "neutral") neutral++;
       else if (bucket === "bearish") bearish++;
+      if (portfolioSet.has(r.empresa)) portfolioInCoverage.add(r.empresa);
     }
     return {
       empresasCount: stats.empresasCount,
+      portfolioCount: portfolioInCoverage.size,
       metricasTotal: stats.metricasTotal,
       bullishCount: bullish,
       neutralCount: neutral,
       bearishCount: bearish,
     };
-  }, [stats, allRows]);
+  }, [stats, allRows, portfolioSet]);
 
   function clearFilters() {
     setEmpresas([]);
@@ -160,6 +177,7 @@ export default function DashboardPage() {
     setFonte(undefined);
     setPeriodo("all");
     setRatingBucket(null);
+    setOnlyPortfolio(false);
   }
 
   const hasFilters =
@@ -167,7 +185,8 @@ export default function DashboardPage() {
     setor !== undefined ||
     fonte !== undefined ||
     periodo !== "all" ||
-    ratingBucket !== null;
+    ratingBucket !== null ||
+    onlyPortfolio;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -256,6 +275,8 @@ export default function DashboardPage() {
           isLoading={loadingTable && !summary}
           activeBucket={ratingBucket}
           onBucketChange={setRatingBucket}
+          activePortfolio={onlyPortfolio}
+          onPortfolioToggle={setOnlyPortfolio}
         />
         <ResearchTable
           data={rows}
@@ -264,6 +285,7 @@ export default function DashboardPage() {
           livePrices={livePrices}
           selectedMetrics={selectedMetrics}
           years={years}
+          portfolioTickers={PORTFOLIO_TICKERS as unknown as string[]}
         />
       </main>
 

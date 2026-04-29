@@ -6,6 +6,7 @@ import { formatNumber } from "@/lib/format";
 import type { RatingBucket } from "@/lib/rating";
 import {
   Building2,
+  Star,
   Database,
   TrendingUp,
   Minus,
@@ -15,6 +16,7 @@ import {
 
 export type SummaryData = {
   empresasCount: number;
+  portfolioCount: number;
   metricasTotal: number;
   bullishCount: number; // Buy + Outperform + Overweight + Strong Buy
   neutralCount: number; // Neutral + Hold + Market Perform
@@ -32,8 +34,12 @@ interface Props {
   isLoading: boolean;
   // Bucket ativo (visual + filtro). null = nenhum filtro.
   activeBucket?: RatingFilterBucket | null;
+  // Filtro ativo de carteira.
+  activePortfolio?: boolean;
   // Chamado ao clicar num card de rating. Passa null para limpar.
   onBucketChange?: (bucket: RatingFilterBucket | null) => void;
+  // Chamado ao clicar no card de carteira (toggle).
+  onPortfolioToggle?: (next: boolean) => void;
 }
 
 type CardItem = {
@@ -44,19 +50,30 @@ type CardItem = {
   iconClass?: string;
   // Se preenchido, o card vira clicavel e filtra por esse bucket.
   bucket?: RatingFilterBucket;
+  // Marca o card de carteira (clicavel com filtro booleano).
+  portfolio?: boolean;
 };
 
 export function SummaryCards({
   data,
   isLoading,
   activeBucket,
+  activePortfolio,
   onBucketChange,
+  onPortfolioToggle,
 }: Props) {
   const items: CardItem[] = [
     {
       label: "EMPRESAS COBERTAS",
       value: data ? formatNumber(data.empresasCount) : "",
       Icon: Building2,
+    },
+    {
+      label: "EMPRESAS EM CARTEIRA",
+      value: data ? formatNumber(data.portfolioCount) : "",
+      Icon: Star,
+      iconClass: "text-amber-500",
+      portfolio: true,
     },
     {
       label: "MÉTRICAS ARMAZENADAS",
@@ -93,14 +110,24 @@ export function SummaryCards({
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-      {items.map(({ label, value, Icon, iconClass, bucket }) => {
-        const clickable = Boolean(bucket && onBucketChange);
-        const isActive = bucket && activeBucket === bucket;
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {items.map(({ label, value, Icon, iconClass, bucket, portfolio }) => {
+        const clickable = Boolean(
+          (bucket && onBucketChange) || (portfolio && onPortfolioToggle)
+        );
+        const isActive = Boolean(
+          (bucket && activeBucket === bucket) || (portfolio && activePortfolio)
+        );
         // Ao clicar num card ja ativo, limpa o filtro (toggle).
         const handleClick = () => {
-          if (!clickable || !bucket) return;
-          onBucketChange!(isActive ? null : bucket);
+          if (!clickable) return;
+          if (bucket) {
+            onBucketChange!(isActive ? null : bucket);
+            return;
+          }
+          if (portfolio) {
+            onPortfolioToggle?.(!isActive);
+          }
         };
 
         return (
@@ -115,7 +142,10 @@ export function SummaryCards({
               "disabled:cursor-default",
               clickable && !isActive && "hover:border-brand-soft/60 cursor-pointer",
               !isActive && "border-line",
-              isActive && activeRingClass(bucket!)
+              isActive &&
+                (bucket
+                  ? activeRingClass(bucket)
+                  : "border-amber-500 ring-1 ring-amber-500/30")
             )}
           >
             <div className="flex items-center justify-between">

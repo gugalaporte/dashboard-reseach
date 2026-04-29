@@ -10,7 +10,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { motion } from "framer-motion";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, Star } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -82,6 +82,7 @@ interface Props {
   isLoading: boolean;
   onRowClick?: (row: ResearchRow) => void;
   livePrices?: LivePricesMap;
+  portfolioTickers?: string[];
   // Metricas selecionadas pelo usuario (1 a 3).
   selectedMetrics: MetricId[];
   // Anos a exibir como sub-colunas (normalmente 3).
@@ -93,12 +94,17 @@ export function ResearchTable({
   isLoading,
   onRowClick,
   livePrices,
+  portfolioTickers = [],
   selectedMetrics,
   years,
 }: Props) {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "empresa", desc: false },
   ]);
+  const portfolioSet = React.useMemo(
+    () => new Set<string>(portfolioTickers),
+    [portfolioTickers]
+  );
 
   // Constroi colunas leaf. Grupos de metrica ficam como 3 colunas sequenciais
   // id=`${metricId}_${year}`. O agrupamento visual vem do header manual abaixo.
@@ -107,11 +113,23 @@ export function ResearchTable({
       {
         accessorKey: "empresa",
         header: "Empresa",
-        cell: ({ row }) => (
-          <span className="font-display text-[15px] text-ink">
-            {row.original.empresa}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const isPortfolio = portfolioSet.has(row.original.empresa);
+          return (
+            <span className="inline-flex items-center gap-2">
+              <span className="font-display text-[15px] text-ink">
+                {row.original.empresa}
+              </span>
+              {isPortfolio && (
+                <Star
+                  className="h-3.5 w-3.5 fill-amber-400 text-amber-500"
+                  title="Empresa da carteira"
+                  aria-label="Empresa da carteira"
+                />
+              )}
+            </span>
+          );
+        },
       },
       {
         id: "setor",
@@ -295,7 +313,7 @@ export function ResearchTable({
     }
 
     return [...base, ...metricCols];
-  }, [selectedMetrics, years, livePrices]);
+  }, [selectedMetrics, years, livePrices, portfolioSet]);
 
   const table = useReactTable({
     data,
