@@ -9,6 +9,7 @@ import { DateFilter } from "@/components/date-filter";
 import { MetricsSelector } from "@/components/metrics-selector";
 import { ResearchTable } from "@/components/research-table";
 import { CompanyDrawer } from "@/components/company-drawer";
+import { ChangeFeed } from "@/components/change-feed";
 import {
   SummaryCards,
   type SummaryData,
@@ -239,6 +240,12 @@ export default function DashboardPage() {
           <SourceFilter value={fonte} onChange={setFonte} />
           <DateFilter value={periodo} onChange={setPeriodo} />
           <div className="flex-1" />
+          <a
+            href="#mudancas-recentes"
+            className="text-xs text-ink/60 hover:text-brand underline-offset-4 hover:underline transition"
+          >
+            ↓ Mudanças recentes
+          </a>
           {hasFilters && (
             <button
               type="button"
@@ -287,6 +294,7 @@ export default function DashboardPage() {
           years={years}
           portfolioTickers={PORTFOLIO_TICKERS as unknown as string[]}
         />
+        <ChangeFeed sectionId="mudancas-recentes" />
       </main>
 
       <CompanyDrawer
