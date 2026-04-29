@@ -226,7 +226,7 @@ export default function DashboardPage() {
       </header>
 
       {/* Barra de filtros em linha unica, sticky abaixo do header */}
-      <div className="sticky top-16 z-30 bg-surface-soft border-b border-line">
+      <div className="bg-surface-soft border-b border-line">
         <div className="mx-auto max-w-[1600px] px-8 py-4 flex items-center gap-3">
           <div className="w-[340px] shrink-0">
             <CompanySearch
