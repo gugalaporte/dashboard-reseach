@@ -59,7 +59,7 @@ const SOURCE_STYLE: Record<
 };
 
 // Largura fixa da coluna sticky (empresa). Em px, sem derivar de fonte.
-const W_EMPRESA = 110;
+const W_EMPRESA = 120;
 
 // IDs das colunas "base" (nao-metricas). Usado para saber onde comeca cada grupo de metrica.
 const BASE_COLUMN_IDS = [
@@ -121,11 +121,9 @@ export function ResearchTable({
                 {row.original.empresa}
               </span>
               {isPortfolio && (
-                <Star
-                  className="h-3.5 w-3.5 fill-amber-400 text-amber-500"
-                  title="Empresa da carteira"
-                  aria-label="Empresa da carteira"
-                />
+                <span title="Empresa da carteira" aria-label="Empresa da carteira">
+                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
+                </span>
               )}
             </span>
           );
@@ -327,7 +325,7 @@ export function ResearchTable({
   // Classes posicionais por column id (sticky so para Empresa).
   function stickyClass(colId: string): string {
     if (colId === "empresa")
-      return "sticky left-0 z-[1] bg-inherit sticky-shadow-right";
+      return "sticky left-0 z-20 sticky-shadow-right border-r border-line/70";
     return "";
   }
   function stickyStyle(colId: string): React.CSSProperties | undefined {
@@ -352,7 +350,7 @@ export function ResearchTable({
                 .map((h) => {
                   const sort = h.column.getIsSorted();
                   const id = h.column.id;
-                  const isSticky = id === "empresa";
+                  const isStickyEmpresa = id === "empresa";
                   return (
                     <TableHead
                       key={h.id}
@@ -362,8 +360,9 @@ export function ResearchTable({
                       className={cn(
                         "group h-10 text-[10px] uppercase tracking-[0.14em] font-medium text-surface-soft/80",
                         "border-b border-ink/40 select-none cursor-pointer align-middle",
-                        isSticky && "sticky left-0 z-40 bg-navy",
-                        !isSticky && "bg-navy"
+                        isStickyEmpresa &&
+                          "sticky left-0 z-50 bg-navy sticky-shadow-right border-r border-ink/30",
+                        !isStickyEmpresa && "bg-navy"
                       )}
                     >
                       <span className="inline-flex items-center gap-1">
@@ -507,12 +506,16 @@ export function ResearchTable({
                     className={cn(
                       "group/row h-16 border-b border-line/60 cursor-pointer transition-colors",
                       idx % 2 === 0 ? "bg-surface-soft" : "bg-surface/40",
-                      "hover:bg-brand-soft/10"
+                      "hover:bg-[#eef4ff]"
                     )}
                   >
                     {row.getVisibleCells().map((c) => {
                       const id = c.column.id;
                       const isSticky = id === "empresa";
+                      const stickyBgClass =
+                        idx % 2 === 0
+                          ? "bg-surface-soft group-hover/row:bg-[#eef4ff]"
+                          : "bg-surface group-hover/row:bg-[#eef4ff]";
                       // Separador visual antes do primeiro ano de cada metrica.
                       const isFirstYearOfMetric = selectedMetrics.some(
                         (mid) => id === `${mid}_${years[0]}`
@@ -524,6 +527,7 @@ export function ResearchTable({
                           className={cn(
                             "px-3 py-2 align-middle",
                             isSticky && stickyClass(id),
+                            isSticky && stickyBgClass,
                             isFirstYearOfMetric && "border-l border-line/50",
                             // Alinhamento: metricas (numericas) a direita.
                             id.includes("_") && "text-right"
