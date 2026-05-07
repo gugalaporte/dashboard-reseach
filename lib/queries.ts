@@ -44,7 +44,7 @@ export const FONTE_SHORT_LABEL: Record<Fonte, string> = {
 // Qualquer empresa fora desta lista nao aparece na tabela nem nos filtros.
 export const ALLOWED_TICKERS = [
   "PETR4", "SLCE3", "VBBR3", "GOAU3", "DXCO3", "GOAU4", "SUZB3", "VALE3",
-  "POSI3", "RAPT3", "LOGG3", "LREN3", "POMO3", "AZUL", "RAPT4", "ALOS3",
+  "POSI3", "RAPT3", "LOGG3", "LREN3", "POMO3", "AZUL", "AZUL3", "RAPT4", "ALOS3",
   "POMO4", "MRVE3", "BRBI11", "ITUB4", "PSSA3", "ITUB3", "INBR32", "CMIG4",
   "TIMS3", "EQTL3", "AXIA3", "ENGI11", "AXIA7", "VIVT3", "AXIA6",
   "GGBR4", "RDOR3", "ASAI3", "CEAB3", "BRAV3",

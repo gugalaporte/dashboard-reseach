@@ -83,12 +83,17 @@ function eventSummary(e: RevisionEvent): string {
   return `${tpVerb} de ${prevTp} → ${currTp} (${pct})`;
 }
 
-function fileUrl(filePath: string | null): string | null {
-  if (!filePath) return null;
-  if (/^https?:\/\//i.test(filePath)) return filePath;
+function supabaseDashboardUrl(): string | null {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!base) return null;
-  return `${base}/storage/v1/object/public/${filePath.replace(/^\/+/, "")}`;
+  try {
+    const u = new URL(base);
+    const projectRef = u.hostname.split(".")[0];
+    if (!projectRef) return null;
+    return `https://supabase.com/dashboard/project/${projectRef}`;
+  } catch {
+    return null;
+  }
 }
 
 interface ChangeFeedProps {
@@ -198,6 +203,7 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
     }
     return Array.from(map.entries()).map(([date, events]) => ({ date, events }));
   }, [visible]);
+  const dashboardUrl = React.useMemo(() => supabaseDashboardUrl(), []);
 
   function toggleFonte(fonte: string) {
     setFontes((prev) => (prev.includes(fonte) ? prev.filter((x) => x !== fonte) : [...prev, fonte]));
@@ -355,9 +361,9 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
                             {FONTE_SHORT_LABEL[e.fonte as keyof typeof FONTE_SHORT_LABEL] ?? e.fonte}
                           </div>
                           <div className="min-w-0 flex-1 text-xs text-ink truncate">{eventSummary(e)}</div>
-                          {fileUrl(e.previous_file_path) && (
+                          {e.prev_pdf_id != null && (
                             <a
-                              href={fileUrl(e.previous_file_path)!}
+                              href={`/api/revisions/pdf?pdf_id=${e.prev_pdf_id}`}
                               target="_blank"
                               rel="noreferrer"
                               onClick={(ev) => ev.stopPropagation()}
@@ -425,34 +431,36 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {fileUrl(selected.current_file_path) && (
+                  {selected.pdf_id != null && (
                     <a
                       className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-line text-sm hover:bg-surface"
-                      href={fileUrl(selected.current_file_path)!}
+                      href={`/api/revisions/pdf?pdf_id=${selected.pdf_id}`}
                       target="_blank"
                       rel="noreferrer"
                     >
                       PDF atual <ExternalLink className="h-3.5 w-3.5" />
                     </a>
                   )}
-                  {fileUrl(selected.previous_file_path) && (
+                  {selected.prev_pdf_id != null && (
                     <a
                       className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-line text-sm hover:bg-surface"
-                      href={fileUrl(selected.previous_file_path)!}
+                      href={`/api/revisions/pdf?pdf_id=${selected.prev_pdf_id}`}
                       target="_blank"
                       rel="noreferrer"
                     >
                       PDF anterior <ExternalLink className="h-3.5 w-3.5" />
                     </a>
                   )}
-                  <a
-                    className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-line text-sm hover:bg-surface"
-                    href={fileUrl(selected.current_file_path) ?? "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Ver no Supabase <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
+                  {dashboardUrl && (
+                    <a
+                      className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-line text-sm hover:bg-surface"
+                      href={dashboardUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Ver no Supabase <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  )}
                 </div>
                 <div>
                   <div className="text-[11px] uppercase tracking-[0.14em] text-ink/50 mb-2">
