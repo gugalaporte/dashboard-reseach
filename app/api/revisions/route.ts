@@ -54,6 +54,32 @@ function isRelevant(r: ApiRevision): boolean {
   return true;
 }
 
+// Ratings podem chegar com caixa diferente do PDF (ex.: "BUY" vs "Buy").
+// Para o usuario eh o mesmo rating; nao deve aparecer como mudanca.
+function sameRatingIgnoreCase(a: string | null, b: string | null): boolean {
+  if (a == null || b == null) return false;
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+// Remove ruido de "mudanca" de rating quando so muda a caixa.
+// - rating_change sem mudanca real -> descarta.
+// - rating_and_tp_change sem mudanca real de rating -> vira tp_change.
+function normalizeRatingNoise(r: ApiRevision): ApiRevision | null {
+  if (
+    r.event_type === "rating_change" &&
+    sameRatingIgnoreCase(r.prev_rating, r.rating)
+  ) {
+    return null;
+  }
+  if (
+    r.event_type === "rating_and_tp_change" &&
+    sameRatingIgnoreCase(r.prev_rating, r.rating)
+  ) {
+    return { ...r, event_type: "tp_change", rating_direction: "hold" };
+  }
+  return r;
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -88,6 +114,8 @@ export async function GET(req: Request) {
     if (error) throw error;
 
     const rows = ((data ?? []) as unknown as ApiRevision[])
+      .map(normalizeRatingNoise)
+      .filter((r): r is ApiRevision => r != null)
       .filter(isRelevant)
       .filter((r) => {
         if (kind === "tp_raise") {
