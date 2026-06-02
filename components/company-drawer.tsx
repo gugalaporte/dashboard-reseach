@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getHistoricoEmpresa, getPdfsEmpresa } from "@/lib/queries";
+import { defaultCcyForTicker, getHistoricoEmpresa, getPdfsEmpresa } from "@/lib/queries";
 import type { ResearchRow } from "@/lib/queries";
 import type { MetricaRow, PdfDoc } from "@/types/research";
 import type { LivePricesMap } from "@/lib/use-live-prices";
@@ -229,9 +229,13 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
                             : null;
                           const price = yClose?.price ?? c.price?.value ?? null;
                           const priceIsLive = yClose != null;
+                          const ccy =
+                            yClose?.currency === "BRL"
+                              ? "R$"
+                              : yClose?.currency ?? (empresa ? defaultCcyForTicker(empresa) : "R$");
                           const target = c.target;
                           const upside =
-                            price != null && target && target.ccy === "R$"
+                            price != null && target && target.ccy === ccy
                               ? ((target.value - price) / price) * 100
                               : null;
                           return (
@@ -259,7 +263,7 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
                                 )}
                               >
                                 {price != null ? (
-                                  formatValue(price, "money", "R$")
+                                  formatValue(price, "money", ccy)
                                 ) : (
                                   <span className="text-line/60">–</span>
                                 )}

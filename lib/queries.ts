@@ -48,6 +48,7 @@ export const ALLOWED_TICKERS = [
   "POMO4", "MRVE3", "BRBI11", "ITUB4", "PSSA3", "ITUB3", "INBR32", "CMIG4",
   "TIMS3", "EQTL3", "AXIA3", "ENGI11", "AXIA7", "VIVT3", "AXIA6",
   "INTR",
+  "VALE",
   "GGBR4", "RDOR3", "ASAI3", "CEAB3", "BRAV3",
   "ABEV3", "AURE3", "AZT73", "B3SA3", "BBSE3", "BBDC3", "BBDC4", "BRAP4",
   "BRAS3", "BRKM5", "BPAC11", "CXTB3", "COGN3", "CSMG3", "CPLE3", "CSAN3",
@@ -252,6 +253,16 @@ function cell(r?: MetricRow): Cell | undefined {
     unidade: r.unidade,
     pdf_id: r.pdf_id,
   };
+}
+
+function isPeriodo12m(periodo: string | null | undefined): boolean {
+  return (periodo ?? "").trim().toLowerCase() === "12m";
+}
+
+export function defaultCcyForTicker(ticker: string): "R$" | "US$" {
+  const t = (ticker ?? "").trim().toUpperCase();
+  // Convenção do projeto: tickers sem número no final (ex.: VALE, INTR) são listados em US$.
+  return /\d$/.test(t) ? "R$" : "US$";
 }
 
 // Quando nao ha metrica em dados_estruturados, cai para o stock_guide.
@@ -476,32 +487,35 @@ export function buildRows(
     const pick = (m: string) => cell(pickLatest(byMetric[m] ?? []));
 
     const sg = sgLatest.get(k);
-    const tp = pickLatest(byMetric["Target Price"] ?? []);
+    // Para Target Price, ignoramos periodos "forward" (ex.: 2026E, 2027E, etc).
+    // Mantemos apenas o periodo "12m" (rolling 12 meses).
+    const tp = pickLatest(
+      (byMetric["Target Price"] ?? []).filter((r) => isPeriodo12m(r.periodo))
+    );
 
     // Prioridade do target:
-    //   1) stock_guide.target_price (dados novos, padronizados e recentes)
-    //   2) dados_estruturados.Target Price (fallback legado quando SG nao tem)
-    const target: TargetCell | undefined =
-      sg?.target_price != null
+    //   1) dados_estruturados.Target Price com periodo "12m" (evita periodos forward 2026E/2027E/etc)
+    //   2) stock_guide.target_price (fallback quando nao houver 12m publicado)
+    const target: TargetCell | undefined = tp
+      ? {
+          value: Number(tp.valor),
+          ccy: tp.unidade ?? defaultCcyForTicker(empresa),
+          date: tp.data_relatorio,
+          periodo: tp.periodo,
+          unidade: tp.unidade,
+          pdf_id: tp.pdf_id,
+        }
+      : sg?.target_price != null
         ? {
             value: Number(sg.target_price),
-            ccy: "R$",
+            ccy: defaultCcyForTicker(empresa),
             date: sg.report_date,
             periodo: null,
-            unidade: "R$",
+            unidade: defaultCcyForTicker(empresa),
             pdf_id: sg.pdf_id,
             upside: sg.upside != null ? Number(sg.upside) : null,
           }
-        : tp
-          ? {
-              value: Number(tp.valor),
-              ccy: tp.unidade ?? "R$",
-              date: tp.data_relatorio,
-              periodo: tp.periodo,
-              unidade: tp.unidade,
-              pdf_id: tp.pdf_id,
-            }
-          : undefined;
+        : undefined;
 
     // byMetricYear: metrica canonica -> ano -> Cell. Vence o mais recente quando
     // ha duplicatas (aliases diferentes com o mesmo ano).

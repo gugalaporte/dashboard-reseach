@@ -25,7 +25,7 @@ import { TargetCell } from "@/components/target-cell";
 import { cn } from "@/lib/utils";
 import { deriveCurrentPE } from "@/lib/derive-metrics";
 import { formatDateShort, formatValue } from "@/lib/format";
-import { FONTE_SHORT_LABEL, type ResearchRow } from "@/lib/queries";
+import { defaultCcyForTicker, FONTE_SHORT_LABEL, type ResearchRow } from "@/lib/queries";
 import type { LivePrice, LivePricesMap } from "@/lib/use-live-prices";
 import { getMetricDef, type MetricId } from "@/lib/metrics";
 import { sectorPt } from "@/lib/sector-labels";
@@ -202,6 +202,7 @@ export function ResearchTable({
             <MetricCell
               value={row.original.price?.value}
               date={row.original.price?.date}
+              ccy={defaultCcyForTicker(row.original.empresa)}
               format="money"
             />
           );
@@ -214,11 +215,22 @@ export function ResearchTable({
         cell: ({ row }) => {
           const live = livePrices?.get(row.original.empresa)?.price;
           const effectivePrice = live ?? row.original.price?.value ?? null;
+          const priceCcy =
+            livePrices?.get(row.original.empresa)?.currency === "BRL"
+              ? "R$"
+              : livePrices?.get(row.original.empresa)?.currency ??
+                defaultCcyForTicker(row.original.empresa);
           const target =
             live != null && row.original.target
               ? { ...row.original.target, upside: null }
               : row.original.target;
-          return <TargetCell target={target} priceValue={effectivePrice} />;
+          return (
+            <TargetCell
+              target={target}
+              priceValue={effectivePrice}
+              priceCcy={priceCcy}
+            />
+          );
         },
       },
     ];
