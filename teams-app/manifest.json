@@ -1,0 +1,35 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.19",
+  "version": "1.0.0",
+  "id": "f8c4e2a1-9b3d-4f6e-a8c1-2d5e7f9b1c3a",
+  "developer": {
+    "name": "Finacap",
+    "websiteUrl": "https://dashboard-reseach.vercel.app",
+    "privacyUrl": "https://dashboard-reseach.vercel.app",
+    "termsOfUseUrl": "https://dashboard-reseach.vercel.app"
+  },
+  "name": {
+    "short": "Dashboard Research",
+    "full": "Finacap Research Dashboard"
+  },
+  "description": {
+    "short": "Dashboard de pesquisa equity",
+    "full": "Cobertura de analistas, targets, ratings e mudanças recentes do mercado."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#1B2A4A",
+  "staticTabs": [
+    {
+      "entityId": "dashboard",
+      "name": "Dashboard Research",
+      "contentUrl": "https://dashboard-reseach.vercel.app/",
+      "websiteUrl": "https://dashboard-reseach.vercel.app/",
+      "scopes": ["team", "personal"]
+    }
+  ],
+  "validDomains": ["dashboard-reseach.vercel.app"]
+}

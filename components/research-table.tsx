@@ -248,10 +248,15 @@ export function ResearchTable({
           accessorFn: (r) => r.byMetricYear?.[mid]?.[year]?.value ?? null,
           cell: ({ row }) => {
             const c = row.original.byMetricYear?.[mid]?.[year];
+            const ccy =
+              def.format === "money" || def.format === "millions"
+                ? defaultCcyForTicker(row.original.empresa)
+                : null;
             return (
               <MetricCell
                 value={c?.value}
                 date={c?.date ?? null}
+                ccy={ccy}
                 format={def.format}
                 derived={c?.derived}
                 formula={c?.formula}

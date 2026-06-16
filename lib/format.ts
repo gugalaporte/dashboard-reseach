@@ -44,7 +44,8 @@ export function formatValue(v: number, f: Format, ccy?: string | null): string {
   }
   if (f === "millions") {
     const n = new Intl.NumberFormat(PT, { maximumFractionDigits: 0 }).format(v);
-    return `R$ ${n} M`;
+    const prefix = ccy === "US$" ? "US$" : "R$";
+    return `${prefix} ${n} M`;
   }
   if (f === "pct") {
     return `${v.toLocaleString(PT, {
