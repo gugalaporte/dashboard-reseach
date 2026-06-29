@@ -113,7 +113,18 @@ function isEquityTrade(row: MovAtivoRow): boolean {
 }
 
 /** Agrega fills do dia por papel e lado. */
-export function aggregateExecutions(rows: MovAtivoRow[]): Omit<DayExecution, "marketClose" | "marketTypical" | "vsCloseBps" | "vsTypicalBps" | "quality">[] {
+export function aggregateExecutions(
+  rows: MovAtivoRow[]
+): Omit<
+  DayExecution,
+  | "marketClose"
+  | "marketTypical"
+  | "vsCloseBps"
+  | "vsTypicalBps"
+  | "vsCloseValue"
+  | "vsTypicalValue"
+  | "quality"
+>[] {
   const map = new Map<string, {
     ric: string;
     tradeDateIso: string;
