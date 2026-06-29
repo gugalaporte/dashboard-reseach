@@ -32,6 +32,15 @@ export function formatNumber(v: number | null | undefined, digits = 0): string {
   }).format(v);
 }
 
+/** Valor com todas as casas decimais (tooltip). */
+export function formatNumberFull(v: number | null | undefined): string {
+  if (isNil(v)) return DASH;
+  return new Intl.NumberFormat(PT, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 10,
+  }).format(v);
+}
+
 // Formatador unificado usado pelo MetricCell.
 export function formatValue(v: number, f: Format, ccy?: string | null): string {
   if (f === "money") {

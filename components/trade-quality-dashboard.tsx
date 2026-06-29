@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDateShort, formatNumber, formatValue } from "@/lib/format";
+import { formatDateShort, formatNumber, formatNumberFull, formatValue } from "@/lib/format";
 import { recomputeRotationPair, summaryStats, type RotationRow } from "@/lib/trade-analytics";
 import { AppHeader } from "@/components/app-header";
 import { cn } from "@/lib/utils";
@@ -125,6 +125,15 @@ function fmtPct(v: number | null): string {
   if (v == null) return "–";
   const sign = v > 0 ? "+" : "";
   return `${sign}${formatNumber(v, 2)}%`;
+}
+
+function PriceValue({ value }: { value: number | null | undefined }) {
+  if (value == null) return <>–</>;
+  return (
+    <span title={formatNumberFull(value)} className="cursor-help">
+      {formatNumber(value, 2)}
+    </span>
+  );
 }
 
 function QualityBadge({ q }: { q: DayExecution["quality"] }) {
@@ -484,12 +493,14 @@ export function TradeQualityDashboard() {
                       <TableCell className={cn(CELL_CENTER, "tabular text-sm text-ink font-medium")}>
                         {fmtMoney(ex.notional)}
                       </TableCell>
-                      <TableCell className={PRICE_COL}>{formatNumber(ex.avgPrice, 2)}</TableCell>
                       <TableCell className={PRICE_COL}>
-                        {ex.marketClose != null ? formatNumber(ex.marketClose, 2) : "–"}
+                        <PriceValue value={ex.avgPrice} />
                       </TableCell>
                       <TableCell className={PRICE_COL}>
-                        {ex.marketTypical != null ? formatNumber(ex.marketTypical, 2) : "–"}
+                        <PriceValue value={ex.marketClose} />
+                      </TableCell>
+                      <TableCell className={PRICE_COL}>
+                        <PriceValue value={ex.marketTypical} />
                       </TableCell>
                       <TableCell
                         className={cn(
