@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,10 +21,32 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDateShort, formatNumber, formatNumberFull, formatValue } from "@/lib/format";
-import { recomputeRotationPair, summaryStats, type RotationRow } from "@/lib/trade-analytics";
+import { comparisonMetrics, summaryStats, type RotationBucket } from "@/lib/trade-analytics";
 import { AppHeader } from "@/components/app-header";
 import { cn } from "@/lib/utils";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { Plus, TrendingDown, TrendingUp, Trash2 } from "lucide-react";
+
+type UserComparison = {
+  id: string;
+  tradeDateIso: string;
+  tradingDesk: string;
+  shortLeg: string;
+  longLeg: string;
+};
+
+type ComparisonDraft = {
+  tradeDateIso: string;
+  tradingDesk: string;
+  shortLeg: string;
+  longLeg: string;
+};
+
+const EMPTY_DRAFT: ComparisonDraft = {
+  tradeDateIso: "",
+  tradingDesk: "",
+  shortLeg: "",
+  longLeg: "",
+};
 
 type DayExecution = {
   ric: string;
@@ -50,7 +73,7 @@ type TradesPayload = {
   toIso: string;
   tradingDesks: string[];
   executions: DayExecution[];
-  rotations: RotationRow[];
+  rotationBuckets: RotationBucket[];
   summary: {
     total: number;
     scored: number;
@@ -189,9 +212,9 @@ export function TradeQualityDashboard() {
   const [data, setData] = React.useState<TradesPayload | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [pairOverrides, setPairOverrides] = React.useState<
-    Record<string, { shortLeg: string; longLeg: string }>
-  >({});
+  const [comparisons, setComparisons] = React.useState<UserComparison[]>([]);
+  const [showAddForm, setShowAddForm] = React.useState(false);
+  const [draft, setDraft] = React.useState<ComparisonDraft>(EMPTY_DRAFT);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -200,19 +223,21 @@ export function TradeQualityDashboard() {
       setError(null);
       try {
         const res = await fetch(`/api/trades?days=${days}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = (await res.json()) as TradesPayload & { error?: string };
+        if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
         if (json.error) throw new Error(json.error);
         if (!cancelled) {
           setData({
             ...json,
-            rotations: json.rotations ?? [],
+            rotationBuckets: json.rotationBuckets ?? [],
           });
           setDesk("all");
           const range = periodDateRange(days);
           setDateFrom(range.from);
           setDateTo(range.to);
-          setPairOverrides({});
+          setComparisons([]);
+          setShowAddForm(false);
+          setDraft(EMPTY_DRAFT);
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Erro");
@@ -235,26 +260,64 @@ export function TradeQualityDashboard() {
     });
   }, [data, desk, dateFrom, dateTo]);
 
-  const filteredRotations = React.useMemo(() => {
+  const filteredBuckets = React.useMemo(() => {
     if (!data) return [];
-    return data.rotations.filter((p) => {
-      if (desk !== "all" && p.tradingDesk !== desk) return false;
-      if (!inDateRange(p.tradeDateIso, dateFrom, dateTo)) return false;
+    return data.rotationBuckets.filter((b) => {
+      if (desk !== "all" && b.tradingDesk !== desk) return false;
+      if (!inDateRange(b.tradeDateIso, dateFrom, dateTo)) return false;
       return true;
     });
   }, [data, desk, dateFrom, dateTo]);
 
-  const updatePairOverride = React.useCallback(
-    (pairId: string, patch: Partial<{ shortLeg: string; longLeg: string }>) => {
-      setPairOverrides((prev) => {
-        const row = data?.rotations.find((r) => r.pairId === pairId);
-        if (!row) return prev;
-        const current = prev[pairId] ?? { shortLeg: row.shortLeg, longLeg: row.longLeg };
-        return { ...prev, [pairId]: { ...current, ...patch } };
-      });
-    },
-    [data]
+  const bucketMap = React.useMemo(() => {
+    const map = new Map<string, RotationBucket>();
+    for (const b of filteredBuckets) {
+      map.set(`${b.tradeDateIso}|${b.tradingDesk}`, b);
+    }
+    return map;
+  }, [filteredBuckets]);
+
+  const comparisonDateOptions = React.useMemo(
+    () => [...new Set(filteredBuckets.map((b) => b.tradeDateIso))].sort((a, b) => b.localeCompare(a)),
+    [filteredBuckets]
   );
+
+  const comparisonDeskOptions = React.useMemo(() => {
+    if (!draft.tradeDateIso) return [];
+    return filteredBuckets
+      .filter((b) => b.tradeDateIso === draft.tradeDateIso)
+      .map((b) => b.tradingDesk)
+      .sort();
+  }, [filteredBuckets, draft.tradeDateIso]);
+
+  const draftBucket = React.useMemo(() => {
+    if (!draft.tradeDateIso || !draft.tradingDesk) return null;
+    return bucketMap.get(`${draft.tradeDateIso}|${draft.tradingDesk}`) ?? null;
+  }, [bucketMap, draft.tradeDateIso, draft.tradingDesk]);
+
+  const canAddComparison = Boolean(
+    draft.tradeDateIso && draft.tradingDesk && draft.shortLeg && draft.longLeg && draftBucket
+  );
+
+  const addComparison = () => {
+    if (!canAddComparison) return;
+    setComparisons((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        tradeDateIso: draft.tradeDateIso,
+        tradingDesk: draft.tradingDesk,
+        shortLeg: draft.shortLeg,
+        longLeg: draft.longLeg,
+      },
+    ]);
+    setDraft(EMPTY_DRAFT);
+    setShowAddForm(false);
+  };
+
+  const removeComparison = (id: string) => {
+    setComparisons((prev) => prev.filter((c) => c.id !== id));
+  };
 
   const filteredSummary = React.useMemo(
     () => summaryStats(filteredExecutions),
@@ -541,12 +604,119 @@ export function TradeQualityDashboard() {
 
         {/* Tabela rotações */}
         <section className="rounded-md border border-line bg-surface-soft overflow-hidden">
-          <div className="px-4 py-3 border-b border-line bg-surface">
-            <h2 className="font-display text-[15px] text-ink">Rotações (long/short sintético)</h2>
-            <p className="text-[11px] text-ink/50 mt-0.5">
-              Pares no mesmo dia e desk · ajuste venda/compra nos selects · retorno ponderado vs IBOV
-            </p>
+          <div className="px-4 py-3 border-b border-line bg-surface flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-display text-[15px] text-ink">Rotações (long/short sintético)</h2>
+              <p className="text-[11px] text-ink/50 mt-0.5">
+                Adicione comparações manualmente · retorno ponderado vs IBOV
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+              disabled={loading}
+              onClick={() => setShowAddForm((v) => !v)}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Adicionar comparação
+            </Button>
           </div>
+
+          {showAddForm && !loading && (
+            <div className="px-4 py-3 border-b border-line bg-surface-soft/80 flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wide text-ink/50">Data</label>
+                <Select
+                  value={draft.tradeDateIso || undefined}
+                  onValueChange={(v) =>
+                    setDraft({ tradeDateIso: v, tradingDesk: "", shortLeg: "", longLeg: "" })
+                  }
+                >
+                  <SelectTrigger className="w-[140px] h-8 text-xs bg-surface border-line">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {comparisonDateOptions.map((d) => (
+                      <SelectItem key={d} value={d} className="text-xs">
+                        {formatDateShort(d)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wide text-ink/50">Fundo</label>
+                <Select
+                  value={draft.tradingDesk || undefined}
+                  disabled={!draft.tradeDateIso}
+                  onValueChange={(v) =>
+                    setDraft((prev) => ({ ...prev, tradingDesk: v, shortLeg: "", longLeg: "" }))
+                  }
+                >
+                  <SelectTrigger className="w-[220px] h-8 text-xs bg-surface border-line">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {comparisonDeskOptions.map((d) => (
+                      <SelectItem key={d} value={d} className="text-xs">
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wide text-ink/50">Venda</label>
+                <Select
+                  value={draft.shortLeg || undefined}
+                  disabled={!draftBucket}
+                  onValueChange={(v) => setDraft((prev) => ({ ...prev, shortLeg: v }))}
+                >
+                  <SelectTrigger className="w-[100px] h-8 text-xs bg-surface border-line tabular">
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(draftBucket?.sellOptions ?? []).map((o) => (
+                      <SelectItem key={o.ric} value={o.ric} className="text-xs tabular">
+                        {o.ric}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wide text-ink/50">Compra</label>
+                <Select
+                  value={draft.longLeg || undefined}
+                  disabled={!draftBucket}
+                  onValueChange={(v) => setDraft((prev) => ({ ...prev, longLeg: v }))}
+                >
+                  <SelectTrigger className="w-[100px] h-8 text-xs bg-surface border-line tabular text-brand">
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(draftBucket?.buyOptions ?? []).map((o) => (
+                      <SelectItem key={o.ric} value={o.ric} className="text-xs tabular">
+                        {o.ric}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 text-xs"
+                disabled={!canAddComparison}
+                onClick={addComparison}
+              >
+                Incluir
+              </Button>
+            </div>
+          )}
+
           <div className="overflow-x-auto scrollbar-thin">
             <Table>
               <TableHeader>
@@ -562,12 +732,13 @@ export function TradeQualityDashboard() {
                     "IBOV",
                     "Alpha",
                     "Até",
+                    "",
                   ].map((h, i) => (
                     <TableHead
-                      key={h}
+                      key={h || "actions"}
                       className={cn(
                         "text-[9px] uppercase tracking-[0.14em] text-surface-soft/80 font-medium h-9",
-                        i >= 4 && "text-right"
+                        i >= 4 && i <= 8 && "text-right"
                       )}
                     >
                       {h}
@@ -578,101 +749,86 @@ export function TradeQualityDashboard() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="py-8">
+                    <TableCell colSpan={11} className="py-8">
                       <Skeleton className="h-6 w-full" />
                     </TableCell>
                   </TableRow>
-                ) : filteredRotations.length === 0 ? (
+                ) : comparisons.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center text-ink/50 py-10 text-sm">
-                      Nenhum par de rotação no período / filtros selecionados.
+                    <TableCell colSpan={11} className="text-center text-ink/50 py-10 text-sm">
+                      Nenhuma comparação adicionada. Clique em &quot;Adicionar comparação&quot; para
+                      começar.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredRotations.map((row, i) => {
-                    const override = pairOverrides[row.pairId];
-                    const shortLeg = override?.shortLeg ?? row.shortLeg;
-                    const longLeg = override?.longLeg ?? row.longLeg;
-                    const metrics = recomputeRotationPair(row, shortLeg, longLeg);
+                  comparisons.map((cmp, i) => {
+                    const bucket = bucketMap.get(`${cmp.tradeDateIso}|${cmp.tradingDesk}`);
+                    if (!bucket) return null;
+                    const metrics = comparisonMetrics(bucket, cmp.shortLeg, cmp.longLeg);
 
                     return (
-                    <TableRow
-                      key={row.pairId}
-                      className={cn("border-line", i % 2 === 0 ? "bg-surface-soft" : "bg-white")}
-                    >
-                      <TableCell className={cn(CELL_CENTER, "tabular text-xs text-ink/70")}>
-                        {formatDateShort(row.tradeDateIso)}
-                      </TableCell>
-                      <TableCell className={cn(CELL_CENTER, "text-[11px] text-ink/55 max-w-[120px] truncate")}>
-                        {row.tradingDesk}
-                      </TableCell>
-                      <TableCell className={CELL_CENTER}>
-                        <Select
-                          value={shortLeg}
-                          onValueChange={(v) => updatePairOverride(row.pairId, { shortLeg: v })}
-                        >
-                          <SelectTrigger className="h-7 w-[96px] mx-auto text-xs font-medium tabular border-line bg-surface">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {row.sellOptions.map((o) => (
-                              <SelectItem key={o.ric} value={o.ric} className="text-xs tabular">
-                                {o.ric}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className={CELL_CENTER}>
-                        <Select
-                          value={longLeg}
-                          onValueChange={(v) => updatePairOverride(row.pairId, { longLeg: v })}
-                        >
-                          <SelectTrigger className="h-7 w-[96px] mx-auto text-xs font-medium tabular border-line bg-surface text-brand">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {row.buyOptions.map((o) => (
-                              <SelectItem key={o.ric} value={o.ric} className="text-xs tabular">
-                                {o.ric}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className={cn(CELL_CENTER, "tabular text-sm")}>
-                        {fmtPct(metrics.longReturnPct)}
-                      </TableCell>
-                      <TableCell className={cn(CELL_CENTER, "tabular text-sm")}>
-                        {fmtPct(metrics.shortReturnPct)}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          CELL_CENTER,
-                          "tabular text-sm font-semibold",
-                          (metrics.pairReturnPct ?? 0) > 0 && "text-brand",
-                          (metrics.pairReturnPct ?? 0) < 0 && "text-destructive"
-                        )}
+                      <TableRow
+                        key={cmp.id}
+                        className={cn("border-line", i % 2 === 0 ? "bg-surface-soft" : "bg-white")}
                       >
-                        {fmtPct(metrics.pairReturnPct)}
-                      </TableCell>
-                      <TableCell className={cn(CELL_CENTER, "tabular text-sm text-ink/50")}>
-                        {fmtPct(row.ibovReturnPct)}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          CELL_CENTER,
-                          "tabular text-sm font-medium",
-                          (metrics.alphaVsIbovPct ?? 0) > 0 && "text-brand",
-                          (metrics.alphaVsIbovPct ?? 0) < 0 && "text-destructive"
-                        )}
-                      >
-                        {fmtPct(metrics.alphaVsIbovPct)}
-                      </TableCell>
-                      <TableCell className={cn(CELL_CENTER, "tabular text-[11px] text-ink/45")}>
-                        {row.asOfDate ? formatDateShort(row.asOfDate) : "–"}
-                      </TableCell>
-                    </TableRow>
+                        <TableCell className={cn(CELL_CENTER, "tabular text-xs text-ink/70")}>
+                          {formatDateShort(cmp.tradeDateIso)}
+                        </TableCell>
+                        <TableCell
+                          className={cn(CELL_CENTER, "text-[11px] text-ink/55 max-w-[120px] truncate")}
+                          title={cmp.tradingDesk}
+                        >
+                          {cmp.tradingDesk}
+                        </TableCell>
+                        <TableCell className={cn(CELL_CENTER, "font-medium text-ink/80 tabular text-sm")}>
+                          {cmp.shortLeg}
+                        </TableCell>
+                        <TableCell className={cn(CELL_CENTER, "font-medium text-brand tabular text-sm")}>
+                          {cmp.longLeg}
+                        </TableCell>
+                        <TableCell className={cn(CELL_CENTER, "tabular text-sm")}>
+                          {fmtPct(metrics.longReturnPct)}
+                        </TableCell>
+                        <TableCell className={cn(CELL_CENTER, "tabular text-sm")}>
+                          {fmtPct(metrics.shortReturnPct)}
+                        </TableCell>
+                        <TableCell
+                          className={cn(
+                            CELL_CENTER,
+                            "tabular text-sm font-semibold",
+                            (metrics.pairReturnPct ?? 0) > 0 && "text-brand",
+                            (metrics.pairReturnPct ?? 0) < 0 && "text-destructive"
+                          )}
+                        >
+                          {fmtPct(metrics.pairReturnPct)}
+                        </TableCell>
+                        <TableCell className={cn(CELL_CENTER, "tabular text-sm text-ink/50")}>
+                          {fmtPct(metrics.ibovReturnPct)}
+                        </TableCell>
+                        <TableCell
+                          className={cn(
+                            CELL_CENTER,
+                            "tabular text-sm font-medium",
+                            (metrics.alphaVsIbovPct ?? 0) > 0 && "text-brand",
+                            (metrics.alphaVsIbovPct ?? 0) < 0 && "text-destructive"
+                          )}
+                        >
+                          {fmtPct(metrics.alphaVsIbovPct)}
+                        </TableCell>
+                        <TableCell className={cn(CELL_CENTER, "tabular text-[11px] text-ink/45")}>
+                          {metrics.asOfDate ? formatDateShort(metrics.asOfDate) : "–"}
+                        </TableCell>
+                        <TableCell className={CELL_CENTER}>
+                          <button
+                            type="button"
+                            onClick={() => removeComparison(cmp.id)}
+                            className="p-1 rounded text-ink/40 hover:text-destructive transition"
+                            aria-label="Remover comparação"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </TableCell>
+                      </TableRow>
                     );
                   })
                 )}

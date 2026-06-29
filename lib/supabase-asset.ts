@@ -11,7 +11,7 @@ export function getAssetSupabase(): SupabaseClient {
   const key = process.env.SUPABASE_ASSET_SERVICE_KEY;
   if (!url || !key) {
     throw new Error(
-      "Configurar SUPABASE_ASSET_URL e SUPABASE_ASSET_SERVICE_KEY em .env.local"
+      "Variáveis SUPABASE_ASSET_URL e SUPABASE_ASSET_SERVICE_KEY não configuradas (adicione no Vercel → Settings → Environment Variables)."
     );
   }
 

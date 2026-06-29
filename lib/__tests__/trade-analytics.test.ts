@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aggregateExecutions,
+  buildRotationBuckets,
   buildRotationRows,
   detectRotationPairs,
   enrichExecutions,
@@ -180,6 +181,24 @@ describe("detectRotationPairs", () => {
     const pairs = detectRotationPairs(executions);
     expect(pairs).toHaveLength(1);
     expect(pairs[0].shortLeg).toBe("VALE3");
+  });
+});
+
+describe("buildRotationBuckets", () => {
+  it("lista opções por dia e desk sem parear automaticamente", () => {
+    const bars = new Map<string, DailyBar[]>();
+    const executions = enrichExecutions(
+      aggregateExecutions([
+        row({ product: "VALE3", amount: "-1000", price: "80" }),
+        row({ product: "PETR4", amount: "-500", price: "39" }),
+        row({ product: "BRAP4", amount: "1000", price: "20" }),
+      ]),
+      bars
+    );
+    const buckets = buildRotationBuckets(executions, bars, []);
+    expect(buckets).toHaveLength(1);
+    expect(buckets[0].sellOptions).toHaveLength(2);
+    expect(buckets[0].buyOptions).toHaveLength(1);
   });
 });
 

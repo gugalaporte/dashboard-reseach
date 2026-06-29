@@ -231,6 +231,10 @@ export function enrichExecutions(
   });
 }
 
+function rotationBucketKey(tradeDateIso: string, tradingDesk: string): string {
+  return `${tradeDateIso}|${tradingDesk}`;
+}
+
 /** Uma rotação por dia e desk (venda/compra padrão pelo maior volume). */
 export function detectRotationPairs(executions: DayExecution[]): RotationPair[] {
   const byDay = new Map<string, { buys: DayExecution[]; sells: DayExecution[] }>();
@@ -358,10 +362,6 @@ export type RotationRow = PairPerformance & {
   buyOptions: RotationLegOption[];
 };
 
-function rotationBucketKey(tradeDateIso: string, tradingDesk: string): string {
-  return `${tradeDateIso}|${tradingDesk}`;
-}
-
 function groupRotationBuckets(
   executions: DayExecution[]
 ): Map<string, { buys: DayExecution[]; sells: DayExecution[] }> {
@@ -402,6 +402,46 @@ function toLegOptions(
       returnPct: executionReturnPct(ex, barsByRic),
     }))
     .sort((a, b) => b.notional - a.notional);
+}
+
+export type RotationBucket = {
+  tradeDateIso: string;
+  tradingDesk: string;
+  sellOptions: RotationLegOption[];
+  buyOptions: RotationLegOption[];
+  ibovReturnPct: number | null;
+  asOfDate: string | null;
+};
+
+/** Buckets por dia/desk com opções de venda e compra (sem parear automaticamente). */
+export function buildRotationBuckets(
+  executions: DayExecution[],
+  barsByRic: Map<string, DailyBar[]>,
+  ibovBars: DailyBar[]
+): RotationBucket[] {
+  const grouped = groupRotationBuckets(executions);
+  const ibovLatest = latestBar(ibovBars);
+  const buckets: RotationBucket[] = [];
+
+  for (const [, { buys, sells }] of grouped) {
+    if (buys.length === 0 || sells.length === 0) continue;
+    const tradeDateIso = buys[0]?.tradeDateIso ?? sells[0]!.tradeDateIso;
+    const tradingDesk = buys[0]?.tradingDesk ?? sells[0]!.tradingDesk;
+    const ibovEntry = barOnDate(ibovBars, tradeDateIso);
+    const ibovReturnPct =
+      ibovEntry && ibovLatest ? returnPct(ibovEntry.close, ibovLatest.close) : null;
+
+    buckets.push({
+      tradeDateIso,
+      tradingDesk,
+      sellOptions: toLegOptions(sells, barsByRic),
+      buyOptions: toLegOptions(buys, barsByRic),
+      ibovReturnPct,
+      asOfDate: ibovLatest?.tradeDate ?? null,
+    });
+  }
+
+  return buckets.sort((a, b) => b.tradeDateIso.localeCompare(a.tradeDateIso));
 }
 
 /** Linhas de rotação com opções de venda/compra do mesmo dia e desk. */
@@ -463,6 +503,37 @@ export function recomputeRotationPair(
     shortReturnPct,
     pairReturnPct,
     alphaVsIbovPct,
+  };
+}
+
+/** Monta linha de comparação manual a partir de um bucket. */
+export function comparisonMetrics(
+  bucket: RotationBucket,
+  shortLeg: string,
+  longLeg: string
+): Pick<
+  PairPerformance,
+  "shortLeg" | "longLeg" | "longReturnPct" | "shortReturnPct" | "pairReturnPct" | "alphaVsIbovPct"
+> & { ibovReturnPct: number | null; asOfDate: string | null } {
+  const row: RotationRow = {
+    pairId: `${bucket.tradeDateIso}|${bucket.tradingDesk}`,
+    tradeDateIso: bucket.tradeDateIso,
+    tradingDesk: bucket.tradingDesk,
+    shortLeg,
+    longLeg,
+    sellOptions: bucket.sellOptions,
+    buyOptions: bucket.buyOptions,
+    ibovReturnPct: bucket.ibovReturnPct,
+    asOfDate: bucket.asOfDate,
+    longReturnPct: null,
+    shortReturnPct: null,
+    pairReturnPct: null,
+    alphaVsIbovPct: null,
+  };
+  return {
+    ...recomputeRotationPair(row, shortLeg, longLeg),
+    ibovReturnPct: bucket.ibovReturnPct,
+    asOfDate: bucket.asOfDate,
   };
 }
 
