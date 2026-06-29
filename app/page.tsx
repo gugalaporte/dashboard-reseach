@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import { CompanySearch, CompanyChips } from "@/components/company-search";
 import { SectorFilter } from "@/components/sector-filter";
 import { SourceFilter } from "@/components/source-filter";
@@ -25,7 +24,6 @@ import {
   type SummaryStats,
   type ResearchRow,
 } from "@/lib/queries";
-import { formatDateLong } from "@/lib/format";
 import { useLivePrices } from "@/lib/use-live-prices";
 import {
   DEFAULT_METRICS,
@@ -34,6 +32,7 @@ import {
 } from "@/lib/metrics";
 import type { PeriodoFilter } from "@/types/research";
 import { sectorPt } from "@/lib/sector-labels";
+import { AppHeader } from "@/components/app-header";
 
 // Empresas da carteira do usuario.
 const PORTFOLIO_TICKERS = [
@@ -192,39 +191,11 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header editorial */}
-      <header className="sticky top-0 z-40 bg-navy text-surface-soft border-b border-ink/30">
-        <div className="mx-auto max-w-[1600px] h-16 px-8 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-sm bg-surface-soft grid place-items-center overflow-hidden">
-              <Image
-                src="/logo.png"
-                alt="Finacap"
-                width={36}
-                height={36}
-                className="object-contain"
-                priority
-              />
-            </div>
-            <div className="flex flex-col leading-none">
-              <span className="font-display text-[17px] tracking-tight">
-                Finacap Research
-              </span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-surface-soft/60 mt-1">
-                Equity Dashboard
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-col items-center text-center leading-tight">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-surface-soft/60">
-              Última atualização
-            </div>
-            <div className="font-mono text-sm tabular mt-1">
-              {stats ? formatDateLong(stats.ultimaAtualizacao) : "–"}
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        active="research"
+        subtitle="Equity Dashboard"
+        lastUpdate={stats?.ultimaAtualizacao}
+      />
 
       {/* Barra de filtros em linha unica, sticky abaixo do header */}
       <div className="bg-surface-soft border-b border-line">
