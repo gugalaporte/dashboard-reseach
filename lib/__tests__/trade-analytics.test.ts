@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   aggregateExecutions,
+  buildRotationRows,
   detectRotationPairs,
   enrichExecutions,
   executionValue,
+  recomputeRotationPair,
   parseMovTradeDate,
   summaryStats,
   type MovAtivoRow,
@@ -163,5 +165,119 @@ describe("detectRotationPairs", () => {
     expect(pairs).toHaveLength(1);
     expect(pairs[0].shortLeg).toBe("VALE3");
     expect(pairs[0].longLeg).toBe("BRAP4");
+  });
+
+  it("gera uma linha por dia e desk mesmo com varias vendas", () => {
+    const executions = enrichExecutions(
+      aggregateExecutions([
+        row({ product: "VALE3", amount: "-1000", price: "80" }),
+        row({ product: "PETR4", amount: "-500", price: "39" }),
+        row({ product: "BRAP4", amount: "1000", price: "20" }),
+        row({ product: "VIVT3", amount: "800", price: "33" }),
+      ]),
+      new Map()
+    );
+    const pairs = detectRotationPairs(executions);
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0].shortLeg).toBe("VALE3");
+  });
+});
+
+describe("recomputeRotationPair", () => {
+  it("recalcula retorno do par ao trocar pernas", () => {
+    const bars = new Map<string, DailyBar[]>([
+      [
+        "VALE3",
+        [
+          {
+            ric: "VALE3",
+            tradeDate: "2026-06-22",
+            open: 78,
+            high: 82,
+            low: 77,
+            close: 80,
+            volume: 1,
+            typicalPrice: 80,
+          },
+          {
+            ric: "VALE3",
+            tradeDate: "2026-06-26",
+            open: 84,
+            high: 86,
+            low: 83,
+            close: 88,
+            volume: 1,
+            typicalPrice: 86,
+          },
+        ],
+      ],
+      [
+        "BRAP4",
+        [
+          {
+            ric: "BRAP4",
+            tradeDate: "2026-06-22",
+            open: 19,
+            high: 21,
+            low: 19,
+            close: 20,
+            volume: 1,
+            typicalPrice: 20,
+          },
+          {
+            ric: "BRAP4",
+            tradeDate: "2026-06-26",
+            open: 21,
+            high: 22,
+            low: 20,
+            close: 22,
+            volume: 1,
+            typicalPrice: 21,
+          },
+        ],
+      ],
+      [
+        "PETR4",
+        [
+          {
+            ric: "PETR4",
+            tradeDate: "2026-06-22",
+            open: 38,
+            high: 40,
+            low: 37,
+            close: 39,
+            volume: 1,
+            typicalPrice: 39,
+          },
+          {
+            ric: "PETR4",
+            tradeDate: "2026-06-26",
+            open: 40,
+            high: 41,
+            low: 39,
+            close: 40,
+            volume: 1,
+            typicalPrice: 40,
+          },
+        ],
+      ],
+    ]);
+
+    const executions = enrichExecutions(
+      aggregateExecutions([
+        row({ product: "VALE3", amount: "-1000", price: "80" }),
+        row({ product: "BRAP4", amount: "1000", price: "20" }),
+        row({ product: "PETR4", amount: "500", price: "39" }),
+      ]),
+      bars
+    );
+
+    const [rotation] = buildRotationRows(executions, bars, []);
+    const recomputed = recomputeRotationPair(rotation, "VALE3", "PETR4");
+
+    expect(recomputed.shortLeg).toBe("VALE3");
+    expect(recomputed.longLeg).toBe("PETR4");
+    expect(recomputed.longReturnPct).not.toBeNull();
+    expect(recomputed.pairReturnPct).not.toBeNull();
   });
 });

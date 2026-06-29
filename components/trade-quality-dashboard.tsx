@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDateShort, formatNumber, formatValue } from "@/lib/format";
-import { summaryStats } from "@/lib/trade-analytics";
+import { recomputeRotationPair, summaryStats, type RotationRow } from "@/lib/trade-analytics";
 import { AppHeader } from "@/components/app-header";
 import { cn } from "@/lib/utils";
 import { TrendingDown, TrendingUp } from "lucide-react";
@@ -35,6 +35,7 @@ type DayExecution = {
   notional: number;
   tradeCount: number;
   book: string;
+  trader: string;
   marketClose: number | null;
   marketTypical: number | null;
   vsCloseBps: number | null;
@@ -44,26 +45,12 @@ type DayExecution = {
   quality: "good" | "neutral" | "poor" | "unknown";
 };
 
-type PairPerformance = {
-  pairId: string;
-  tradeDateIso: string;
-  tradingDesk: string;
-  shortLeg: string;
-  longLeg: string;
-  pairReturnPct: number | null;
-  longReturnPct: number | null;
-  shortReturnPct: number | null;
-  ibovReturnPct: number | null;
-  alphaVsIbovPct: number | null;
-  asOfDate: string | null;
-};
-
 type TradesPayload = {
   fromIso: string;
   toIso: string;
   tradingDesks: string[];
   executions: DayExecution[];
-  performance: PairPerformance[];
+  rotations: RotationRow[];
   summary: {
     total: number;
     scored: number;
@@ -83,6 +70,32 @@ const PERIOD_OPTIONS = [
   { value: "180", label: "180d" },
   { value: "365", label: "1a" },
 ] as const;
+
+const DEFAULT_PERIOD_DAYS = "30";
+
+function todayIso(ref = new Date()): string {
+  const d = ref;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function isoDaysAgo(n: number, ref = new Date()): string {
+  const d = new Date(ref);
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Padrão: 1º dia do mês corrente até hoje. */
+function defaultMonthRange(ref = new Date()): { from: string; to: string } {
+  const y = ref.getFullYear();
+  const m = String(ref.getMonth() + 1).padStart(2, "0");
+  return { from: `${y}-${m}-01`, to: todayIso(ref) };
+}
+
+function periodDateRange(days: string): { from: string; to: string } {
+  const n = Number(days);
+  if (days === DEFAULT_PERIOD_DAYS) return defaultMonthRange();
+  return { from: isoDaysAgo(n), to: todayIso() };
+}
 
 /** Preço médio negociado, fechamento e média do dia — mesma tipografia. */
 const PRICE_COL = "text-center tabular text-sm text-ink";
@@ -159,13 +172,17 @@ function FilterPill({
 }
 
 export function TradeQualityDashboard() {
-  const [days, setDays] = React.useState("90");
+  const initialRange = React.useMemo(() => defaultMonthRange(), []);
+  const [days, setDays] = React.useState(DEFAULT_PERIOD_DAYS);
   const [desk, setDesk] = React.useState<string>("all");
-  const [dateFrom, setDateFrom] = React.useState("");
-  const [dateTo, setDateTo] = React.useState("");
+  const [dateFrom, setDateFrom] = React.useState(initialRange.from);
+  const [dateTo, setDateTo] = React.useState(initialRange.to);
   const [data, setData] = React.useState<TradesPayload | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [pairOverrides, setPairOverrides] = React.useState<
+    Record<string, { shortLeg: string; longLeg: string }>
+  >({});
 
   React.useEffect(() => {
     let cancelled = false;
@@ -178,10 +195,15 @@ export function TradeQualityDashboard() {
         const json = (await res.json()) as TradesPayload & { error?: string };
         if (json.error) throw new Error(json.error);
         if (!cancelled) {
-          setData(json);
+          setData({
+            ...json,
+            rotations: json.rotations ?? [],
+          });
           setDesk("all");
-          setDateFrom("");
-          setDateTo("");
+          const range = periodDateRange(days);
+          setDateFrom(range.from);
+          setDateTo(range.to);
+          setPairOverrides({});
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Erro");
@@ -204,21 +226,52 @@ export function TradeQualityDashboard() {
     });
   }, [data, desk, dateFrom, dateTo]);
 
-  const filteredPerformance = React.useMemo(() => {
+  const filteredRotations = React.useMemo(() => {
     if (!data) return [];
-    return data.performance.filter((p) => {
+    return data.rotations.filter((p) => {
       if (desk !== "all" && p.tradingDesk !== desk) return false;
       if (!inDateRange(p.tradeDateIso, dateFrom, dateTo)) return false;
       return true;
     });
   }, [data, desk, dateFrom, dateTo]);
 
+  const updatePairOverride = React.useCallback(
+    (pairId: string, patch: Partial<{ shortLeg: string; longLeg: string }>) => {
+      setPairOverrides((prev) => {
+        const row = data?.rotations.find((r) => r.pairId === pairId);
+        if (!row) return prev;
+        const current = prev[pairId] ?? { shortLeg: row.shortLeg, longLeg: row.longLeg };
+        return { ...prev, [pairId]: { ...current, ...patch } };
+      });
+    },
+    [data]
+  );
+
   const filteredSummary = React.useMemo(
     () => summaryStats(filteredExecutions),
     [filteredExecutions]
   );
 
-  const hasFilters = desk !== "all" || dateFrom !== "" || dateTo !== "";
+  const hasFilters =
+    desk !== "all" ||
+    dateFrom !== initialRange.from ||
+    dateTo !== initialRange.to ||
+    days !== DEFAULT_PERIOD_DAYS;
+
+  const applyPeriod = (value: string) => {
+    setDays(value);
+    const range = periodDateRange(value);
+    setDateFrom(range.from);
+    setDateTo(range.to);
+  };
+
+  const clearFilters = () => {
+    setDesk("all");
+    setDays(DEFAULT_PERIOD_DAYS);
+    const range = defaultMonthRange();
+    setDateFrom(range.from);
+    setDateTo(range.to);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-surface-soft">
@@ -237,7 +290,7 @@ export function TradeQualityDashboard() {
                 key={opt.value}
                 label={opt.label}
                 active={days === opt.value}
-                onClick={() => setDays(opt.value)}
+                onClick={() => applyPeriod(opt.value)}
               />
             ))}
           </div>
@@ -284,11 +337,7 @@ export function TradeQualityDashboard() {
           {hasFilters && (
             <button
               type="button"
-              onClick={() => {
-                setDesk("all");
-                setDateFrom("");
-                setDateTo("");
-              }}
+              onClick={clearFilters}
               className="text-xs text-ink/60 hover:text-brand underline-offset-4 hover:underline transition"
             >
               Limpar filtros
@@ -484,7 +533,7 @@ export function TradeQualityDashboard() {
           <div className="px-4 py-3 border-b border-line bg-surface">
             <h2 className="font-display text-[15px] text-ink">Rotações (long/short sintético)</h2>
             <p className="text-[11px] text-ink/50 mt-0.5">
-              Pares no mesmo dia e desk · retorno ponderado vs IBOV
+              Pares no mesmo dia e desk · ajuste venda/compra nos selects · retorno ponderado vs IBOV
             </p>
           </div>
           <div className="overflow-x-auto scrollbar-thin">
@@ -522,54 +571,99 @@ export function TradeQualityDashboard() {
                       <Skeleton className="h-6 w-full" />
                     </TableCell>
                   </TableRow>
-                ) : filteredPerformance.length === 0 ? (
+                ) : filteredRotations.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={10} className="text-center text-ink/50 py-10 text-sm">
                       Nenhum par de rotação no período / filtros selecionados.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredPerformance.map((p, i) => (
+                  filteredRotations.map((row, i) => {
+                    const override = pairOverrides[row.pairId];
+                    const shortLeg = override?.shortLeg ?? row.shortLeg;
+                    const longLeg = override?.longLeg ?? row.longLeg;
+                    const metrics = recomputeRotationPair(row, shortLeg, longLeg);
+
+                    return (
                     <TableRow
-                      key={p.pairId}
+                      key={row.pairId}
                       className={cn("border-line", i % 2 === 0 ? "bg-surface-soft" : "bg-white")}
                     >
-                      <TableCell className="tabular text-xs text-ink/70">
-                        {formatDateShort(p.tradeDateIso)}
+                      <TableCell className={cn(CELL_CENTER, "tabular text-xs text-ink/70")}>
+                        {formatDateShort(row.tradeDateIso)}
                       </TableCell>
-                      <TableCell className="text-[11px] text-ink/55 max-w-[120px] truncate">
-                        {p.tradingDesk}
+                      <TableCell className={cn(CELL_CENTER, "text-[11px] text-ink/55 max-w-[120px] truncate")}>
+                        {row.tradingDesk}
                       </TableCell>
-                      <TableCell className="font-medium text-ink/80 tabular">{p.shortLeg}</TableCell>
-                      <TableCell className="font-medium text-brand tabular">{p.longLeg}</TableCell>
-                      <TableCell className="text-right tabular text-sm">{fmtPct(p.longReturnPct)}</TableCell>
-                      <TableCell className="text-right tabular text-sm">{fmtPct(p.shortReturnPct)}</TableCell>
+                      <TableCell className={CELL_CENTER}>
+                        <Select
+                          value={shortLeg}
+                          onValueChange={(v) => updatePairOverride(row.pairId, { shortLeg: v })}
+                        >
+                          <SelectTrigger className="h-7 w-[96px] mx-auto text-xs font-medium tabular border-line bg-surface">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {row.sellOptions.map((o) => (
+                              <SelectItem key={o.ric} value={o.ric} className="text-xs tabular">
+                                {o.ric}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className={CELL_CENTER}>
+                        <Select
+                          value={longLeg}
+                          onValueChange={(v) => updatePairOverride(row.pairId, { longLeg: v })}
+                        >
+                          <SelectTrigger className="h-7 w-[96px] mx-auto text-xs font-medium tabular border-line bg-surface text-brand">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {row.buyOptions.map((o) => (
+                              <SelectItem key={o.ric} value={o.ric} className="text-xs tabular">
+                                {o.ric}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className={cn(CELL_CENTER, "tabular text-sm")}>
+                        {fmtPct(metrics.longReturnPct)}
+                      </TableCell>
+                      <TableCell className={cn(CELL_CENTER, "tabular text-sm")}>
+                        {fmtPct(metrics.shortReturnPct)}
+                      </TableCell>
                       <TableCell
                         className={cn(
-                          "text-right tabular text-sm font-semibold",
-                          (p.pairReturnPct ?? 0) > 0 && "text-brand",
-                          (p.pairReturnPct ?? 0) < 0 && "text-destructive"
+                          CELL_CENTER,
+                          "tabular text-sm font-semibold",
+                          (metrics.pairReturnPct ?? 0) > 0 && "text-brand",
+                          (metrics.pairReturnPct ?? 0) < 0 && "text-destructive"
                         )}
                       >
-                        {fmtPct(p.pairReturnPct)}
+                        {fmtPct(metrics.pairReturnPct)}
                       </TableCell>
-                      <TableCell className="text-right tabular text-sm text-ink/50">
-                        {fmtPct(p.ibovReturnPct)}
+                      <TableCell className={cn(CELL_CENTER, "tabular text-sm text-ink/50")}>
+                        {fmtPct(row.ibovReturnPct)}
                       </TableCell>
                       <TableCell
                         className={cn(
-                          "text-right tabular text-sm font-medium",
-                          (p.alphaVsIbovPct ?? 0) > 0 && "text-brand",
-                          (p.alphaVsIbovPct ?? 0) < 0 && "text-destructive"
+                          CELL_CENTER,
+                          "tabular text-sm font-medium",
+                          (metrics.alphaVsIbovPct ?? 0) > 0 && "text-brand",
+                          (metrics.alphaVsIbovPct ?? 0) < 0 && "text-destructive"
                         )}
                       >
-                        {fmtPct(p.alphaVsIbovPct)}
+                        {fmtPct(metrics.alphaVsIbovPct)}
                       </TableCell>
-                      <TableCell className="text-right tabular text-[11px] text-ink/45">
-                        {p.asOfDate ? formatDateShort(p.asOfDate) : "–"}
+                      <TableCell className={cn(CELL_CENTER, "tabular text-[11px] text-ink/45")}>
+                        {row.asOfDate ? formatDateShort(row.asOfDate) : "–"}
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

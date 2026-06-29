@@ -3,8 +3,7 @@ import { getAssetSupabase } from "@/lib/supabase-asset";
 import { getDailyBars } from "@/lib/market-history";
 import {
   aggregateExecutions,
-  computePairPerformances,
-  detectRotationPairs,
+  buildRotationRows,
   enrichExecutions,
   IBOV_RIC,
   parseMovTradeDate,
@@ -72,9 +71,8 @@ export async function GET(req: Request) {
 
     const barsByRic = await getDailyBars([...rics, IBOV_RIC], fromIso, toIso);
     const executions = enrichExecutions(base, barsByRic);
-    const pairs = detectRotationPairs(executions);
-    const performance = computePairPerformances(
-      pairs,
+    const rotations = buildRotationRows(
+      executions,
       barsByRic,
       barsByRic.get(IBOV_RIC) ?? []
     );
@@ -89,8 +87,8 @@ export async function GET(req: Request) {
         toIso,
         tradingDesks,
         executions: executions.sort((a, b) => b.tradeDateIso.localeCompare(a.tradeDateIso)),
-        pairs,
-        performance,
+        rotations,
+        performance: rotations,
         summary: summaryStats(executions),
         priceSource: barsByRic.size > 0 ? "supabase+yahoo" : "yahoo",
       },

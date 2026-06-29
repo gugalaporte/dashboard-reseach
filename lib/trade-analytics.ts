@@ -220,12 +220,12 @@ export function enrichExecutions(
   });
 }
 
-/** Pares long/short sintéticos no mesmo dia (rotação setorial). */
+/** Uma rotação por dia e desk (venda/compra padrão pelo maior volume). */
 export function detectRotationPairs(executions: DayExecution[]): RotationPair[] {
   const byDay = new Map<string, { buys: DayExecution[]; sells: DayExecution[] }>();
 
   for (const ex of executions) {
-    const bucketKey = `${ex.tradeDateIso}|${ex.tradingDesk}`;
+    const bucketKey = rotationBucketKey(ex.tradeDateIso, ex.tradingDesk);
     const bucket = byDay.get(bucketKey) ?? { buys: [], sells: [] };
     if (ex.side === "buy") bucket.buys.push(ex);
     else bucket.sells.push(ex);
@@ -239,40 +239,34 @@ export function detectRotationPairs(executions: DayExecution[]): RotationPair[] 
     const tradeDateIso = bucketKey.split("|")[0]!;
     const tradingDesk = buys[0]?.tradingDesk ?? sells[0]?.tradingDesk ?? "—";
 
-    const usedBuys = new Set<string>();
-    const sortedSells = [...sells].sort((a, b) => b.notional - a.notional);
+    const sell = [...sells].sort((a, b) => b.notional - a.notional)[0]!;
 
-    for (const sell of sortedSells) {
-      let best: DayExecution | null = null;
-      let bestDiff = Infinity;
-
-      for (const buy of buys) {
-        if (usedBuys.has(buy.ric)) continue;
-        const diff = Math.abs(buy.notional - sell.notional);
-        if (diff < bestDiff) {
-          bestDiff = diff;
-          best = buy;
-        }
+    let best: DayExecution | null = null;
+    let bestDiff = Infinity;
+    for (const buy of buys) {
+      const diff = Math.abs(buy.notional - sell.notional);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        best = buy;
       }
-
-      if (!best) continue;
-      usedBuys.add(best.ric);
-
-      pairs.push({
-        tradeDateIso,
-        tradingDesk,
-        shortLeg: sell.ric,
-        longLeg: best.ric,
-        shortAvg: sell.avgPrice,
-        longAvg: best.avgPrice,
-        shortNotional: sell.notional,
-        longNotional: best.notional,
-        book: sell.book === best.book ? sell.book : `${sell.book} / ${best.book}`,
-      });
     }
+
+    if (!best) continue;
+
+    pairs.push({
+      tradeDateIso,
+      tradingDesk,
+      shortLeg: sell.ric,
+      longLeg: best.ric,
+      shortAvg: sell.avgPrice,
+      longAvg: best.avgPrice,
+      shortNotional: sell.notional,
+      longNotional: best.notional,
+      book: sell.book === best.book ? sell.book : `${sell.book} / ${best.book}`,
+    });
   }
 
-  return pairs;
+  return pairs.sort((a, b) => b.tradeDateIso.localeCompare(a.tradeDateIso));
 }
 
 function returnPct(from: number, to: number): number | null {
@@ -327,7 +321,7 @@ export function computePairPerformances(
         : null;
 
     return {
-      pairId: `${p.tradeDateIso}|${p.tradingDesk}|${p.shortLeg}|${p.longLeg}`,
+      pairId: `${p.tradeDateIso}|${p.tradingDesk}`,
       tradeDateIso: p.tradeDateIso,
       tradingDesk: p.tradingDesk,
       shortLeg: p.shortLeg,
@@ -340,6 +334,125 @@ export function computePairPerformances(
       asOfDate: longNow?.tradeDate ?? shortNow?.tradeDate ?? ibovLatest?.tradeDate ?? null,
     };
   });
+}
+
+export type RotationLegOption = {
+  ric: string;
+  notional: number;
+  returnPct: number | null;
+};
+
+export type RotationRow = PairPerformance & {
+  sellOptions: RotationLegOption[];
+  buyOptions: RotationLegOption[];
+};
+
+function rotationBucketKey(tradeDateIso: string, tradingDesk: string): string {
+  return `${tradeDateIso}|${tradingDesk}`;
+}
+
+function groupRotationBuckets(
+  executions: DayExecution[]
+): Map<string, { buys: DayExecution[]; sells: DayExecution[] }> {
+  const map = new Map<string, { buys: DayExecution[]; sells: DayExecution[] }>();
+
+  for (const ex of executions) {
+    const key = rotationBucketKey(ex.tradeDateIso, ex.tradingDesk);
+    const bucket = map.get(key) ?? { buys: [], sells: [] };
+    if (ex.side === "buy") bucket.buys.push(ex);
+    else bucket.sells.push(ex);
+    map.set(key, bucket);
+  }
+
+  return map;
+}
+
+function executionReturnPct(
+  ex: DayExecution,
+  barsByRic: Map<string, DailyBar[]>
+): number | null {
+  const bars = barsByRic.get(ex.ric) ?? [];
+  const entry = barOnDate(bars, ex.tradeDateIso);
+  const now = latestBar(bars);
+  const from = entry?.close ?? ex.avgPrice;
+  const to = now?.close ?? null;
+  if (to == null) return null;
+  return ex.side === "buy" ? returnPct(from, to) : syntheticShortReturn(from, to);
+}
+
+function toLegOptions(
+  execs: DayExecution[],
+  barsByRic: Map<string, DailyBar[]>
+): RotationLegOption[] {
+  return execs
+    .map((ex) => ({
+      ric: ex.ric,
+      notional: ex.notional,
+      returnPct: executionReturnPct(ex, barsByRic),
+    }))
+    .sort((a, b) => b.notional - a.notional);
+}
+
+/** Linhas de rotação com opções de venda/compra do mesmo dia e desk. */
+export function buildRotationRows(
+  executions: DayExecution[],
+  barsByRic: Map<string, DailyBar[]>,
+  ibovBars: DailyBar[]
+): RotationRow[] {
+  const pairs = detectRotationPairs(executions);
+  const performances = computePairPerformances(pairs, barsByRic, ibovBars);
+  const buckets = groupRotationBuckets(executions);
+
+  return performances.map((perf, i) => {
+    const pair = pairs[i]!;
+    const bucket =
+      buckets.get(rotationBucketKey(pair.tradeDateIso, pair.tradingDesk)) ?? {
+        buys: [],
+        sells: [],
+      };
+
+    return {
+      ...perf,
+      sellOptions: toLegOptions(bucket.sells, barsByRic),
+      buyOptions: toLegOptions(bucket.buys, barsByRic),
+    };
+  });
+}
+
+/** Recalcula retornos ao trocar venda/compra na UI. */
+export function recomputeRotationPair(
+  row: RotationRow,
+  shortLeg: string,
+  longLeg: string
+): Pick<
+  PairPerformance,
+  "shortLeg" | "longLeg" | "longReturnPct" | "shortReturnPct" | "pairReturnPct" | "alphaVsIbovPct"
+> {
+  const short = row.sellOptions.find((o) => o.ric === shortLeg);
+  const long = row.buyOptions.find((o) => o.ric === longLeg);
+
+  const longReturnPct = long?.returnPct ?? null;
+  const shortReturnPct = short?.returnPct ?? null;
+
+  let pairReturnPct: number | null = null;
+  if (long && short && longReturnPct != null && shortReturnPct != null) {
+    const wLong = long.notional / (long.notional + short.notional);
+    pairReturnPct = wLong * longReturnPct + (1 - wLong) * shortReturnPct;
+  }
+
+  const alphaVsIbovPct =
+    pairReturnPct != null && row.ibovReturnPct != null
+      ? pairReturnPct - row.ibovReturnPct
+      : null;
+
+  return {
+    shortLeg,
+    longLeg,
+    longReturnPct,
+    shortReturnPct,
+    pairReturnPct,
+    alphaVsIbovPct,
+  };
 }
 
 export function summaryStats(executions: DayExecution[]) {
