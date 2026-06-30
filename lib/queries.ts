@@ -10,6 +10,7 @@ export const FONTES = [
   "Bradesco BBI",
   "Safra",
   "Itaú BBA",
+  "LSEG",
 ] as const;
 export type Fonte = (typeof FONTES)[number];
 
@@ -23,6 +24,7 @@ const FONTE_ALIASES: Record<string, Fonte> = {
   "Itaǧ BBA": "Itaú BBA",
   "ItaÃº BBA": "Itaú BBA",
   "Itau BBA": "Itaú BBA",
+  LSEG: "LSEG",
 };
 
 const FONTE_FILTER_VALUES = Object.keys(FONTE_ALIASES);
@@ -38,6 +40,7 @@ export const FONTE_SHORT_LABEL: Record<Fonte, string> = {
   "Bradesco BBI": "Bradesco",
   Safra: "SAFRA",
   "Itaú BBA": "Itau",
+  LSEG: "LSEG",
 };
 
 // Whitelist de tickers exibidos no dashboard.
@@ -57,7 +60,7 @@ export const ALLOWED_TICKERS = [
   "JBNT1", "RENT3", "LRN3", "MGLU3", "YOI4", "BMF3", "BEEF3", "MOTV3",
   "MULT3", "NTCO3", "PETR3", "PECV3", "PRIO3", "RADL3", "RAIL3", "SBSP3",
   "SANB11", "SCNA3", "SMFT3", "JET1", "TOTS3", "UGPA3", "USIM5", "VAMO3",
-  "VIVA3",
+  "VIVA3", "VTRU3",
 ] as const;
 
 // Celula generica de metrica: valor + metadados de origem.

@@ -41,6 +41,7 @@ const PORTFOLIO_TICKERS = [
   "POMO4", "MRVE3", "BRBI11", "ITUB4", "PSSA3", "ITUB3", "INBR32", "CMIG4",
   "TIMS3", "EQTL3", "AXIA3", "ENGI11", "AXIA7", "VIVT3", "AXIA6",
   "GGBR4", "INTR", "VALE",
+  "BPAC11", "VIVA3", "VTRU3",
 ] as const;
 
 // Converte periodo filtro em data minima (ISO yyyy-mm-dd).

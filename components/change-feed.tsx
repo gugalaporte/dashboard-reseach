@@ -47,6 +47,7 @@ function sourceChipClass(fonte: string): string {
   if (fonte === "Bradesco BBI") return "border-[#C0392B] text-[#C0392B]";
   if (fonte === "Safra") return "border-[#B8860B] text-[#B8860B]";
   if (fonte === "Itaú BBA") return "border-[#EC7000] text-[#EC7000]";
+  if (fonte === "LSEG") return "border-[#6B2C91] text-[#6B2C91]";
   return "border-line text-ink/70";
 }
 

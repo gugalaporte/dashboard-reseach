@@ -56,6 +56,11 @@ const SOURCE_STYLE: Record<
     text: "text-[#EC7000]",
     label: FONTE_SHORT_LABEL["Itaú BBA"],
   },
+  LSEG: {
+    border: "border-[#6B2C91]",
+    text: "text-[#6B2C91]",
+    label: FONTE_SHORT_LABEL.LSEG,
+  },
 };
 
 // Largura fixa da coluna sticky (empresa). Em px, sem derivar de fonte.
