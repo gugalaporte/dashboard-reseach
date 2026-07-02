@@ -5,7 +5,9 @@ import {
   aggregateExecutions,
   buildRotationBuckets,
   enrichExecutions,
+  excludeStockConversions,
   IBOV_RIC,
+  latestEquityTradeIso,
   parseMovTradeDate,
   summaryStats,
   type MovAtivoRow,
@@ -58,6 +60,18 @@ async function loadEquityTrades(fromIso: string): Promise<MovAtivoRow[]> {
   return rows;
 }
 
+async function fetchLatestEquityTradeIso(): Promise<string | null> {
+  const sb = getAssetSupabase();
+  const { data, error } = await sb
+    .from("mov_ativo")
+    .select("trade_date,product,productclass")
+    .eq("productclass", "Equity")
+    .order("id", { ascending: false })
+    .limit(500);
+  if (error) throw error;
+  return latestEquityTradeIso((data ?? []) as MovAtivoRow[]);
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -67,7 +81,8 @@ export async function GET(req: Request) {
     const toIso = new Date().toISOString().slice(0, 10);
 
     const raw = await loadEquityTrades(fromIso);
-    const base = aggregateExecutions(raw);
+    const latestTradeIso = await fetchLatestEquityTradeIso();
+    const base = excludeStockConversions(aggregateExecutions(raw));
     const rics = [...new Set(base.map((e) => e.ric))];
 
     const barsByRic = await getDailyBars([...rics, IBOV_RIC], fromIso, toIso);
@@ -87,6 +102,7 @@ export async function GET(req: Request) {
         executions: executions.sort((a, b) => b.tradeDateIso.localeCompare(a.tradeDateIso)),
         rotationBuckets,
         summary: summaryStats(executions),
+        latestTradeIso,
         priceSource: barsByRic.size > 0 ? "supabase+yahoo" : "yahoo",
       },
       { headers: { "Cache-Control": "no-store" } }

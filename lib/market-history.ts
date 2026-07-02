@@ -142,7 +142,12 @@ async function fetchFromYahoo(
     HIST_CACHE.set(cacheKey, { bars, expires: Date.now() + HIST_TTL_MS });
     return bars;
   } catch (err) {
-    console.error("[market-history] Yahoo", ric, err);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("No data found") || msg.includes("delisted")) {
+      console.warn("[market-history] Yahoo", ric, msg);
+    } else {
+      console.error("[market-history] Yahoo", ric, err);
+    }
     return [];
   }
 }

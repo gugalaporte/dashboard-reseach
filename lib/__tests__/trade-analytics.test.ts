@@ -5,6 +5,7 @@ import {
   buildRotationRows,
   detectRotationPairs,
   enrichExecutions,
+  excludeStockConversions,
   executionValue,
   recomputeRotationPair,
   parseMovTradeDate,
@@ -49,6 +50,41 @@ describe("aggregateExecutions", () => {
       row({ product: "VALE3", amount: "-1000", price: "80" }),
     ]);
     expect(base).toHaveLength(2);
+  });
+});
+
+describe("excludeStockConversions", () => {
+  it("remove conversão AXIA6→AXIA3 no mesmo dia com notional igual", () => {
+    const base = aggregateExecutions([
+      row({
+        trade_date: "06/08/2026",
+        product: "AXIA6",
+        amount: "-657696",
+        price: "55.78",
+        trading_desk: "FINACAP MAURI",
+        book: "Energia Elétrica",
+      }),
+      row({
+        trade_date: "06/08/2026",
+        product: "AXIA3",
+        amount: "723465",
+        price: "50.71",
+        trading_desk: "FINACAP MAURI",
+        book: "Energia Elétrica",
+      }),
+      row({ product: "VALE3", amount: "-100", price: "80" }),
+    ]);
+    const out = excludeStockConversions(base);
+    expect(out).toHaveLength(1);
+    expect(out[0].ric).toBe("VALE3");
+  });
+
+  it("mantém rotação real entre papéis diferentes", () => {
+    const base = aggregateExecutions([
+      row({ product: "VALE3", amount: "-1000", price: "80" }),
+      row({ product: "PETR4", amount: "1000", price: "30" }),
+    ]);
+    expect(excludeStockConversions(base)).toHaveLength(2);
   });
 });
 

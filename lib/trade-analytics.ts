@@ -112,6 +112,71 @@ function isEquityTrade(row: MovAtivoRow): boolean {
   return /^[A-Z]{4}\d{1,2}$/.test(p);
 }
 
+/** Data ISO da execução de equity mais recente em um lote de mov_ativo. */
+export function latestEquityTradeIso(rows: MovAtivoRow[]): string | null {
+  let max: string | null = null;
+  for (const row of rows) {
+    if (!isEquityTrade(row)) continue;
+    const iso = parseMovTradeDate(row.trade_date);
+    if (iso && (!max || iso > max)) max = iso;
+  }
+  return max;
+}
+
+/** Prefixo do ticker (ex.: AXIA3 → AXIA) para detectar conversão entre classes. */
+function tickerFamily(ric: string): string {
+  const m = ric.trim().toUpperCase().match(/^([A-Z]{4})\d/);
+  return m ? m[1]! : ric.trim().toUpperCase();
+}
+
+function executionKey(ex: {
+  tradeDateIso: string;
+  tradingDesk: string;
+  ric: string;
+  side: TradeSide;
+}): string {
+  return `${ex.tradeDateIso}|${ex.tradingDesk}|${ex.ric}|${ex.side}`;
+}
+
+/**
+ * Remove pares compra/venda no mesmo dia+desk, mesma família (AXIA3↔AXIA6)
+ * e notional quase igual — típico de conversão de classe, não execução de mercado.
+ */
+export function excludeStockConversions<T extends ReturnType<typeof aggregateExecutions>[number]>(
+  executions: T[]
+): T[] {
+  const toRemove = new Set<string>();
+  const byBucket = new Map<string, T[]>();
+
+  for (const ex of executions) {
+    const key = `${ex.tradeDateIso}|${ex.tradingDesk}`;
+    const list = byBucket.get(key) ?? [];
+    list.push(ex);
+    byBucket.set(key, list);
+  }
+
+  for (const list of byBucket.values()) {
+    const buys = list.filter((e) => e.side === "buy");
+    const sells = list.filter((e) => e.side === "sell");
+
+    for (const buy of buys) {
+      for (const sell of sells) {
+        if (buy.ric === sell.ric) continue;
+        if (tickerFamily(buy.ric) !== tickerFamily(sell.ric)) continue;
+        const maxN = Math.max(buy.notional, sell.notional);
+        if (maxN <= 0) continue;
+        const diffPct = Math.abs(buy.notional - sell.notional) / maxN;
+        if (diffPct <= 0.02) {
+          toRemove.add(executionKey(buy));
+          toRemove.add(executionKey(sell));
+        }
+      }
+    }
+  }
+
+  return executions.filter((ex) => !toRemove.has(executionKey(ex)));
+}
+
 /** Agrega fills do dia por papel e lado. */
 export function aggregateExecutions(
   rows: MovAtivoRow[]

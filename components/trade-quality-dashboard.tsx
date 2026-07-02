@@ -85,6 +85,7 @@ type TradesPayload = {
     sellNotional: number;
     totalVsTypicalValue: number | null;
   };
+  latestTradeIso?: string | null;
 };
 
 const PERIOD_OPTIONS = [
@@ -107,16 +108,9 @@ function isoDaysAgo(n: number, ref = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** Padrão: 1º dia do mês corrente até hoje. */
-function defaultMonthRange(ref = new Date()): { from: string; to: string } {
-  const y = ref.getFullYear();
-  const m = String(ref.getMonth() + 1).padStart(2, "0");
-  return { from: `${y}-${m}-01`, to: todayIso(ref) };
-}
-
+/** Alinhado com GET /api/trades?days=N (últimos N dias corridos). */
 function periodDateRange(days: string): { from: string; to: string } {
   const n = Number(days);
-  if (days === DEFAULT_PERIOD_DAYS) return defaultMonthRange();
   return { from: isoDaysAgo(n), to: todayIso() };
 }
 
@@ -204,7 +198,7 @@ function FilterPill({
 }
 
 export function TradeQualityDashboard() {
-  const initialRange = React.useMemo(() => defaultMonthRange(), []);
+  const initialRange = React.useMemo(() => periodDateRange(DEFAULT_PERIOD_DAYS), []);
   const [days, setDays] = React.useState(DEFAULT_PERIOD_DAYS);
   const [desk, setDesk] = React.useState<string>("all");
   const [dateFrom, setDateFrom] = React.useState(initialRange.from);
@@ -340,7 +334,7 @@ export function TradeQualityDashboard() {
   const clearFilters = () => {
     setDesk("all");
     setDays(DEFAULT_PERIOD_DAYS);
-    const range = defaultMonthRange();
+    const range = periodDateRange(DEFAULT_PERIOD_DAYS);
     setDateFrom(range.from);
     setDateTo(range.to);
   };
@@ -521,7 +515,13 @@ export function TradeQualityDashboard() {
                 ) : filteredExecutions.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={14} className="text-center text-ink/50 py-10 text-sm">
-                      Nenhuma execução no período / filtros selecionados.
+                      <p>Nenhuma execução no período / filtros selecionados.</p>
+                      {data?.latestTradeIso && (
+                        <p className="mt-2 text-xs text-ink/40">
+                          Última execução no sistema: {formatDateShort(data.latestTradeIso)}.
+                          {days !== "365" ? " Tente ampliar o período para 1a." : null}
+                        </p>
+                      )}
                     </TableCell>
                   </TableRow>
                 ) : (
