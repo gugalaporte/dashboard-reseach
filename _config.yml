@@ -1,0 +1,34 @@
+# GitHub Pages: este repositório é Next.js (deploy na Vercel).
+# Impede o Jekyll de processar o código-fonte e quebrar o build.
+theme: jekyll-theme-primer
+plugins: []
+include:
+  - index.html
+exclude:
+  - app
+  - components
+  - lib
+  - hooks
+  - types
+  - supabase
+  - scripts
+  - dashboard-research
+  - teams-app
+  - node_modules
+  - .next
+  - public
+  - .git
+  - .github
+  - .cursor
+  - .env.local.example
+  - next.config.mjs
+  - tailwind.config.ts
+  - postcss.config.mjs
+  - tsconfig.json
+  - vitest.config.ts
+  - eslint.config.mjs
+  - components.json
+  - next-env.d.ts
+  - package.json
+  - package-lock.json
+  - README.md
