@@ -1,7 +1,7 @@
 import "server-only";
 
 import { ALLOWED_TICKERS } from "./queries";
-import { getResearchSupabase } from "./supabase-research";
+import { getResearchSupabase, hasResearchServiceKey } from "./supabase-research";
 import {
   buildLsegRows,
   type LsegCompanyRow,
@@ -54,6 +54,12 @@ export async function loadLsegRaw(): Promise<LsegRaw> {
 }
 
 export async function loadLsegResearchRows(): Promise<ResearchRow[]> {
-  const raw = await loadLsegRaw();
-  return buildLsegRows(raw, ALLOWED_TICKERS);
+  if (!hasResearchServiceKey()) return [];
+  try {
+    const raw = await loadLsegRaw();
+    return buildLsegRows(raw, ALLOWED_TICKERS);
+  } catch (e) {
+    console.error("[lseg] load failed:", e);
+    return [];
+  }
 }

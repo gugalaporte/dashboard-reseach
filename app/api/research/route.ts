@@ -13,14 +13,23 @@ export const dynamic = "force-dynamic";
 // Monta ResearchRow[] no servidor: Supabase + fechamentos Yahoo para EPS/NI sem price no guide.
 export async function GET() {
   try {
-    const [{ metrics, guide }, lsegRows] = await Promise.all([
-      loadResearchRaw(),
-      loadLsegResearchRows(),
-    ]);
+    const { metrics, guide } = await loadResearchRaw();
+
+    let lsegRows: Awaited<ReturnType<typeof loadLsegResearchRows>> = [];
+    try {
+      lsegRows = await loadLsegResearchRows();
+    } catch (e) {
+      console.error("[api/research] LSEG:", e);
+    }
+
     const pairs = collectYahooReportClosePairs(guide);
     let yahooMap = new Map<string, number>();
     if (pairs.length > 0) {
-      yahooMap = await batchGetClosesForReportDates(pairs);
+      try {
+        yahooMap = await batchGetClosesForReportDates(pairs);
+      } catch (e) {
+        console.error("[api/research] Yahoo:", e);
+      }
     }
     const brokerRows = buildRows(metrics, guide, yahooMap);
     const rows = [...brokerRows, ...lsegRows].sort(

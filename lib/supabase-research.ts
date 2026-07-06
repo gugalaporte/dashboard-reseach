@@ -3,6 +3,13 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let client: SupabaseClient | null = null;
 
+/** true quando a service role está disponível (server-only). */
+export function hasResearchServiceKey(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_RESEARCH_SERVICE_KEY
+  );
+}
+
 /** Cliente Supabase Research com service role (server-only, tabelas LSEG). */
 export function getResearchSupabase(): SupabaseClient {
   if (client) return client;
