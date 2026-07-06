@@ -96,6 +96,38 @@ const PERIOD_OPTIONS = [
 ] as const;
 
 const DEFAULT_PERIOD_DAYS = "30";
+const COMPARISONS_STORAGE_KEY = "finacap:rotation-comparisons";
+
+function loadStoredComparisons(): UserComparison[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(COMPARISONS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is UserComparison =>
+        typeof item === "object" &&
+        item != null &&
+        typeof item.id === "string" &&
+        typeof item.tradeDateIso === "string" &&
+        typeof item.tradingDesk === "string" &&
+        typeof item.shortLeg === "string" &&
+        typeof item.longLeg === "string"
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredComparisons(items: UserComparison[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(COMPARISONS_STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // quota exceeded ou modo privado — ignora
+  }
+}
 
 function todayIso(ref = new Date()): string {
   const d = ref;
@@ -206,9 +238,13 @@ export function TradeQualityDashboard() {
   const [data, setData] = React.useState<TradesPayload | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [comparisons, setComparisons] = React.useState<UserComparison[]>([]);
+  const [comparisons, setComparisons] = React.useState<UserComparison[]>(loadStoredComparisons);
   const [showAddForm, setShowAddForm] = React.useState(false);
   const [draft, setDraft] = React.useState<ComparisonDraft>(EMPTY_DRAFT);
+
+  React.useEffect(() => {
+    saveStoredComparisons(comparisons);
+  }, [comparisons]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -229,7 +265,6 @@ export function TradeQualityDashboard() {
           const range = periodDateRange(days);
           setDateFrom(range.from);
           setDateTo(range.to);
-          setComparisons([]);
           setShowAddForm(false);
           setDraft(EMPTY_DRAFT);
         }
@@ -263,13 +298,21 @@ export function TradeQualityDashboard() {
     });
   }, [data, desk, dateFrom, dateTo]);
 
-  const bucketMap = React.useMemo(() => {
+  const filteredBucketMap = React.useMemo(() => {
     const map = new Map<string, RotationBucket>();
     for (const b of filteredBuckets) {
       map.set(`${b.tradeDateIso}|${b.tradingDesk}`, b);
     }
     return map;
   }, [filteredBuckets]);
+
+  const allBucketMap = React.useMemo(() => {
+    const map = new Map<string, RotationBucket>();
+    for (const b of data?.rotationBuckets ?? []) {
+      map.set(`${b.tradeDateIso}|${b.tradingDesk}`, b);
+    }
+    return map;
+  }, [data?.rotationBuckets]);
 
   const comparisonDateOptions = React.useMemo(
     () => [...new Set(filteredBuckets.map((b) => b.tradeDateIso))].sort((a, b) => b.localeCompare(a)),
@@ -286,8 +329,8 @@ export function TradeQualityDashboard() {
 
   const draftBucket = React.useMemo(() => {
     if (!draft.tradeDateIso || !draft.tradingDesk) return null;
-    return bucketMap.get(`${draft.tradeDateIso}|${draft.tradingDesk}`) ?? null;
-  }, [bucketMap, draft.tradeDateIso, draft.tradingDesk]);
+    return filteredBucketMap.get(`${draft.tradeDateIso}|${draft.tradingDesk}`) ?? null;
+  }, [filteredBucketMap, draft.tradeDateIso, draft.tradingDesk]);
 
   const canAddComparison = Boolean(
     draft.tradeDateIso && draft.tradingDesk && draft.shortLeg && draft.longLeg && draftBucket
@@ -762,8 +805,46 @@ export function TradeQualityDashboard() {
                   </TableRow>
                 ) : (
                   comparisons.map((cmp, i) => {
-                    const bucket = bucketMap.get(`${cmp.tradeDateIso}|${cmp.tradingDesk}`);
-                    if (!bucket) return null;
+                    const bucket = allBucketMap.get(`${cmp.tradeDateIso}|${cmp.tradingDesk}`);
+                    if (!bucket) {
+                      return (
+                        <TableRow
+                          key={cmp.id}
+                          className={cn("border-line", i % 2 === 0 ? "bg-surface-soft" : "bg-white")}
+                        >
+                          <TableCell className={cn(CELL_CENTER, "tabular text-xs text-ink/70")}>
+                            {formatDateShort(cmp.tradeDateIso)}
+                          </TableCell>
+                          <TableCell
+                            className={cn(CELL_CENTER, "text-[11px] text-ink/55 max-w-[120px] truncate")}
+                            title={cmp.tradingDesk}
+                          >
+                            {cmp.tradingDesk}
+                          </TableCell>
+                          <TableCell className={cn(CELL_CENTER, "font-medium text-ink/80 tabular text-sm")}>
+                            {cmp.shortLeg}
+                          </TableCell>
+                          <TableCell className={cn(CELL_CENTER, "font-medium text-brand tabular text-sm")}>
+                            {cmp.longLeg}
+                          </TableCell>
+                          <TableCell colSpan={6} className="text-center text-xs text-ink/40">
+                            Fora do período carregado — amplie o filtro de datas
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-ink/40 hover:text-destructive"
+                              onClick={() => removeComparison(cmp.id)}
+                              aria-label="Remover comparação"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
                     const metrics = comparisonMetrics(bucket, cmp.shortLeg, cmp.longLeg);
 
                     return (

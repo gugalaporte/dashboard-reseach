@@ -22,39 +22,43 @@ const PAGE_SIZE = 1000;
 function isoDaysAgo(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 async function loadEquityTrades(fromIso: string): Promise<MovAtivoRow[]> {
   const sb = getAssetSupabase();
   const rows: MovAtivoRow[] = [];
-  let offset = 0;
+  let cursor: number | undefined;
 
   while (true) {
-    const { data, error } = await sb
+    let query = sb
       .from("mov_ativo")
       .select(
         "id,trade_date,product,amount,price,productclass,book,trader,financialsettle,trading_desk"
       )
       .eq("productclass", "Equity")
       .order("id", { ascending: false })
-      .range(offset, offset + PAGE_SIZE - 1);
+      .limit(PAGE_SIZE);
 
+    if (cursor != null) query = query.lt("id", cursor);
+
+    const { data, error } = await query;
     if (error) throw error;
+
     const batch = (data ?? []) as MovAtivoRow[];
     if (batch.length === 0) break;
 
-    let anyInRange = false;
     for (const row of batch) {
       const iso = parseMovTradeDate(row.trade_date);
       if (!iso || iso < fromIso) continue;
       rows.push(row);
-      anyInRange = true;
     }
 
-    if (!anyInRange) break;
+    cursor = batch[batch.length - 1]!.id;
     if (batch.length < PAGE_SIZE) break;
-    offset += PAGE_SIZE;
   }
 
   return rows;
@@ -78,10 +82,11 @@ export async function GET(req: Request) {
     const days = Math.min(365, Math.max(7, Number(searchParams.get("days") ?? 90)));
 
     const fromIso = isoDaysAgo(days);
-    const toIso = new Date().toISOString().slice(0, 10);
+    const toIso = isoDaysAgo(0);
 
     const raw = await loadEquityTrades(fromIso);
-    const latestTradeIso = await fetchLatestEquityTradeIso();
+    const latestTradeIso =
+      latestEquityTradeIso(raw) ?? (await fetchLatestEquityTradeIso());
     const base = excludeStockConversions(aggregateExecutions(raw));
     const rics = [...new Set(base.map((e) => e.ric))];
 
