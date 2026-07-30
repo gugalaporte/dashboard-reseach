@@ -9,34 +9,55 @@ import {
   type LsegForwardEstimateRow,
   type LsegHistoricalSeriesRow,
   type LsegRaw,
+  type LsegViewRow,
 } from "./lseg-transform";
 import type { ResearchRow } from "./queries";
 
 export { LSEG_FONTE } from "./lseg-transform";
+export type { LsegViewRow };
 
-export async function loadLsegRaw(): Promise<LsegRaw> {
+type LoadOpts = {
+  /** Se true, carrega todas as empresas LSEG (aba Dados LSEG). */
+  allCompanies?: boolean;
+};
+
+const SNAPSHOT_SELECT =
+  "ric,as_of_date,last_price,price_target,rating_label,upside_pct,pe_ratio,pb_ratio,ev_ebitda,net_debt_ebitda,dividend_yield,ev_to_sales,price_to_sales,net_margin,operating_margin,revenue,ebitda,net_income,gross_profit,operating_income,free_cash_flow,capex,total_debt,total_equity,market_cap,beta,roic,roe";
+
+const FORWARD_SELECT =
+  "ric,as_of_date,fiscal_year,eps_mean,dps_mean,pe_fwd,dy_fwd";
+
+const HISTORICAL_SELECT =
+  "ric,as_of_date,period_type,period_year,period_label,revenue,ebitda,net_income,free_cash_flow,capex,total_debt";
+
+export async function loadLsegRaw(opts?: LoadOpts): Promise<LsegRaw> {
   const db = getResearchSupabase();
   const tickers = ALLOWED_TICKERS as unknown as string[];
 
+  const companiesSelect =
+    "ticker,ric,sector,name,gics_industry,updated_at,in_portfolio" as const;
+
+  const companiesQuery = opts?.allCompanies
+    ? db.from("companies").select(companiesSelect).returns<LsegCompanyRow[]>()
+    : db
+        .from("companies")
+        .select(companiesSelect)
+        .in("ticker", tickers)
+        .returns<LsegCompanyRow[]>();
+
   const [cRes, sRes, fRes, hRes] = await Promise.all([
-    db
-      .from("companies")
-      .select("ticker,ric,sector,name,gics_industry,updated_at")
-      .in("ticker", tickers)
-      .returns<LsegCompanyRow[]>(),
+    companiesQuery,
     db
       .from("daily_snapshot")
-      .select(
-        "ric,as_of_date,last_price,price_target,rating_label,upside_pct,pe_ratio,ev_ebitda,dividend_yield,revenue,ebitda,net_income,roic,roe"
-      )
+      .select(SNAPSHOT_SELECT)
       .returns<LsegDailySnapshotRow[]>(),
     db
       .from("forward_estimates")
-      .select("ric,fiscal_year,eps_mean,dps_mean")
+      .select(FORWARD_SELECT)
       .returns<LsegForwardEstimateRow[]>(),
     db
       .from("historical_series")
-      .select("ric,as_of_date,period_type,period_year,period_label,revenue,ebitda,net_income")
+      .select(HISTORICAL_SELECT)
       .returns<LsegHistoricalSeriesRow[]>(),
   ]);
 
@@ -53,6 +74,7 @@ export async function loadLsegRaw(): Promise<LsegRaw> {
   };
 }
 
+/** Linhas LSEG filtradas pelos tickers do Research. */
 export async function loadLsegResearchRows(): Promise<ResearchRow[]> {
   if (!hasResearchServiceKey()) return [];
   try {
@@ -62,4 +84,11 @@ export async function loadLsegResearchRows(): Promise<ResearchRow[]> {
     console.error("[lseg] load failed:", e);
     return [];
   }
+}
+
+/** Todas as empresas LSEG (aba dedicada). */
+export async function loadAllLsegViewRows(): Promise<LsegViewRow[]> {
+  if (!hasResearchServiceKey()) return [];
+  const raw = await loadLsegRaw({ allCompanies: true });
+  return buildLsegRows(raw);
 }

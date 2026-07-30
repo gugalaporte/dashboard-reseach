@@ -7,13 +7,35 @@ já populado por um pipeline que extrai métricas de PDFs de corretoras.
 
 Next.js 14 · TypeScript · Tailwind · shadcn/ui · @tanstack/react-table · @supabase/supabase-js · lucide-react.
 
-## Setup
+## Como rodar
 
-1. `cp .env.local.example .env.local` e cole a **anon key** (não use service_role).
-2. As RLS policies de leitura já estão aplicadas nas tabelas.
-3. `npm run dev`
+Pré-requisito: **Node.js 18+** e npm.
 
-Sem SQL manual. A agregação é feita no cliente a partir de `dados_estruturados` + `stock_guide`.
+```bash
+# 1. Instalar dependências
+npm install
+
+# 2. Configurar variáveis de ambiente
+cp .env.local.example .env.local
+# Edite .env.local e preencha as chaves necessárias (veja tabela abaixo).
+# Use a anon key — nunca service_role no NEXT_PUBLIC_*.
+
+# 3. Subir o servidor de desenvolvimento
+npm run dev
+```
+
+Abra [http://localhost:3000](http://localhost:3000) no navegador.
+
+Outros comandos úteis:
+
+| Comando | Descrição |
+|---|---|
+| `npm run build` | Build de produção |
+| `npm start` | Sobe o build de produção |
+| `npm run lint` | Lint do código |
+| `npm test` | Roda os testes |
+
+Sem SQL manual. A agregação é feita no cliente a partir de `dados_estruturados` + `stock_guide`. As RLS policies de leitura já estão aplicadas nas tabelas.
 
 ### Variáveis de ambiente
 
@@ -21,6 +43,9 @@ Sem SQL manual. A agregação é feita no cliente a partir de `dados_estruturado
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | URL do projeto (`https://liyqnjsphrqudkgxhcup.supabase.co`) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Chave `anon` (pública). **Nunca** use `service_role` aqui. |
+| `SUPABASE_RESEARCH_SERVICE_KEY` | Service role (server-only). Necessária para linhas LSEG. |
+| `SUPABASE_ASSET_URL` | URL do Supabase Asset (server-only). Necessária para a aba Execução. |
+| `SUPABASE_ASSET_SERVICE_KEY` | Service key do Asset (server-only). Necessária para `/api/trades`. |
 
 ## Arquitetura
 

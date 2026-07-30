@@ -2,7 +2,7 @@ import Image from "next/image";
 import { AppHeaderNav } from "@/components/app-header-nav";
 import { formatDateLong } from "@/lib/format";
 
-type Tab = "research" | "trades";
+type Tab = "research" | "lseg" | "trades";
 
 type Props = {
   active: Tab;

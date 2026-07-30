@@ -1,4 +1,4 @@
-import { extractYear } from "./metrics";
+import { extractYear, type MetricId } from "./metrics";
 import type { Cell, ResearchRow, TargetCell } from "./queries";
 
 export const LSEG_FONTE = "LSEG" as const;
@@ -22,6 +22,7 @@ export type LsegCompanyRow = {
   name: string | null;
   gics_industry: string | null;
   updated_at: string | null;
+  in_portfolio?: boolean | null;
 };
 
 export type LsegDailySnapshotRow = {
@@ -32,20 +33,37 @@ export type LsegDailySnapshotRow = {
   rating_label: string | null;
   upside_pct: number | null;
   pe_ratio: number | null;
+  pb_ratio?: number | null;
   ev_ebitda: number | null;
+  net_debt_ebitda?: number | null;
   dividend_yield: number | null;
+  ev_to_sales?: number | null;
+  price_to_sales?: number | null;
+  net_margin?: number | null;
+  operating_margin?: number | null;
   revenue: number | null;
   ebitda: number | null;
   net_income: number | null;
+  gross_profit?: number | null;
+  operating_income?: number | null;
+  free_cash_flow?: number | null;
+  capex?: number | null;
+  total_debt?: number | null;
+  total_equity?: number | null;
+  market_cap?: number | null;
+  beta?: number | null;
   roic: number | null;
   roe: number | null;
 };
 
 export type LsegForwardEstimateRow = {
   ric: string;
+  as_of_date?: string | null;
   fiscal_year: number | string | null;
   eps_mean: number | null;
   dps_mean: number | null;
+  pe_fwd?: number | null;
+  dy_fwd?: number | null;
 };
 
 export type LsegHistoricalSeriesRow = {
@@ -57,6 +75,9 @@ export type LsegHistoricalSeriesRow = {
   revenue: number | null;
   ebitda: number | null;
   net_income: number | null;
+  free_cash_flow?: number | null;
+  capex?: number | null;
+  total_debt?: number | null;
 };
 
 export type LsegRaw = {
@@ -66,6 +87,13 @@ export type LsegRaw = {
   historical: LsegHistoricalSeriesRow[];
 };
 
+/** Linha da aba Dados LSEG (ResearchRow + identidade RIC/nome/carteira). */
+export type LsegViewRow = ResearchRow & {
+  ric: string;
+  name: string | null;
+  inPortfolio: boolean;
+};
+
 function num(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim()) {
@@ -73,6 +101,13 @@ function num(v: unknown): number | null {
     return Number.isFinite(n) ? n : null;
   }
   return null;
+}
+
+/** Converte valores absolutos LSEG para R$ milhões (formato da UI). */
+function toMillions(v: unknown): number | null {
+  const n = num(v);
+  if (n == null) return null;
+  return Math.abs(n) >= 1_000_000 ? n / 1_000_000 : n;
 }
 
 function makeCell(
@@ -96,12 +131,29 @@ function yearFromHistorical(hs: LsegHistoricalSeriesRow): string | null {
   return extractYear(hs.period_label);
 }
 
+function snapYear(asOf: string | null): string {
+  if (asOf && /^\d{4}/.test(asOf)) return asOf.slice(0, 4);
+  return String(new Date().getFullYear());
+}
+
 function putMetricYear(
   bucket: Partial<Record<string, Cell>>,
   year: string,
   cell: Cell | undefined
 ): void {
   if (!cell) return;
+  bucket[year] = cell;
+}
+
+function putMetricYearIfEmpty(
+  byMetricYear: NonNullable<ResearchRow["byMetricYear"]>,
+  id: MetricId,
+  year: string,
+  cell: Cell | undefined
+): void {
+  if (!cell) return;
+  const bucket = (byMetricYear[id] ??= {});
+  if (bucket[year]) return;
   bucket[year] = cell;
 }
 
@@ -128,7 +180,12 @@ export function dedupeForward(rows: LsegForwardEstimateRow[]): LsegForwardEstima
   return [...seen.values()];
 }
 
-/** Mantém série histórica mais recente por (ric, ano). */
+function isAnnual(periodType: string | null | undefined): boolean {
+  if (!periodType) return true;
+  return /annual|yearly|a\b|fy/i.test(periodType) && !/quarter|qtr|interim/i.test(periodType);
+}
+
+/** Mantém série histórica mais recente por (ric, ano), preferindo ANNUAL. */
 export function latestHistorical(rows: LsegHistoricalSeriesRow[]): LsegHistoricalSeriesRow[] {
   const byKey = new Map<string, LsegHistoricalSeriesRow>();
   for (const row of rows) {
@@ -136,48 +193,111 @@ export function latestHistorical(rows: LsegHistoricalSeriesRow[]): LsegHistorica
     if (!year) continue;
     const key = `${row.ric}|${year}`;
     const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, row);
+      continue;
+    }
+    const prevAnnual = isAnnual(prev.period_type);
+    const nextAnnual = isAnnual(row.period_type);
+    if (nextAnnual && !prevAnnual) {
+      byKey.set(key, row);
+      continue;
+    }
+    if (prevAnnual && !nextAnnual) continue;
     const d = row.as_of_date ?? "";
-    const pd = prev?.as_of_date ?? "";
-    if (!prev || d > pd) byKey.set(key, row);
+    const pd = prev.as_of_date ?? "";
+    if (d > pd) byKey.set(key, row);
   }
   return [...byKey.values()];
 }
 
 function buildOneLsegRow(args: {
   ticker: string;
+  ric: string;
   company?: LsegCompanyRow;
   snap?: LsegDailySnapshotRow;
   forward: LsegForwardEstimateRow[];
   historical: LsegHistoricalSeriesRow[];
-}): ResearchRow | null {
-  const { ticker, company, snap, forward, historical } = args;
+}): LsegViewRow | null {
+  const { ticker, ric, company, snap, forward, historical } = args;
   const asOf = snap?.as_of_date ?? company?.updated_at ?? null;
   const priceVal = num(snap?.last_price);
   const ratingLabel = snap?.rating_label?.trim() || null;
-  const byMetricYear: ResearchRow["byMetricYear"] = {};
+  const byMetricYear: NonNullable<ResearchRow["byMetricYear"]> = {};
+  const ySnap = snapYear(asOf);
 
+  // 1) Histórico por ano (valores absolutos → milhões)
+  for (const hs of historical) {
+    const year = yearFromHistorical(hs);
+    if (!year) continue;
+    const hsDate = hs.as_of_date ?? asOf;
+    putMetricYear(
+      (byMetricYear.revenue ??= {}),
+      year,
+      makeCell(toMillions(hs.revenue), hsDate, { periodo: year, unidade: "R$ M" })
+    );
+    putMetricYear(
+      (byMetricYear.ebitda ??= {}),
+      year,
+      makeCell(toMillions(hs.ebitda), hsDate, { periodo: year, unidade: "R$ M" })
+    );
+    putMetricYear(
+      (byMetricYear.net_income ??= {}),
+      year,
+      makeCell(toMillions(hs.net_income), hsDate, { periodo: year, unidade: "R$ M" })
+    );
+    putMetricYear(
+      (byMetricYear.free_cash_flow ??= {}),
+      year,
+      makeCell(toMillions(hs.free_cash_flow), hsDate, { periodo: year, unidade: "R$ M" })
+    );
+    putMetricYear(
+      (byMetricYear.capex ??= {}),
+      year,
+      makeCell(toMillions(hs.capex), hsDate, { periodo: year, unidade: "R$ M" })
+    );
+    putMetricYear(
+      (byMetricYear.net_debt ??= {}),
+      year,
+      makeCell(toMillions(hs.total_debt), hsDate, { periodo: year, unidade: "R$ M" })
+    );
+  }
+
+  // 2) Forward por ano fiscal
   for (const fe of forward) {
     const year = yearFromFiscalYear(fe.fiscal_year);
     if (!year) continue;
+    const feDate = fe.as_of_date ?? asOf;
 
     putMetricYear(
       (byMetricYear.eps ??= {}),
       year,
-      makeCell(fe.eps_mean, asOf, { periodo: `${year}E`, unidade: "R$" })
+      makeCell(fe.eps_mean, feDate, { periodo: `${year}E`, unidade: "R$" })
     );
     putMetricYear(
       (byMetricYear.net_dps ??= {}),
       year,
-      makeCell(fe.dps_mean, asOf, { periodo: `${year}E`, unidade: "R$" })
+      makeCell(fe.dps_mean, feDate, { periodo: `${year}E`, unidade: "R$" })
+    );
+    putMetricYear(
+      (byMetricYear.pe ??= {}),
+      year,
+      makeCell(fe.pe_fwd, feDate, { periodo: `${year}E`, unidade: "x" })
+    );
+    putMetricYear(
+      (byMetricYear.dy ??= {}),
+      year,
+      makeCell(fe.dy_fwd, feDate, { periodo: `${year}E`, unidade: "%" })
     );
 
-    if (priceVal != null && priceVal > 0) {
+    // Fallback: P/E derivado se não veio pe_fwd
+    if (!byMetricYear.pe?.[year] && priceVal != null && priceVal > 0) {
       const eps = num(fe.eps_mean);
       if (eps != null && eps > 0) {
         putMetricYear(
           (byMetricYear.pe ??= {}),
           year,
-          makeCell(priceVal / eps, asOf, {
+          makeCell(priceVal / eps, feDate, {
             periodo: `${year}E`,
             unidade: "x",
             derived: true,
@@ -188,23 +308,145 @@ function buildOneLsegRow(args: {
     }
   }
 
-  for (const hs of historical) {
-    const year = yearFromHistorical(hs);
-    if (!year) continue;
-    putMetricYear(
-      (byMetricYear.revenue ??= {}),
-      year,
-      makeCell(hs.revenue, asOf, { periodo: year, unidade: "R$ M" })
+  // 3) Snapshot “atual” no ano do as_of (não sobrescreve forward/histórico)
+  if (snap) {
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "pe",
+      ySnap,
+      makeCell(snap.pe_ratio, asOf, { periodo: "Atual", unidade: "x" })
     );
-    putMetricYear(
-      (byMetricYear.ebitda ??= {}),
-      year,
-      makeCell(hs.ebitda, asOf, { periodo: year, unidade: "R$ M" })
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "p_bv",
+      ySnap,
+      makeCell(snap.pb_ratio, asOf, { periodo: "Atual", unidade: "x" })
     );
-    putMetricYear(
-      (byMetricYear.net_income ??= {}),
-      year,
-      makeCell(hs.net_income, asOf, { periodo: year, unidade: "R$ M" })
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "ev_ebitda",
+      ySnap,
+      makeCell(snap.ev_ebitda, asOf, { periodo: "Atual", unidade: "x" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "nd_ebitda",
+      ySnap,
+      makeCell(snap.net_debt_ebitda, asOf, { periodo: "Atual", unidade: "x" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "dy",
+      ySnap,
+      makeCell(snap.dividend_yield, asOf, { periodo: "Atual", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "roe",
+      ySnap,
+      makeCell(snap.roe, asOf, { periodo: "Atual", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "roic",
+      ySnap,
+      makeCell(snap.roic, asOf, { periodo: "Atual", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "operating_margin",
+      ySnap,
+      makeCell(snap.operating_margin, asOf, { periodo: "Atual", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "net_margin",
+      ySnap,
+      makeCell(snap.net_margin, asOf, { periodo: "Atual", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "beta",
+      ySnap,
+      makeCell(snap.beta, asOf, { periodo: "Atual", unidade: "x" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "ev_sales",
+      ySnap,
+      makeCell(snap.ev_to_sales, asOf, { periodo: "Atual", unidade: "x" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "ps",
+      ySnap,
+      makeCell(snap.price_to_sales, asOf, { periodo: "Atual", unidade: "x" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "revenue",
+      ySnap,
+      makeCell(toMillions(snap.revenue), asOf, { periodo: "Atual", unidade: "R$ M" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "ebitda",
+      ySnap,
+      makeCell(toMillions(snap.ebitda), asOf, { periodo: "Atual", unidade: "R$ M" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "net_income",
+      ySnap,
+      makeCell(toMillions(snap.net_income), asOf, { periodo: "Atual", unidade: "R$ M" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "gross_profit",
+      ySnap,
+      makeCell(toMillions(snap.gross_profit), asOf, { periodo: "Atual", unidade: "R$ M" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "operating_income",
+      ySnap,
+      makeCell(toMillions(snap.operating_income), asOf, {
+        periodo: "Atual",
+        unidade: "R$ M",
+      })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "free_cash_flow",
+      ySnap,
+      makeCell(toMillions(snap.free_cash_flow), asOf, {
+        periodo: "Atual",
+        unidade: "R$ M",
+      })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "capex",
+      ySnap,
+      makeCell(toMillions(snap.capex), asOf, { periodo: "Atual", unidade: "R$ M" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "net_debt",
+      ySnap,
+      makeCell(toMillions(snap.total_debt), asOf, { periodo: "Atual", unidade: "R$ M" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "market_cap",
+      ySnap,
+      makeCell(toMillions(snap.market_cap), asOf, { periodo: "Atual", unidade: "R$ M" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "total_equity",
+      ySnap,
+      makeCell(toMillions(snap.total_equity), asOf, { periodo: "Atual", unidade: "R$ M" })
     );
   }
 
@@ -232,6 +474,9 @@ function buildOneLsegRow(args: {
 
   return {
     empresa: ticker,
+    ric,
+    name: company?.name ?? null,
+    inPortfolio: Boolean(company?.in_portfolio),
     fonte: LSEG_FONTE,
     sector: company?.sector ?? company?.gics_industry ?? null,
     rating: ratingLabel ? { value: ratingLabel, date: asOf } : undefined,
@@ -241,18 +486,22 @@ function buildOneLsegRow(args: {
     ev_ebitda: makeCell(snap?.ev_ebitda, asOf, { unidade: "x" }),
     dy: makeCell(snap?.dividend_yield, asOf, { unidade: "%" }),
     roic: makeCell(snap?.roic, asOf, { unidade: "%" }),
-    revenue: makeCell(snap?.revenue, asOf, { unidade: "R$ M" }),
-    ebitda: makeCell(snap?.ebitda, asOf, { unidade: "R$ M" }),
-    net_income: makeCell(snap?.net_income, asOf, { unidade: "R$ M" }),
+    revenue: makeCell(toMillions(snap?.revenue), asOf, { unidade: "R$ M" }),
+    ebitda: makeCell(toMillions(snap?.ebitda), asOf, { unidade: "R$ M" }),
+    net_income: makeCell(toMillions(snap?.net_income), asOf, { unidade: "R$ M" }),
+    net_debt: makeCell(toMillions(snap?.total_debt), asOf, { unidade: "R$ M" }),
     byMetricYear: Object.keys(byMetricYear).length > 0 ? byMetricYear : undefined,
   };
 }
 
+/** Se `allowedTickers` for omitido, inclui todos os RICs com dados. */
 export function buildLsegRows(
   raw: LsegRaw,
-  allowedTickers: readonly string[]
-): ResearchRow[] {
-  const allowed = new Set(allowedTickers.map((t) => t.trim().toUpperCase()));
+  allowedTickers?: readonly string[] | null
+): LsegViewRow[] {
+  const allowed = allowedTickers
+    ? new Set(allowedTickers.map((t) => t.trim().toUpperCase()))
+    : null;
   const companyByRic = new Map(raw.companies.map((c) => [c.ric, c]));
   const snapshotByRic = new Map(latestSnapshots(raw.snapshots).map((s) => [s.ric, s]));
 
@@ -276,16 +525,18 @@ export function buildLsegRows(
   for (const f of forwardByRic.keys()) allRics.add(f);
   for (const h of historicalByRic.keys()) allRics.add(h);
 
-  const out: ResearchRow[] = [];
+  const out: LsegViewRow[] = [];
 
   for (const ric of allRics) {
     const company = companyByRic.get(ric);
     const ticker =
       company?.ticker?.trim().toUpperCase() || ricToTicker(ric);
-    if (!ticker || !allowed.has(ticker)) continue;
+    if (!ticker) continue;
+    if (allowed && !allowed.has(ticker)) continue;
 
     const row = buildOneLsegRow({
       ticker,
+      ric,
       company,
       snap: snapshotByRic.get(ric),
       forward: forwardByRic.get(ric) ?? [],

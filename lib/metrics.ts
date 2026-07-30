@@ -26,7 +26,18 @@ export type MetricId =
   | "net_debt"
   | "revenue"
   | "ebitda"
-  | "net_income";
+  | "net_income"
+  | "free_cash_flow"
+  | "capex"
+  | "market_cap"
+  | "operating_margin"
+  | "net_margin"
+  | "beta"
+  | "ev_sales"
+  | "ps"
+  | "gross_profit"
+  | "operating_income"
+  | "total_equity";
 
 // Ordem = ordem no seletor (pills) e referencia de produto.
 // Aliases: nomes brutos em dados_estruturados.metrica (case-sensitive).
@@ -71,6 +82,46 @@ export const METRICS: MetricDef[] = [
   },
 ];
 
+/** Métricas extras disponíveis na aba Dados LSEG (além das do Research). */
+export const LSEG_EXTRA_METRICS: MetricDef[] = [
+  { id: "free_cash_flow", label: "FCF", aliases: ["Free Cash Flow"], format: "millions" },
+  { id: "capex", label: "Capex", aliases: ["Capex"], format: "millions" },
+  { id: "market_cap", label: "Market Cap", aliases: ["Market Cap"], format: "millions" },
+  {
+    id: "operating_margin",
+    label: "Op. Margin",
+    aliases: ["Operating Margin"],
+    format: "pct",
+  },
+  { id: "net_margin", label: "Net Margin", aliases: ["Net Margin"], format: "pct" },
+  { id: "beta", label: "Beta", aliases: ["Beta"], format: "mult" },
+  { id: "ev_sales", label: "EV/Sales", aliases: ["EV/Sales"], format: "mult" },
+  { id: "ps", label: "P/S", aliases: ["P/S", "Price/Sales"], format: "mult" },
+  {
+    id: "gross_profit",
+    label: "Gross Profit",
+    aliases: ["Gross Profit"],
+    format: "millions",
+  },
+  {
+    id: "operating_income",
+    label: "Op. Income",
+    aliases: ["Operating Income"],
+    format: "millions",
+  },
+  {
+    id: "total_equity",
+    label: "Equity",
+    aliases: ["Total Equity"],
+    format: "millions",
+  },
+];
+
+/** Catálogo completo da aba LSEG (Research + extras). */
+export const LSEG_METRICS: MetricDef[] = [...METRICS, ...LSEG_EXTRA_METRICS];
+
+export const DEFAULT_LSEG_METRICS: MetricId[] = ["pe", "eps", "ev_ebitda"];
+
 // Map reverso: alias bruto -> id canonico. Construido uma vez.
 const ALIAS_TO_ID = new Map<string, MetricId>();
 for (const m of METRICS) {
@@ -83,7 +134,7 @@ export function canonicalMetricId(raw: string): MetricId | null {
 }
 
 export function getMetricDef(id: MetricId): MetricDef {
-  const def = METRICS.find((m) => m.id === id);
+  const def = LSEG_METRICS.find((m) => m.id === id) ?? METRICS.find((m) => m.id === id);
   if (!def) throw new Error(`Unknown metric id: ${id}`);
   return def;
 }

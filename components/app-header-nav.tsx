@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-type Tab = "research" | "trades";
+type Tab = "research" | "lseg" | "trades";
 
 function tabClass(active: boolean) {
   return cn(
@@ -20,6 +20,13 @@ export function AppHeaderNav({ active }: { active: Tab }) {
       ) : (
         <Link href="/" className={tabClass(false)}>
           Research
+        </Link>
+      )}
+      {active === "lseg" ? (
+        <span className={tabClass(true)}>Dados Lseg</span>
+      ) : (
+        <Link href="/lseg" className={tabClass(false)}>
+          Dados Lseg
         </Link>
       )}
       {active === "trades" ? (

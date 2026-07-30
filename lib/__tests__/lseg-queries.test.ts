@@ -28,8 +28,8 @@ describe("latestSnapshots", () => {
 describe("dedupeForward", () => {
   it("remove fiscal_year duplicado", () => {
     const out = dedupeForward([
-      { ric: "VALE3.SA", fiscal_year: 2026, eps_mean: 1.9, dps_mean: 1 },
-      { ric: "VALE3.SA", fiscal_year: 2026, eps_mean: 2.0, dps_mean: 1 },
+      { ric: "VALE3.SA", fiscal_year: 2026, eps_mean: 1.9, dps_mean: 1, pe_fwd: null, dy_fwd: null },
+      { ric: "VALE3.SA", fiscal_year: 2026, eps_mean: 2.0, dps_mean: 1, pe_fwd: null, dy_fwd: null },
     ]);
     expect(out).toHaveLength(1);
     expect(out[0].eps_mean).toBe(2);
@@ -46,8 +46,8 @@ describe("buildLsegRows", () => {
           rating_label: "Buy", upside_pct: 10.35, pe_ratio: 21, ev_ebitda: 5, dividend_yield: 9,
           revenue: 213e9, ebitda: 80e9, net_income: 13e9, roic: 7, roe: 13,
         }],
-        forward: [{ ric: "VALE3.SA", fiscal_year: 2026, eps_mean: 2, dps_mean: 1 }],
-        historical: [{ ric: "VALE3.SA", as_of_date: "2026-06-29", period_type: "ANNUAL", period_year: 2025, period_label: "2025", revenue: 200e9, ebitda: 75e9, net_income: 12e9 }],
+        forward: [{ ric: "VALE3.SA", fiscal_year: 2026, eps_mean: 2, dps_mean: 1, pe_fwd: 10, dy_fwd: 8 }],
+        historical: [{ ric: "VALE3.SA", as_of_date: "2026-06-29", period_type: "ANNUAL", period_year: 2025, period_label: "2025", revenue: 200e9, ebitda: 75e9, net_income: 12e9, free_cash_flow: 10e9, capex: -5e9, total_debt: 50e9 }],
       },
       ALLOWED
     );
@@ -56,5 +56,7 @@ describe("buildLsegRows", () => {
     expect(rows[0].rating?.value).toBe("Buy");
     expect(rows[0].target?.value).toBe(86.24);
     expect(rows[0].byMetricYear?.eps?.["2026"]?.value).toBe(2);
+    expect(rows[0].byMetricYear?.pe?.["2026"]?.value).toBe(10);
+    expect(rows[0].byMetricYear?.revenue?.["2025"]?.value).toBe(200000);
   });
 });

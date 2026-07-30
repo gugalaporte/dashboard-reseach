@@ -1,24 +1,31 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { METRICS, MAX_SELECTED_METRICS, type MetricId } from "@/lib/metrics";
+import {
+  METRICS,
+  MAX_SELECTED_METRICS,
+  type MetricDef,
+  type MetricId,
+} from "@/lib/metrics";
 
 interface Props {
-  value: MetricId[]; // ordem preservada (primeiro -> mais antigo)
+  value: MetricId[];
   onChange: (value: MetricId[]) => void;
+  /** Catálogo exibido (default = Research). */
+  metrics?: MetricDef[];
 }
 
-// Seletor multi-toggle de metricas. Limite = MAX_SELECTED_METRICS.
-// Comportamento quando atinge o limite: clicar em uma metrica nao selecionada
-// remove a MAIS ANTIGA (FIFO) e adiciona a nova no fim.
-export function MetricsSelector({ value, onChange }: Props) {
+export function MetricsSelector({
+  value,
+  onChange,
+  metrics = METRICS,
+}: Props) {
   function toggle(id: MetricId) {
     if (value.includes(id)) {
       onChange(value.filter((v) => v !== id));
       return;
     }
     if (value.length >= MAX_SELECTED_METRICS) {
-      // FIFO: remove o mais antigo, adiciona no fim.
       onChange([...value.slice(1), id]);
       return;
     }
@@ -27,7 +34,7 @@ export function MetricsSelector({ value, onChange }: Props) {
 
   return (
     <div className="flex items-center gap-1 rounded-md bg-surface p-1 flex-wrap">
-      {METRICS.map((m) => {
+      {metrics.map((m) => {
         const active = value.includes(m.id);
         return (
           <button

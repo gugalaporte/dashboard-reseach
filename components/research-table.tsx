@@ -94,6 +94,23 @@ interface Props {
   years: string[];
 }
 
+/** Ano tem dado na métrica (ou EPS, para coluna Atual do P/E). */
+function metricHasYearData(
+  rows: ResearchRow[],
+  mid: MetricId,
+  year: string
+): boolean {
+  for (const r of rows) {
+    if (r.byMetricYear?.[mid]?.[year]?.value != null) return true;
+  }
+  if (mid === "pe") {
+    for (const r of rows) {
+      if (r.byMetricYear?.eps?.[year]?.value != null) return true;
+    }
+  }
+  return false;
+}
+
 export function ResearchTable({
   data,
   isLoading,
@@ -111,7 +128,16 @@ export function ResearchTable({
     [portfolioTickers]
   );
 
-  // Constroi colunas leaf. Grupos de metrica ficam como 3 colunas sequenciais
+  // Anos por métrica: só exibe coluna se existir ao menos um valor nos dados.
+  const yearsByMetric = React.useMemo(() => {
+    const out: Partial<Record<MetricId, string[]>> = {};
+    for (const mid of selectedMetrics) {
+      out[mid] = years.filter((y) => metricHasYearData(data, mid, y));
+    }
+    return out;
+  }, [data, selectedMetrics, years]);
+
+  // Constroi colunas leaf. Grupos de metrica ficam como N colunas sequenciais
   // id=`${metricId}_${year}`. O agrupamento visual vem do header manual abaixo.
   const columns = React.useMemo<ColumnDef<ResearchRow>[]>(() => {
     const base: ColumnDef<ResearchRow>[] = [
@@ -240,13 +266,12 @@ export function ResearchTable({
       },
     ];
 
-    // Colunas de metrica: 1 leaf por (metrica x ano). Acessor retorna o valor
-    // cru; cell usa MetricCell (valor em cima + data do relatorio embaixo).
-    // Nao passamos `periodo` pois o ano ja esta representado pelo header.
+    // Colunas de metrica: 1 leaf por (metrica x ano com dados).
     const metricCols: ColumnDef<ResearchRow>[] = [];
     for (const mid of selectedMetrics) {
       const def = getMetricDef(mid);
-      for (const year of years) {
+      const metricYears = yearsByMetric[mid] ?? [];
+      for (const year of metricYears) {
         metricCols.push({
           id: `${mid}_${year}`,
           header: `${year}E`,
@@ -333,7 +358,7 @@ export function ResearchTable({
     }
 
     return [...base, ...metricCols];
-  }, [selectedMetrics, years, livePrices, portfolioSet]);
+  }, [selectedMetrics, yearsByMetric, livePrices, portfolioSet]);
 
   const table = useReactTable({
     data,
@@ -400,10 +425,12 @@ export function ResearchTable({
                     </TableHead>
                   );
                 })}
-              {/* Agrupadores: 1 por metrica selecionada, colSpan=years.length */}
+              {/* Agrupadores: 1 por metrica com ao menos um ano de dados */}
               {selectedMetrics.map((mid) => {
+                const metricYears = yearsByMetric[mid] ?? [];
+                if (metricYears.length === 0) return null;
                 const def = getMetricDef(mid);
-                const span = mid === "pe" ? years.length * 2 : years.length;
+                const span = mid === "pe" ? metricYears.length * 2 : metricYears.length;
                 return (
                   <TableHead
                     key={`group_${mid}`}
@@ -419,11 +446,11 @@ export function ResearchTable({
                 );
               })}
             </tr>
-            {/* Linha 2: anos para cada metrica (so renderiza se houver metricas) */}
+            {/* Linha 2: anos para cada metrica (so anos com dados) */}
             {selectedMetrics.length > 0 && (
               <tr>
                 {selectedMetrics.flatMap((mid) =>
-                  years.flatMap((year, yIdx) => {
+                  (yearsByMetric[mid] ?? []).flatMap((year, yIdx) => {
                     const h = leafHeaders.find(
                       (x) => x.column.id === `${mid}_${year}`
                     );
