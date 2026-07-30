@@ -51,9 +51,43 @@ export type LsegDailySnapshotRow = {
   total_debt?: number | null;
   total_equity?: number | null;
   market_cap?: number | null;
+  market_cap_currency?: string | null;
   beta?: number | null;
   roic: number | null;
   roe: number | null;
+  // Novos campos LSEG
+  price_52w_high?: number | null;
+  price_52w_low?: number | null;
+  ret_1m?: number | null;
+  ret_3m?: number | null;
+  ret_6m?: number | null;
+  ret_ytd?: number | null;
+  ret_1y?: number | null;
+  total_return?: number | null;
+  day_volume?: number | null;
+  price_target_high?: number | null;
+  price_target_low?: number | null;
+  price_target_median?: number | null;
+  num_buys?: number | null;
+  num_holds?: number | null;
+  num_sells?: number | null;
+  enterprise_value?: number | null;
+  net_debt?: number | null;
+  net_debt_to_equity?: number | null;
+  current_ratio?: number | null;
+  quick_ratio?: number | null;
+  interest_coverage?: number | null;
+  interest_expense?: number | null;
+  cash_from_ops?: number | null;
+  depreciation_amort?: number | null;
+  book_value_per_share?: number | null;
+  tangible_bvps?: number | null;
+  asset_turnover?: number | null;
+  gross_margin?: number | null;
+  ebitda_margin?: number | null;
+  wacc?: number | null;
+  dps_common?: number | null;
+  eps_fy0?: number | null;
 };
 
 export type LsegForwardEstimateRow = {
@@ -64,6 +98,9 @@ export type LsegForwardEstimateRow = {
   dps_mean: number | null;
   pe_fwd?: number | null;
   dy_fwd?: number | null;
+  revenue_mean?: number | null;
+  ebitda_mean?: number | null;
+  net_income_mean?: number | null;
 };
 
 export type LsegHistoricalSeriesRow = {
@@ -289,6 +326,30 @@ function buildOneLsegRow(args: {
       year,
       makeCell(fe.dy_fwd, feDate, { periodo: `${year}E`, unidade: "%" })
     );
+    putMetricYear(
+      (byMetricYear.revenue ??= {}),
+      year,
+      makeCell(toMillions(fe.revenue_mean), feDate, {
+        periodo: `${year}E`,
+        unidade: "R$ M",
+      })
+    );
+    putMetricYear(
+      (byMetricYear.ebitda ??= {}),
+      year,
+      makeCell(toMillions(fe.ebitda_mean), feDate, {
+        periodo: `${year}E`,
+        unidade: "R$ M",
+      })
+    );
+    putMetricYear(
+      (byMetricYear.net_income ??= {}),
+      year,
+      makeCell(toMillions(fe.net_income_mean), feDate, {
+        periodo: `${year}E`,
+        unidade: "R$ M",
+      })
+    );
 
     // Fallback: P/E derivado se não veio pe_fwd
     if (!byMetricYear.pe?.[year] && priceVal != null && priceVal > 0) {
@@ -310,6 +371,11 @@ function buildOneLsegRow(args: {
 
   // 3) Snapshot “atual” no ano do as_of (não sobrescreve forward/histórico)
   if (snap) {
+    const snapCcy =
+      snap.market_cap_currency?.toUpperCase() === "USD"
+        ? "US$"
+        : defaultCcyForTicker(ticker);
+
     putMetricYearIfEmpty(
       byMetricYear,
       "pe",
@@ -366,6 +432,24 @@ function buildOneLsegRow(args: {
     );
     putMetricYearIfEmpty(
       byMetricYear,
+      "gross_margin",
+      ySnap,
+      makeCell(snap.gross_margin, asOf, { periodo: "Atual", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "ebitda_margin",
+      ySnap,
+      makeCell(snap.ebitda_margin, asOf, { periodo: "Atual", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "wacc",
+      ySnap,
+      makeCell(snap.wacc, asOf, { periodo: "Atual", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
       "beta",
       ySnap,
       makeCell(snap.beta, asOf, { periodo: "Atual", unidade: "x" })
@@ -381,6 +465,36 @@ function buildOneLsegRow(args: {
       "ps",
       ySnap,
       makeCell(snap.price_to_sales, asOf, { periodo: "Atual", unidade: "x" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "nd_equity",
+      ySnap,
+      makeCell(snap.net_debt_to_equity, asOf, { periodo: "Atual", unidade: "x" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "current_ratio",
+      ySnap,
+      makeCell(snap.current_ratio, asOf, { periodo: "Atual", unidade: "x" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "quick_ratio",
+      ySnap,
+      makeCell(snap.quick_ratio, asOf, { periodo: "Atual", unidade: "x" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "interest_coverage",
+      ySnap,
+      makeCell(snap.interest_coverage, asOf, { periodo: "Atual", unidade: "x" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "asset_turnover",
+      ySnap,
+      makeCell(snap.asset_turnover, asOf, { periodo: "Atual", unidade: "x" })
     );
     putMetricYearIfEmpty(
       byMetricYear,
@@ -432,15 +546,58 @@ function buildOneLsegRow(args: {
     );
     putMetricYearIfEmpty(
       byMetricYear,
+      "cash_from_ops",
+      ySnap,
+      makeCell(toMillions(snap.cash_from_ops), asOf, {
+        periodo: "Atual",
+        unidade: "R$ M",
+      })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "depreciation_amort",
+      ySnap,
+      makeCell(toMillions(snap.depreciation_amort), asOf, {
+        periodo: "Atual",
+        unidade: "R$ M",
+      })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "interest_expense",
+      ySnap,
+      makeCell(toMillions(snap.interest_expense), asOf, {
+        periodo: "Atual",
+        unidade: "R$ M",
+      })
+    );
+    // Prefere net_debt real; fallback total_debt
+    putMetricYearIfEmpty(
+      byMetricYear,
       "net_debt",
       ySnap,
-      makeCell(toMillions(snap.total_debt), asOf, { periodo: "Atual", unidade: "R$ M" })
+      makeCell(toMillions(snap.net_debt ?? snap.total_debt), asOf, {
+        periodo: "Atual",
+        unidade: "R$ M",
+      })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "enterprise_value",
+      ySnap,
+      makeCell(toMillions(snap.enterprise_value), asOf, {
+        periodo: "Atual",
+        unidade: snapCcy === "US$" ? "US$ M" : "R$ M",
+      })
     );
     putMetricYearIfEmpty(
       byMetricYear,
       "market_cap",
       ySnap,
-      makeCell(toMillions(snap.market_cap), asOf, { periodo: "Atual", unidade: "R$ M" })
+      makeCell(toMillions(snap.market_cap), asOf, {
+        periodo: "Atual",
+        unidade: snapCcy === "US$" ? "US$ M" : "R$ M",
+      })
     );
     putMetricYearIfEmpty(
       byMetricYear,
@@ -448,12 +605,130 @@ function buildOneLsegRow(args: {
       ySnap,
       makeCell(toMillions(snap.total_equity), asOf, { periodo: "Atual", unidade: "R$ M" })
     );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "eps",
+      ySnap,
+      makeCell(snap.eps_fy0, asOf, { periodo: "FY0", unidade: snapCcy })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "net_dps",
+      ySnap,
+      makeCell(snap.dps_common, asOf, { periodo: "Atual", unidade: snapCcy })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "bvps",
+      ySnap,
+      makeCell(snap.book_value_per_share, asOf, { periodo: "Atual", unidade: snapCcy })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "tangible_bvps",
+      ySnap,
+      makeCell(snap.tangible_bvps, asOf, { periodo: "Atual", unidade: snapCcy })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "price_52w_high",
+      ySnap,
+      makeCell(snap.price_52w_high, asOf, { periodo: "Atual", unidade: snapCcy })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "price_52w_low",
+      ySnap,
+      makeCell(snap.price_52w_low, asOf, { periodo: "Atual", unidade: snapCcy })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "target_high",
+      ySnap,
+      makeCell(snap.price_target_high, asOf, { periodo: "12m", unidade: snapCcy })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "target_low",
+      ySnap,
+      makeCell(snap.price_target_low, asOf, { periodo: "12m", unidade: snapCcy })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "target_median",
+      ySnap,
+      makeCell(snap.price_target_median, asOf, { periodo: "12m", unidade: snapCcy })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "ret_1m",
+      ySnap,
+      makeCell(snap.ret_1m, asOf, { periodo: "1M", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "ret_3m",
+      ySnap,
+      makeCell(snap.ret_3m, asOf, { periodo: "3M", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "ret_6m",
+      ySnap,
+      makeCell(snap.ret_6m, asOf, { periodo: "6M", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "ret_ytd",
+      ySnap,
+      makeCell(snap.ret_ytd, asOf, { periodo: "YTD", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "ret_1y",
+      ySnap,
+      makeCell(snap.ret_1y, asOf, { periodo: "1Y", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "total_return",
+      ySnap,
+      makeCell(snap.total_return, asOf, { periodo: "Atual", unidade: "%" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "day_volume",
+      ySnap,
+      makeCell(snap.day_volume, asOf, { periodo: "Atual" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "num_buys",
+      ySnap,
+      makeCell(snap.num_buys, asOf, { periodo: "Atual" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "num_holds",
+      ySnap,
+      makeCell(snap.num_holds, asOf, { periodo: "Atual" })
+    );
+    putMetricYearIfEmpty(
+      byMetricYear,
+      "num_sells",
+      ySnap,
+      makeCell(snap.num_sells, asOf, { periodo: "Atual" })
+    );
   }
 
   let target: TargetCell | undefined;
-  const targetVal = num(snap?.price_target);
+  const targetVal =
+    num(snap?.price_target) ?? num(snap?.price_target_median);
   if (targetVal != null) {
-    const ccy = defaultCcyForTicker(ticker);
+    const ccy =
+      snap?.market_cap_currency?.toUpperCase() === "USD"
+        ? "US$"
+        : defaultCcyForTicker(ticker);
     const upside =
       num(snap?.upside_pct) ??
       (priceVal != null && priceVal > 0
@@ -489,7 +764,9 @@ function buildOneLsegRow(args: {
     revenue: makeCell(toMillions(snap?.revenue), asOf, { unidade: "R$ M" }),
     ebitda: makeCell(toMillions(snap?.ebitda), asOf, { unidade: "R$ M" }),
     net_income: makeCell(toMillions(snap?.net_income), asOf, { unidade: "R$ M" }),
-    net_debt: makeCell(toMillions(snap?.total_debt), asOf, { unidade: "R$ M" }),
+    net_debt: makeCell(toMillions(snap?.net_debt ?? snap?.total_debt), asOf, {
+      unidade: "R$ M",
+    }),
     byMetricYear: Object.keys(byMetricYear).length > 0 ? byMetricYear : undefined,
   };
 }

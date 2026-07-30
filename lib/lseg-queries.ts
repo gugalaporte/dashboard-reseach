@@ -22,10 +22,10 @@ type LoadOpts = {
 };
 
 const SNAPSHOT_SELECT =
-  "ric,as_of_date,last_price,price_target,rating_label,upside_pct,pe_ratio,pb_ratio,ev_ebitda,net_debt_ebitda,dividend_yield,ev_to_sales,price_to_sales,net_margin,operating_margin,revenue,ebitda,net_income,gross_profit,operating_income,free_cash_flow,capex,total_debt,total_equity,market_cap,beta,roic,roe";
+  "ric,as_of_date,last_price,price_target,rating_label,upside_pct,pe_ratio,pb_ratio,ev_ebitda,net_debt_ebitda,dividend_yield,ev_to_sales,price_to_sales,net_margin,operating_margin,revenue,ebitda,net_income,gross_profit,operating_income,free_cash_flow,capex,total_debt,total_equity,market_cap,market_cap_currency,beta,roic,roe,price_52w_high,price_52w_low,ret_1m,ret_3m,ret_6m,ret_ytd,ret_1y,total_return,day_volume,price_target_high,price_target_low,price_target_median,num_buys,num_holds,num_sells,enterprise_value,net_debt,net_debt_to_equity,current_ratio,quick_ratio,interest_coverage,interest_expense,cash_from_ops,depreciation_amort,book_value_per_share,tangible_bvps,asset_turnover,gross_margin,ebitda_margin,wacc,dps_common,eps_fy0";
 
 const FORWARD_SELECT =
-  "ric,as_of_date,fiscal_year,eps_mean,dps_mean,pe_fwd,dy_fwd";
+  "ric,as_of_date,fiscal_year,eps_mean,dps_mean,pe_fwd,dy_fwd,revenue_mean,ebitda_mean,net_income_mean";
 
 const HISTORICAL_SELECT =
   "ric,as_of_date,period_type,period_year,period_label,revenue,ebitda,net_income,free_cash_flow,capex,total_debt";

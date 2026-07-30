@@ -22,6 +22,7 @@ import {
   YEARS_PER_METRIC,
   type MetricId,
 } from "@/lib/metrics";
+import { LsegSeriesPanel } from "@/components/lseg-series-panel";
 
 export function LsegDashboard() {
   const [allRows, setAllRows] = React.useState<LsegViewRow[]>([]);
@@ -161,6 +162,12 @@ export function LsegDashboard() {
           </div>
           <SectorFilter options={setoresOpts} value={setor} onChange={setSetor} />
           <div className="flex-1" />
+          <a
+            href="#serie-temporal"
+            className="text-xs text-ink/60 hover:text-brand underline-offset-4 hover:underline transition"
+          >
+            ↓ Série temporal
+          </a>
           {hasFilters && (
             <button
               type="button"
@@ -220,6 +227,10 @@ export function LsegDashboard() {
           years={years}
           portfolioTickers={portfolioTickers}
         />
+
+        <div id="serie-temporal" className="pt-4 border-t border-line">
+          <LsegSeriesPanel tickerOptions={empresasOpts} />
+        </div>
       </main>
     </div>
   );

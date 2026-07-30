@@ -37,7 +37,36 @@ export type MetricId =
   | "ps"
   | "gross_profit"
   | "operating_income"
-  | "total_equity";
+  | "total_equity"
+  | "ret_1m"
+  | "ret_3m"
+  | "ret_6m"
+  | "ret_ytd"
+  | "ret_1y"
+  | "total_return"
+  | "price_52w_high"
+  | "price_52w_low"
+  | "target_high"
+  | "target_low"
+  | "target_median"
+  | "enterprise_value"
+  | "nd_equity"
+  | "current_ratio"
+  | "quick_ratio"
+  | "interest_coverage"
+  | "interest_expense"
+  | "cash_from_ops"
+  | "depreciation_amort"
+  | "bvps"
+  | "tangible_bvps"
+  | "asset_turnover"
+  | "gross_margin"
+  | "ebitda_margin"
+  | "wacc"
+  | "day_volume"
+  | "num_buys"
+  | "num_holds"
+  | "num_sells";
 
 // Ordem = ordem no seletor (pills) e referencia de produto.
 // Aliases: nomes brutos em dados_estruturados.metrica (case-sensitive).
@@ -114,6 +143,140 @@ export const LSEG_EXTRA_METRICS: MetricDef[] = [
     label: "Equity",
     aliases: ["Total Equity"],
     format: "millions",
+  },
+  { id: "ret_1m", label: "Ret 1M", aliases: ["Ret 1M"], format: "pct" },
+  { id: "ret_3m", label: "Ret 3M", aliases: ["Ret 3M"], format: "pct" },
+  { id: "ret_6m", label: "Ret 6M", aliases: ["Ret 6M"], format: "pct" },
+  { id: "ret_ytd", label: "Ret YTD", aliases: ["Ret YTD"], format: "pct" },
+  { id: "ret_1y", label: "Ret 1Y", aliases: ["Ret 1Y"], format: "pct" },
+  {
+    id: "total_return",
+    label: "Total Return",
+    aliases: ["Total Return"],
+    format: "pct",
+  },
+  {
+    id: "price_52w_high",
+    label: "52W High",
+    aliases: ["52W High"],
+    format: "money",
+  },
+  {
+    id: "price_52w_low",
+    label: "52W Low",
+    aliases: ["52W Low"],
+    format: "money",
+  },
+  {
+    id: "target_high",
+    label: "Target High",
+    aliases: ["Target High"],
+    format: "money",
+  },
+  {
+    id: "target_low",
+    label: "Target Low",
+    aliases: ["Target Low"],
+    format: "money",
+  },
+  {
+    id: "target_median",
+    label: "Target Med",
+    aliases: ["Target Median"],
+    format: "money",
+  },
+  {
+    id: "enterprise_value",
+    label: "EV",
+    aliases: ["Enterprise Value"],
+    format: "millions",
+  },
+  {
+    id: "nd_equity",
+    label: "ND/Equity",
+    aliases: ["Net Debt/Equity"],
+    format: "mult",
+  },
+  {
+    id: "current_ratio",
+    label: "Current Ratio",
+    aliases: ["Current Ratio"],
+    format: "mult",
+  },
+  {
+    id: "quick_ratio",
+    label: "Quick Ratio",
+    aliases: ["Quick Ratio"],
+    format: "mult",
+  },
+  {
+    id: "interest_coverage",
+    label: "Int. Coverage",
+    aliases: ["Interest Coverage"],
+    format: "mult",
+  },
+  {
+    id: "interest_expense",
+    label: "Int. Expense",
+    aliases: ["Interest Expense"],
+    format: "millions",
+  },
+  {
+    id: "cash_from_ops",
+    label: "CFO",
+    aliases: ["Cash From Ops"],
+    format: "millions",
+  },
+  {
+    id: "depreciation_amort",
+    label: "D&A",
+    aliases: ["D&A"],
+    format: "millions",
+  },
+  { id: "bvps", label: "BVPS", aliases: ["BVPS"], format: "money" },
+  {
+    id: "tangible_bvps",
+    label: "TBVPS",
+    aliases: ["Tangible BVPS"],
+    format: "money",
+  },
+  {
+    id: "asset_turnover",
+    label: "Asset Turn.",
+    aliases: ["Asset Turnover"],
+    format: "mult",
+  },
+  {
+    id: "gross_margin",
+    label: "Gross Margin",
+    aliases: ["Gross Margin"],
+    format: "pct",
+  },
+  {
+    id: "ebitda_margin",
+    label: "EBITDA Margin",
+    aliases: ["EBITDA Margin"],
+    format: "pct",
+  },
+  { id: "wacc", label: "WACC", aliases: ["WACC"], format: "pct" },
+  {
+    id: "day_volume",
+    label: "Volume",
+    aliases: ["Day Volume"],
+    format: "number",
+  },
+  { id: "num_buys", label: "# Buys", aliases: ["Num Buys"], format: "number" },
+  {
+    id: "num_holds",
+    label: "# Holds",
+    aliases: ["Num Holds"],
+    format: "number",
+  },
+  {
+    id: "num_sells",
+    label: "# Sells",
+    aliases: ["Num Sells"],
+    format: "number",
   },
 ];
 

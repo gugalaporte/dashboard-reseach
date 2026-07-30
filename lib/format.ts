@@ -18,7 +18,7 @@ export function parseDisplayDate(d: string): Date {
   return new Date(t);
 }
 
-export type Format = "money" | "millions" | "mult" | "pct";
+export type Format = "money" | "millions" | "mult" | "pct" | "number";
 
 export function isNil(v: unknown): v is null | undefined {
   return v === null || v === undefined || (typeof v === "number" && Number.isNaN(v));
@@ -61,6 +61,11 @@ export function formatValue(v: number, f: Format, ccy?: string | null): string {
       minimumFractionDigits: 1,
       maximumFractionDigits: 1,
     })}%`;
+  }
+  if (f === "number") {
+    return new Intl.NumberFormat(PT, {
+      maximumFractionDigits: v >= 1000 ? 0 : 2,
+    }).format(v);
   }
   // default: 'mult'
   return `${v.toLocaleString(PT, {
