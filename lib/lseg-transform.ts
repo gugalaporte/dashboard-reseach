@@ -65,6 +65,7 @@ export type LsegDailySnapshotRow = {
   ret_1y?: number | null;
   total_return?: number | null;
   day_volume?: number | null;
+  analyst_count?: number | null;
   price_target_high?: number | null;
   price_target_low?: number | null;
   price_target_median?: number | null;
@@ -98,6 +99,7 @@ export type LsegForwardEstimateRow = {
   dps_mean: number | null;
   pe_fwd?: number | null;
   dy_fwd?: number | null;
+  eps_rev_4w_pct?: number | null;
   revenue_mean?: number | null;
   ebitda_mean?: number | null;
   net_income_mean?: number | null;
