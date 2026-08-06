@@ -134,12 +134,15 @@ function FactorTipBody({ row, factor }: { row: FactorRow; factor: FactorId }) {
 }
 
 function ScoreTipBody({ row }: { row: FactorRow }) {
-  const parts: Array<{ id: FactorId; w: number; v: number | null }> = [
-    { id: "quality", w: FACTOR_WEIGHTS.quality, v: row.quality },
-    { id: "value", w: FACTOR_WEIGHTS.value, v: row.value },
-    { id: "momentum", w: FACTOR_WEIGHTS.momentum, v: row.momentum },
-    { id: "carry", w: FACTOR_WEIGHTS.carry, v: row.carry },
-  ].filter((p) => p.w > 0);
+  const parts = (
+    [
+      { id: "quality" as const, w: FACTOR_WEIGHTS.quality, v: row.quality },
+      { id: "value" as const, w: FACTOR_WEIGHTS.value, v: row.value },
+      { id: "momentum" as const, w: FACTOR_WEIGHTS.momentum, v: row.momentum },
+      { id: "carry" as const, w: FACTOR_WEIGHTS.carry, v: row.carry },
+      { id: "liquidity" as const, w: FACTOR_WEIGHTS.liquidity, v: row.liquidity },
+    ] satisfies { id: FactorId; w: number; v: number | null }[]
+  ).filter((p) => p.w > 0);
   const present = parts.filter((p) => p.v != null);
   const wSum = present.reduce((a, p) => a + p.w, 0);
 
