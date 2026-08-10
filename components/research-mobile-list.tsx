@@ -5,9 +5,14 @@ import { RatingCell } from "@/components/rating-cell";
 import { TargetCell } from "@/components/target-cell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { defaultCcyForTicker, FONTE_SHORT_LABEL, type ResearchRow } from "@/lib/queries";
+import {
+  defaultCcyForTicker,
+  FONTE_SHORT_LABEL,
+  type ResearchRow,
+} from "@/lib/queries";
 import type { LivePricesMap } from "@/lib/use-live-prices";
 import { formatValue } from "@/lib/format";
+import { getMetricDef, type MetricId } from "@/lib/metrics";
 import { sectorPt } from "@/lib/sector-labels";
 
 type Props = {
@@ -16,10 +21,17 @@ type Props = {
   onRowClick?: (row: ResearchRow) => void;
   livePrices?: LivePricesMap;
   portfolioTickers?: string[];
+  selectedMetrics?: MetricId[];
+  /** Anos com dado por métrica (já filtrados). */
+  yearsByMetric?: Partial<Record<MetricId, string[]>>;
 };
 
+function shortYear(year: string): string {
+  return year.length === 4 ? `${year.slice(2)}E` : `${year}E`;
+}
+
 /**
- * Lista compacta para mobile — ticker, rating, preço/target e fonte.
+ * Lista compacta para mobile — ticker, rating, preço/target, métricas e fonte.
  * Toque abre o mesmo drawer da tabela desktop.
  */
 export function ResearchMobileList({
@@ -28,6 +40,8 @@ export function ResearchMobileList({
   onRowClick,
   livePrices,
   portfolioTickers = [],
+  selectedMetrics = [],
+  yearsByMetric = {},
 }: Props) {
   const portfolioSet = new Set(portfolioTickers);
 
@@ -107,6 +121,55 @@ export function ResearchMobileList({
                   priceCcy={priceCcy}
                 />
               </div>
+
+              {selectedMetrics.length > 0 && (
+                <div className="mt-3 space-y-2 border-t border-line/70 pt-2.5">
+                  {selectedMetrics.map((mid) => {
+                    const def = getMetricDef(mid);
+                    const metricYears = yearsByMetric[mid] ?? [];
+                    const ccy =
+                      def.format === "money" || def.format === "millions"
+                        ? defaultCcyForTicker(row.empresa)
+                        : null;
+                    return (
+                      <div key={mid}>
+                        <div className="text-[9px] uppercase tracking-[0.14em] text-ink/40 font-medium">
+                          {def.label}
+                        </div>
+                        {metricYears.length === 0 ? (
+                          <p className="mt-1 text-[11px] text-ink/35">sem dados</p>
+                        ) : (
+                          <div
+                            className="mt-1 grid gap-1"
+                            style={{
+                              gridTemplateColumns: `repeat(${metricYears.length}, minmax(0, 1fr))`,
+                            }}
+                          >
+                            {metricYears.map((year) => {
+                              const cell = row.byMetricYear?.[mid]?.[year];
+                              return (
+                                <div
+                                  key={year}
+                                  className="rounded-md border border-line/70 bg-white px-1.5 py-1.5 text-center"
+                                >
+                                  <div className="text-[9px] uppercase tracking-wide text-ink/40">
+                                    {shortYear(year)}
+                                  </div>
+                                  <div className="font-mono tabular text-[12px] text-ink mt-0.5">
+                                    {cell?.value != null
+                                      ? formatValue(cell.value, def.format, ccy)
+                                      : "–"}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </button>
           </li>
         );

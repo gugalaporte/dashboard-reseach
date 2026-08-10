@@ -8,10 +8,12 @@ import {
   FACTOR_FORMULA,
   FACTOR_LABELS,
   FACTOR_WEIGHTS,
+  type FactorClass,
   type FactorId,
   type FactorRow,
   type MetricBreakdown,
 } from "@/lib/factor-scoring";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 function fmtZ(v: number | null): string {
@@ -257,6 +259,57 @@ export function PercentileCell({
       <span className="tabular text-xs text-ink/60">
         {p != null ? formatNumber(p, 0) : "–"}
       </span>
+    </HoverTip>
+  );
+}
+
+function ClassTipBody({ row }: { row: FactorRow }) {
+  const p = row.percentile;
+  return (
+    <div className="space-y-2">
+      <p className="text-surface-soft/70 text-[10px] leading-snug">
+        Classe pelo percentil do score composto entre as empresas elegíveis
+        (universo completo do screening, sem filtro de setor).
+      </p>
+      <ul className="space-y-0.5 font-mono tabular text-[10px]">
+        <li className="flex justify-between gap-3">
+          <span className="text-surface-soft/75">A</span>
+          <span>percentil ≥ 75 (top 25%)</span>
+        </li>
+        <li className="flex justify-between gap-3">
+          <span className="text-surface-soft/75">B</span>
+          <span>25 ≤ percentil &lt; 75</span>
+        </li>
+        <li className="flex justify-between gap-3">
+          <span className="text-surface-soft/75">C</span>
+          <span>percentil &lt; 25 (bottom 25%)</span>
+        </li>
+      </ul>
+      <p className="pt-1 border-t border-surface-soft/15 font-semibold tabular">
+        Score {fmtZ(row.score)} · percentil{" "}
+        {p != null ? formatNumber(p, 0) : "–"} → Classe {row.factorClass ?? "–"}
+      </p>
+    </div>
+  );
+}
+
+const CLASS_BADGE_STYLES: Record<FactorClass, string> = {
+  A: "bg-brand/10 text-brand border-brand/30",
+  B: "bg-surface text-ink/70 border-line",
+  C: "bg-destructive/10 text-destructive border-destructive/25",
+};
+
+export function ClassCell({ row }: { row: FactorRow }) {
+  const c = row.factorClass;
+  if (!c) return <span className="text-ink/30">–</span>;
+  return (
+    <HoverTip content={<ClassTipBody row={row} />}>
+      <Badge
+        variant="outline"
+        className={cn("font-semibold tabular text-[11px]", CLASS_BADGE_STYLES[c])}
+      >
+        {c}
+      </Badge>
     </HoverTip>
   );
 }

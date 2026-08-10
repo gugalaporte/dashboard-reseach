@@ -3,7 +3,6 @@
 import * as React from "react";
 import { AppHeader } from "@/components/app-header";
 import { SectorFilter } from "@/components/sector-filter";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,9 +28,11 @@ import {
   type FactorRow,
 } from "@/lib/factor-scoring";
 import {
+  ClassCell,
   CompositeScoreCell,
   FactorScoreCell,
 } from "@/components/factor-cell-tip";
+import { FactorMobileList } from "@/components/factor-mobile-list";
 import { cn } from "@/lib/utils";
 import { Star } from "lucide-react";
 
@@ -50,20 +51,6 @@ type SortKey =
   | "carry"
   | "liquidity"
   | "ticker";
-
-function ClassBadge({ c }: { c: FactorClass | null }) {
-  if (!c) return <span className="text-ink/30">–</span>;
-  const styles = {
-    A: "bg-brand/10 text-brand border-brand/30",
-    B: "bg-surface text-ink/70 border-line",
-    C: "bg-destructive/10 text-destructive border-destructive/25",
-  } as const;
-  return (
-    <Badge variant="outline" className={cn("font-semibold tabular text-[11px]", styles[c])}>
-      {c}
-    </Badge>
-  );
-}
 
 function fmtZ(v: number | null): string {
   if (v == null) return "–";
@@ -212,70 +199,78 @@ export function FactorInvestingDashboard() {
         lastUpdate={data?.asOfDate}
       />
 
-      <div className="bg-surface-soft border-b border-line sticky top-16 z-30">
+      <div className="bg-surface-soft border-b border-line sticky top-14 md:top-16 z-30">
         <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-3 md:py-4 flex flex-wrap items-center gap-2 md:gap-3">
-          <SectorFilter
-            options={data?.sectors ?? []}
-            value={setor}
-            onChange={setSetor}
-          />
-          <div className="h-6 w-px bg-line shrink-0" />
+          <div className="w-full sm:w-auto">
+            <SectorFilter
+              options={data?.sectors ?? []}
+              value={setor}
+              onChange={setSetor}
+            />
+          </div>
+          <div className="hidden sm:block h-6 w-px bg-line shrink-0" />
           <ClassFilter value={classFilter} onChange={setClassFilter} />
-          <div className="h-6 w-px bg-line shrink-0" />
-          <div className="flex items-center gap-1 rounded-md bg-surface p-1">
+          <div className="hidden sm:block h-6 w-px bg-line shrink-0" />
+          <div className="flex items-center gap-1 rounded-md bg-surface p-1 w-full sm:w-auto">
             <TogglePill
               active={onlyEligible}
               onClick={() => setOnlyEligible((v) => !v)}
               label="Só elegíveis"
+              className="flex-1 sm:flex-none"
             />
             <TogglePill
               active={onlyPortfolio}
               onClick={() => setOnlyPortfolio((v) => !v)}
               label="Em carteira"
+              className="flex-1 sm:flex-none"
             />
           </div>
-          <div className="flex-1" />
-          <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.12em] text-ink/45">
-            <span className="tabular">{counts.total} elegíveis</span>
-            <span className="text-brand tabular">A {counts.A}</span>
-            <span className="tabular">B {counts.B}</span>
-            <span className="text-destructive tabular">C {counts.C}</span>
+          <div className="hidden md:block flex-1" />
+          <div className="flex items-center justify-between gap-3 w-full md:w-auto text-[11px] uppercase tracking-[0.12em] text-ink/45">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="tabular shrink-0">{counts.total} elegíveis</span>
+              <span className="text-brand tabular">A {counts.A}</span>
+              <span className="tabular">B {counts.B}</span>
+              <span className="text-destructive tabular">C {counts.C}</span>
+            </div>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-xs text-ink/60 hover:text-brand underline-offset-4 hover:underline transition shrink-0"
+              >
+                Limpar filtros
+              </button>
+            )}
           </div>
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="text-xs text-ink/60 hover:text-brand underline-offset-4 hover:underline transition"
-            >
-              Limpar filtros
-            </button>
-          )}
         </div>
 
         <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 pb-3 flex flex-wrap items-center gap-2 md:gap-3">
-          <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium shrink-0">
+          <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium w-full sm:w-auto shrink-0">
             Elegibilidade
           </span>
-          <label className="flex items-center gap-2 text-xs text-ink/55">
+          <label className="flex items-center gap-2 text-xs text-ink/55 flex-1 sm:flex-none min-w-0">
             <span className="shrink-0">Vol. mín.</span>
             <Input
-              className="h-8 w-[7.5rem] text-xs tabular border-line bg-surface"
+              className="h-8 w-full sm:w-[7.5rem] text-xs tabular border-line bg-surface"
               value={minVol}
               onChange={(e) => setMinVol(e.target.value)}
+              inputMode="numeric"
             />
           </label>
-          <label className="flex items-center gap-2 text-xs text-ink/55">
+          <label className="flex items-center gap-2 text-xs text-ink/55 flex-1 sm:flex-none min-w-0">
             <span className="shrink-0">ND/EBITDA máx.</span>
             <Input
-              className="h-8 w-16 text-xs tabular border-line bg-surface"
+              className="h-8 w-full sm:w-16 text-xs tabular border-line bg-surface"
               value={maxNd}
               onChange={(e) => setMaxNd(e.target.value)}
+              inputMode="decimal"
             />
           </label>
           <Button
             type="button"
             size="sm"
-            className="h-8 text-[11px] uppercase tracking-[0.08em]"
+            className="h-8 text-[11px] uppercase tracking-[0.08em] w-full sm:w-auto"
             onClick={fetchData}
             disabled={loading}
           >
@@ -296,12 +291,19 @@ export function FactorInvestingDashboard() {
             <h2 className="font-display text-lg text-ink tracking-tight">
               Screening multifatorial
             </h2>
-            <p className="text-xs text-ink/45 mt-0.5">
+            <p className="text-xs text-ink/45 mt-0.5 leading-relaxed">
               Quality 30% · Value 30% · Carry 30% · Momentum 10% — z-score por
               setor · ND/EBITDA ignore bancos/financeiras
             </p>
           </div>
-          <div className="overflow-x-auto border border-line bg-white">
+
+          <FactorMobileList
+            data={rows}
+            isLoading={loading}
+            onRowClick={setSelected}
+          />
+
+          <div className="hidden md:block overflow-x-auto border border-line bg-white">
             <Table>
               <TableHeader>
                 <TableRow className="bg-navy hover:bg-navy border-none">
@@ -377,8 +379,8 @@ export function FactorInvestingDashboard() {
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                         <CompositeScoreCell row={r} />
                       </TableCell>
-                      <TableCell className="text-center">
-                        <ClassBadge c={r.factorClass} />
+                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        <ClassCell row={r} />
                       </TableCell>
                       {!onlyEligible && (
                         <TableCell className="text-[11px] text-ink/45 max-w-[180px] truncate">
@@ -409,10 +411,12 @@ function TogglePill({
   active,
   onClick,
   label,
+  className,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
+  className?: string;
 }) {
   return (
     <button
@@ -423,7 +427,8 @@ function TogglePill({
         "px-3 h-8 rounded text-[11px] font-medium uppercase tracking-[0.08em] transition",
         active
           ? "bg-navy text-surface-soft"
-          : "text-ink/60 hover:text-ink"
+          : "text-ink/60 hover:text-ink",
+        className
       )}
     >
       {label}
@@ -445,14 +450,14 @@ function ClassFilter({
     { value: "C", label: "C" },
   ];
   return (
-    <div className="flex items-center gap-1 rounded-md bg-surface p-1">
+    <div className="flex items-center gap-1 rounded-md bg-surface p-1 w-full sm:w-auto">
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
           onClick={() => onChange(opt.value)}
           className={cn(
-            "px-3 h-8 rounded text-[11px] font-medium uppercase tracking-[0.08em] transition min-w-[2.25rem]",
+            "px-3 h-8 rounded text-[11px] font-medium uppercase tracking-[0.08em] transition flex-1 sm:flex-none min-w-[2.25rem]",
             value === opt.value
               ? "bg-navy text-surface-soft"
               : "text-ink/60 hover:text-ink"
@@ -474,8 +479,8 @@ function FactorDetailSheet({
 }) {
   return (
     <Sheet open={!!row} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent>
-        <SheetHeader>
+      <SheetContent className="w-full max-w-full sm:max-w-xl">
+        <SheetHeader className="p-4 sm:p-6 pr-12">
           <SheetTitle className="font-display text-xl">
             {row?.ticker}
             {row?.name ? (
@@ -486,14 +491,14 @@ function FactorDetailSheet({
           </SheetTitle>
         </SheetHeader>
         {row && (
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-            <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 space-y-5 sm:space-y-6">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 text-sm">
               <Meta label="Setor" value={row.sector ? sectorPt(row.sector) : "–"} />
               <Meta label="Classe" value={row.factorClass ?? "–"} />
               <Meta label="Score" value={fmtZ(row.score)} />
             </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-center">
+            <div className="grid grid-cols-5 gap-1.5 sm:gap-2 text-center">
               {(
                 [
                   ["Quality", row.quality],
@@ -503,9 +508,13 @@ function FactorDetailSheet({
                   ["Liq.", row.liquidity],
                 ] as const
               ).map(([label, v]) => (
-                <div key={label} className="border border-line bg-white px-2 py-3">
-                  <div className="text-[9px] uppercase tracking-wide text-ink/40">{label}</div>
-                  <div className="tabular text-sm font-semibold mt-1">{fmtZ(v)}</div>
+                <div key={label} className="border border-line bg-white px-1.5 sm:px-2 py-2.5 sm:py-3">
+                  <div className="text-[9px] uppercase tracking-wide text-ink/40 truncate">
+                    {label}
+                  </div>
+                  <div className="tabular text-xs sm:text-sm font-semibold mt-1">
+                    {fmtZ(v)}
+                  </div>
                 </div>
               ))}
             </div>
@@ -520,7 +529,7 @@ function FactorDetailSheet({
                 </p>
               ) : (
                 <div className="border border-line bg-white overflow-hidden">
-                  <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_4.25rem] gap-x-4 px-4 py-2.5 border-b border-line bg-surface text-[9px] uppercase tracking-[0.14em] text-ink/45">
+                  <div className="grid grid-cols-[minmax(0,1fr)_5rem_3.75rem] sm:grid-cols-[minmax(0,1fr)_6.5rem_4.25rem] gap-x-2 sm:gap-x-4 px-3 sm:px-4 py-2.5 border-b border-line bg-surface text-[9px] uppercase tracking-[0.14em] text-ink/45">
                     <span>Métrica</span>
                     <span className="text-right">Valor</span>
                     <span className="text-right">Z-score</span>
@@ -529,7 +538,7 @@ function FactorDetailSheet({
                     {row.breakdown.map((m) => (
                       <li
                         key={m.key}
-                        className="grid grid-cols-[minmax(0,1fr)_6.5rem_4.25rem] gap-x-4 items-center px-4 py-2.5 border-b border-line/60 last:border-b-0 text-sm"
+                        className="grid grid-cols-[minmax(0,1fr)_5rem_3.75rem] sm:grid-cols-[minmax(0,1fr)_6.5rem_4.25rem] gap-x-2 sm:gap-x-4 items-center px-3 sm:px-4 py-2.5 border-b border-line/60 last:border-b-0 text-sm"
                       >
                         <span className="text-ink/70 truncate min-w-0" title={m.label}>
                           {m.label}
@@ -540,7 +549,7 @@ function FactorDetailSheet({
                         <span className="tabular text-ink/55 text-xs text-right whitespace-nowrap">
                           {fmtRaw(m.key, m.raw)}
                         </span>
-                        <span className="tabular font-medium text-right whitespace-nowrap">
+                        <span className="tabular font-medium text-right whitespace-nowrap text-xs sm:text-sm">
                           {fmtZ(m.z)}
                         </span>
                       </li>
@@ -558,9 +567,11 @@ function FactorDetailSheet({
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border border-line bg-white px-3 py-2">
+    <div className="border border-line bg-white px-2.5 sm:px-3 py-2 min-w-0">
       <div className="text-[9px] uppercase tracking-wide text-ink/40">{label}</div>
-      <div className="text-sm font-medium mt-0.5">{value}</div>
+      <div className="text-sm font-medium mt-0.5 truncate" title={value}>
+        {value}
+      </div>
     </div>
   );
 }

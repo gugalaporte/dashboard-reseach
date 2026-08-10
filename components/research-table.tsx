@@ -392,6 +392,8 @@ export function ResearchTable({
         onRowClick={onRowClick}
         livePrices={livePrices}
         portfolioTickers={portfolioTickers}
+        selectedMetrics={selectedMetrics}
+        yearsByMetric={yearsByMetric}
       />
 
       <div className="hidden md:block rounded-lg border border-line bg-surface-soft overflow-hidden">
