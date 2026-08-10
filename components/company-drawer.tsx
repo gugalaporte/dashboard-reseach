@@ -78,16 +78,16 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
 
   return (
     <Sheet open={!!empresa} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-[760px] max-w-[92vw] bg-surface-soft border-l border-line p-0">
+      <SheetContent className="w-full sm:w-[760px] max-w-[100vw] sm:max-w-[92vw] bg-surface-soft border-l border-line p-0">
         {/* Header editorial */}
-        <SheetHeader className="px-8 py-6 border-b border-line bg-surface-soft">
+        <SheetHeader className="px-4 sm:px-8 py-5 sm:py-6 border-b border-line bg-surface-soft">
           <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium">
             Empresa
           </div>
-          <SheetTitle className="font-display text-3xl text-ink leading-tight mt-1">
+          <SheetTitle className="font-display text-2xl sm:text-3xl text-ink leading-tight mt-1">
             {empresa}
           </SheetTitle>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
             <span className="inline-flex items-center h-6 px-2 rounded-sm bg-navy/5 border border-navy/10 font-mono text-[11px] tracking-wide text-navy">
               {empresa}
             </span>
@@ -100,13 +100,13 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
 
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           <Tabs defaultValue="metricas" className="flex flex-col">
-            <TabsList className="mx-8 mt-6">
+            <TabsList className="mx-4 sm:mx-8 mt-5 sm:mt-6 overflow-x-auto max-w-[calc(100%-2rem)] sm:max-w-none justify-start">
               <TabsTrigger value="metricas">Métricas</TabsTrigger>
               <TabsTrigger value="consenso">Stock Guide</TabsTrigger>
               <TabsTrigger value="pdfs">Relatórios</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="metricas" className="px-8 pb-8">
+            <TabsContent value="metricas" className="px-4 sm:px-8 pb-8">
               {loading ? (
                 <div className="space-y-3 pt-2">
                   <Skeleton className="h-8 w-full" />
@@ -172,7 +172,7 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
               )}
             </TabsContent>
 
-            <TabsContent value="consenso" className="px-8 pb-8">
+            <TabsContent value="consenso" className="px-4 sm:px-8 pb-8">
               {consenso.length === 0 ? (
                 <div className="py-12 text-center text-sm text-ink/50">
                   Sem cobertura de consenso disponível.
@@ -299,7 +299,7 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
               )}
             </TabsContent>
 
-            <TabsContent value="pdfs" className="px-8 pb-8">
+            <TabsContent value="pdfs" className="px-4 sm:px-8 pb-8">
               {loading ? (
                 <Skeleton className="h-32 w-full" />
               ) : pdfs.length === 0 ? (

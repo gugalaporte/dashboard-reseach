@@ -392,7 +392,7 @@ export function TradeQualityDashboard() {
 
       {/* Barra de filtros */}
       <div className="bg-surface-soft border-b border-line sticky top-16 z-30">
-        <div className="mx-auto max-w-[1600px] px-8 py-4 flex flex-wrap items-center gap-3">
+        <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-3 md:py-4 flex flex-wrap items-center gap-2 md:gap-3">
           <div className="flex items-center gap-1 rounded-md bg-surface p-1">
             {PERIOD_OPTIONS.map((opt) => (
               <FilterPill
@@ -407,7 +407,7 @@ export function TradeQualityDashboard() {
           <div className="h-6 w-px bg-line hidden sm:block" />
 
           <Select value={desk} onValueChange={setDesk}>
-            <SelectTrigger className="w-[200px] h-8 text-xs bg-surface border-line">
+            <SelectTrigger className="w-full sm:w-[200px] h-8 text-xs bg-surface border-line">
               <SelectValue placeholder="Trading desk" />
             </SelectTrigger>
             <SelectContent>
@@ -420,7 +420,7 @@ export function TradeQualityDashboard() {
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <span className="text-[11px] text-ink/50 uppercase tracking-wide">De</span>
             <Input
               type="date"
@@ -455,7 +455,7 @@ export function TradeQualityDashboard() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-[1600px] px-8 py-6 space-y-6 flex-1 w-full">
+      <main className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-5 md:py-6 space-y-5 md:space-y-6 flex-1 w-full">
         {error && (
           <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {error}
@@ -698,7 +698,7 @@ export function TradeQualityDashboard() {
                     setDraft((prev) => ({ ...prev, tradingDesk: v, shortLeg: "", longLeg: "" }))
                   }
                 >
-                  <SelectTrigger className="w-[220px] h-8 text-xs bg-surface border-line">
+                  <SelectTrigger className="w-full sm:w-[220px] h-8 text-xs bg-surface border-line">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>

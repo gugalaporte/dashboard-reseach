@@ -19,7 +19,7 @@ const OPTIONS: { value: string | undefined; label: string }[] = [
 
 export function SourceFilter({ value, onChange }: Props) {
   return (
-    <div className="flex items-center gap-1 rounded-md bg-surface p-1">
+    <div className="flex items-center gap-1 rounded-md bg-surface p-1 overflow-x-auto max-w-full scrollbar-thin">
       {OPTIONS.map((opt) => {
         const active = value === opt.value;
         return (
@@ -28,7 +28,7 @@ export function SourceFilter({ value, onChange }: Props) {
             type="button"
             onClick={() => onChange(opt.value)}
             className={cn(
-              "px-3 h-8 rounded text-[11px] font-medium uppercase tracking-[0.08em] transition",
+              "px-2.5 sm:px-3 h-8 rounded text-[11px] font-medium uppercase tracking-[0.08em] transition shrink-0",
               active
                 ? "bg-navy text-surface-soft"
                 : "text-ink/60 hover:text-ink"

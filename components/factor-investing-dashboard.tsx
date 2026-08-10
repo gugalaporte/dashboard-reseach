@@ -213,7 +213,7 @@ export function FactorInvestingDashboard() {
       />
 
       <div className="bg-surface-soft border-b border-line sticky top-16 z-30">
-        <div className="mx-auto max-w-[1600px] px-8 py-4 flex flex-wrap items-center gap-3">
+        <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-3 md:py-4 flex flex-wrap items-center gap-2 md:gap-3">
           <SectorFilter
             options={data?.sectors ?? []}
             value={setor}
@@ -252,7 +252,7 @@ export function FactorInvestingDashboard() {
           )}
         </div>
 
-        <div className="mx-auto max-w-[1600px] px-8 pb-3 flex flex-wrap items-center gap-3">
+        <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 pb-3 flex flex-wrap items-center gap-2 md:gap-3">
           <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium shrink-0">
             Elegibilidade
           </span>
@@ -284,7 +284,7 @@ export function FactorInvestingDashboard() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-[1600px] w-full px-8 py-8 space-y-6 flex-1">
+      <main className="mx-auto max-w-[1600px] w-full px-4 sm:px-6 lg:px-8 py-5 md:py-8 space-y-5 md:space-y-6 flex-1">
         {error && (
           <p className="text-sm text-destructive bg-destructive/5 border border-destructive/20 px-4 py-3">
             {error}
@@ -493,7 +493,7 @@ function FactorDetailSheet({
               <Meta label="Score" value={fmtZ(row.score)} />
             </div>
 
-            <div className="grid grid-cols-5 gap-2 text-center">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-center">
               {(
                 [
                   ["Quality", row.quality],

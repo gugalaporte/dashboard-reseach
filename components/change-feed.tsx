@@ -217,7 +217,7 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
           MUDANÇAS RECENTES
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="w-[340px] shrink-0">
+          <div className="w-full md:w-[340px] md:shrink-0">
             <CompanySearch options={empresasOpts} selected={empresas} onChange={setEmpresas} />
           </div>
           <SectorFilter options={setoresOpts} value={setor} onChange={setSetor} />

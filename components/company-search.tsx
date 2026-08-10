@@ -57,7 +57,7 @@ export function CompanySearch({ options, selected, onChange }: Props) {
           type="button"
           className={cn(
             "group flex items-center gap-2 h-10 px-3 rounded-md border border-line bg-surface-soft",
-            "hover:border-brand-soft transition text-left w-full max-w-md",
+            "hover:border-brand-soft transition text-left w-full",
             "focus:outline-none focus:ring-2 focus:ring-brand-soft"
           )}
         >

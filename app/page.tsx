@@ -198,39 +198,43 @@ export default function DashboardPage() {
         lastUpdate={stats?.ultimaAtualizacao}
       />
 
-      {/* Barra de filtros em linha unica, sticky abaixo do header */}
+      {/* Barra de filtros — empilha no mobile */}
       <div className="bg-surface-soft border-b border-line">
-        <div className="mx-auto max-w-[1600px] px-8 py-4 flex items-center gap-3">
-          <div className="w-[340px] shrink-0">
+        <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-3 md:py-4 flex flex-wrap items-center gap-2 md:gap-3">
+          <div className="w-full md:w-[340px] md:shrink-0">
             <CompanySearch
               options={empresasOpts}
               selected={empresas}
               onChange={setEmpresas}
             />
           </div>
-          <SectorFilter options={setoresOpts} value={setor} onChange={setSetor} />
-          <div className="h-6 w-px bg-line" />
+          <div className="w-full sm:w-auto">
+            <SectorFilter options={setoresOpts} value={setor} onChange={setSetor} />
+          </div>
+          <div className="hidden md:block h-6 w-px bg-line" />
           <SourceFilter value={fonte} onChange={setFonte} />
           <DateFilter value={periodo} onChange={setPeriodo} />
-          <div className="flex-1" />
-          <a
-            href="#mudancas-recentes"
-            className="text-xs text-ink/60 hover:text-brand underline-offset-4 hover:underline transition"
-          >
-            ↓ Mudanças recentes
-          </a>
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
+          <div className="hidden md:block flex-1" />
+          <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+            <a
+              href="#mudancas-recentes"
               className="text-xs text-ink/60 hover:text-brand underline-offset-4 hover:underline transition"
             >
-              Limpar filtros
-            </button>
-          )}
+              ↓ Mudanças recentes
+            </a>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-xs text-ink/60 hover:text-brand underline-offset-4 hover:underline transition"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
         </div>
         {empresas.length > 0 && (
-          <div className="mx-auto max-w-[1600px] px-8 pb-3 -mt-1">
+          <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 pb-3 -mt-1">
             <CompanyChips
               selected={empresas}
               onRemove={(v) => setEmpresas(empresas.filter((x) => x !== v))}
@@ -238,7 +242,7 @@ export default function DashboardPage() {
           </div>
         )}
         {/* Segunda linha: seletor de metricas (max 3). Separada para caber as pills. */}
-        <div className="mx-auto max-w-[1600px] px-8 pb-3 flex items-center gap-3">
+        <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 pb-3 flex flex-wrap items-center gap-2 md:gap-3">
           <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium shrink-0">
             Métricas ({selectedMetrics.length}/3)
           </span>
@@ -249,7 +253,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <main className="flex-1 mx-auto max-w-[1600px] w-full px-8 py-8 space-y-6">
+      <main className="flex-1 mx-auto max-w-[1600px] w-full px-4 sm:px-6 lg:px-8 py-5 md:py-8 space-y-5 md:space-y-6">
         <SummaryCards
           data={summary}
           isLoading={loadingTable && !summary}

@@ -24,7 +24,7 @@ export function SectorFilter({ options, value, onChange }: Props) {
       onValueChange={(next) => onChange(next === "__all__" ? undefined : next)}
     >
       <SelectTrigger
-        className="h-10 w-[220px] border-line bg-surface-soft text-sm text-ink/60 hover:border-brand-soft"
+        className="h-10 w-full sm:w-[220px] border-line bg-surface-soft text-sm text-ink/60 hover:border-brand-soft"
       >
         <SelectValue placeholder="Todos setores" className="text-ink/60" />
       </SelectTrigger>

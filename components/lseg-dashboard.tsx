@@ -152,46 +152,50 @@ export function LsegDashboard() {
       <AppHeader active="lseg" subtitle="Dados LSEG" lastUpdate={lastUpdate} />
 
       <div className="bg-surface-soft border-b border-line">
-        <div className="mx-auto max-w-[1600px] px-8 py-4 flex items-center gap-3">
-          <div className="w-[340px] shrink-0">
+        <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-3 md:py-4 flex flex-wrap items-center gap-2 md:gap-3">
+          <div className="w-full md:w-[340px] md:shrink-0">
             <CompanySearch
               options={empresasOpts}
               selected={empresas}
               onChange={setEmpresas}
             />
           </div>
-          <SectorFilter options={setoresOpts} value={setor} onChange={setSetor} />
-          <div className="flex-1" />
-          <a
-            href="#serie-temporal"
-            className="text-xs text-ink/60 hover:text-brand underline-offset-4 hover:underline transition"
-          >
-            ↓ Série temporal
-          </a>
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={() => {
-                setEmpresas([]);
-                setSetor(undefined);
-                setOnlyPortfolio(false);
-                setRatingBucket(null);
-              }}
+          <div className="w-full sm:w-auto">
+            <SectorFilter options={setoresOpts} value={setor} onChange={setSetor} />
+          </div>
+          <div className="hidden md:block flex-1" />
+          <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+            <a
+              href="#serie-temporal"
               className="text-xs text-ink/60 hover:text-brand underline-offset-4 hover:underline transition"
             >
-              Limpar filtros
-            </button>
-          )}
+              ↓ Série temporal
+            </a>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEmpresas([]);
+                  setSetor(undefined);
+                  setOnlyPortfolio(false);
+                  setRatingBucket(null);
+                }}
+                className="text-xs text-ink/60 hover:text-brand underline-offset-4 hover:underline transition"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
         </div>
         {empresas.length > 0 && (
-          <div className="mx-auto max-w-[1600px] px-8 pb-3 -mt-1">
+          <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 pb-3 -mt-1">
             <CompanyChips
               selected={empresas}
               onRemove={(v) => setEmpresas(empresas.filter((x) => x !== v))}
             />
           </div>
         )}
-        <div className="mx-auto max-w-[1600px] px-8 pb-3 flex items-center gap-3">
+        <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 pb-3 flex flex-wrap items-center gap-2 md:gap-3">
           <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium shrink-0">
             Métricas ({selectedMetrics.length}/3)
           </span>
@@ -203,7 +207,7 @@ export function LsegDashboard() {
         </div>
       </div>
 
-      <main className="flex-1 mx-auto max-w-[1600px] w-full px-8 py-8 space-y-6">
+      <main className="flex-1 mx-auto max-w-[1600px] w-full px-4 sm:px-6 lg:px-8 py-5 md:py-8 space-y-5 md:space-y-6">
         {error && (
           <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {error}

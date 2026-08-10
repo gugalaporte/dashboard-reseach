@@ -138,7 +138,7 @@ export function SummaryCards({
             disabled={!clickable}
             aria-pressed={isActive || undefined}
             className={cn(
-              "group text-left rounded-md border bg-surface-soft px-4 py-3 transition-colors",
+              "group text-left rounded-md border bg-surface-soft px-3 sm:px-4 py-3 transition-colors",
               "disabled:cursor-default",
               clickable && !isActive && "hover:border-brand-soft/60 cursor-pointer",
               !isActive && "border-line",
@@ -163,7 +163,7 @@ export function SummaryCards({
               {isLoading || !data ? (
                 <Skeleton className="h-6 w-16" />
               ) : (
-                <span className="font-display text-2xl text-ink tabular">
+                <span className="font-display text-xl sm:text-2xl text-ink tabular">
                   {value}
                 </span>
               )}

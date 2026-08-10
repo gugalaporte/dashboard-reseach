@@ -29,6 +29,7 @@ import { defaultCcyForTicker, FONTE_SHORT_LABEL, type ResearchRow } from "@/lib/
 import type { LivePrice, LivePricesMap } from "@/lib/use-live-prices";
 import { getMetricDef, type MetricId } from "@/lib/metrics";
 import { sectorPt } from "@/lib/sector-labels";
+import { ResearchMobileList } from "@/components/research-mobile-list";
 
 // Cores outline por corretora (borda + texto, sem fundo preenchido).
 const SOURCE_STYLE: Record<
@@ -384,7 +385,16 @@ export function ResearchTable({
   const leafHeaders = table.getHeaderGroups()[0]?.headers ?? [];
 
   return (
-    <div className="rounded-lg border border-line bg-surface-soft overflow-hidden">
+    <>
+      <ResearchMobileList
+        data={data}
+        isLoading={isLoading}
+        onRowClick={onRowClick}
+        livePrices={livePrices}
+        portfolioTickers={portfolioTickers}
+      />
+
+      <div className="hidden md:block rounded-lg border border-line bg-surface-soft overflow-hidden">
       <div className="max-h-[calc(100vh-280px)] overflow-auto scrollbar-thin">
         <Table>
           <TableHeader>
@@ -594,5 +604,6 @@ export function ResearchTable({
         </Table>
       </div>
     </div>
+    </>
   );
 }

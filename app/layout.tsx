@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 
@@ -23,12 +23,18 @@ export const metadata: Metadata = {
   description: "Dashboard de equity research — Finacap",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR" className={`${fraunces.variable} ${inter.variable}`}>
-      <body className="antialiased bg-surface-soft text-ink font-sans">
+      <body className="antialiased bg-surface-soft text-ink font-sans overflow-x-hidden">
         {children}
       </body>
     </html>
