@@ -12,6 +12,7 @@ import { useLivePrices, type LivePrice } from "@/lib/use-live-prices";
 import type { LsegViewRow } from "@/lib/lseg-transform";
 import { GovernancaRemuneracaoDialog } from "@/components/governanca-remuneracao";
 import { GovernancaCeoCard } from "@/components/governanca-ceo-card";
+import { GovernancaOwnershipCard } from "@/components/governanca-ownership";
 
 type Props = { ticker: string };
 
@@ -121,6 +122,7 @@ export function GovernancaEmpresa({ ticker }: Props) {
                     Abrir →
                   </div>
                 </button>
+                <GovernancaOwnershipCard ticker={row.empresa} />
               </div>
             </div>
 

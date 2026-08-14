@@ -50,6 +50,18 @@ describe("searchToken", () => {
   it("usa a marca, não o descritor genérico", () => {
     expect(searchToken("Petroleo Brasileiro SA Petrobras")).toBe("PETROBRAS");
     expect(searchToken("Itau Unibanco Holding SA")).toBe("UNIBANCO");
+    expect(searchToken("Vitru Educacao SA")).toBe("VITRU");
+  });
+});
+
+describe("pickBestCompanyName Vitru", () => {
+  it("escolhe VITRU EDUCAÇÃO e não outra educadora", () => {
+    const picked = pickBestCompanyName("Vitru Educacao SA", [
+      "SER EDUCACIONAL S.A.",
+      "VITRU EDUCAÇÃO S.A.",
+      "CRUZEIRO DO SUL EDUCACIONAL S.A.",
+    ]);
+    expect(picked).toBe("VITRU EDUCAÇÃO S.A.");
   });
 });
 

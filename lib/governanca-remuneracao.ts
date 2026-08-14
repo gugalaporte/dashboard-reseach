@@ -83,10 +83,14 @@ export function searchToken(lsegName: string): string | null {
     "BANCO",
     "ENGENHARIA",
     "TECNOLOGIA",
+    "EDUCACAO",
+    "EDUCACIONAL",
   ]);
   const tks = tokens(lsegName);
-  const branded = [...tks].reverse().find((t) => !generic.has(t));
-  return branded ?? tks.sort((a, b) => b.length - a.length)[0] ?? null;
+  const branded = tks.filter((t) => !generic.has(t));
+  // Último token de marca (Petrobras); se só um, é a marca (Vitru).
+  if (branded.length > 0) return branded[branded.length - 1];
+  return tks.sort((a, b) => b.length - a.length)[0] ?? null;
 }
 
 export function pickBestCompanyName(

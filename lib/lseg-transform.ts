@@ -747,7 +747,8 @@ function buildOneLsegRow(args: {
   }
 
   const hasData = snap != null || forward.length > 0 || historical.length > 0;
-  if (!hasData) return null;
+  // Empresas em carteira entram mesmo sem snapshot LSEG (ex.: VTRU3).
+  if (!hasData && !Boolean(company?.in_portfolio)) return null;
 
   return {
     empresa: ticker,

@@ -2,14 +2,10 @@
 
 import * as React from "react";
 import { AlertTriangle } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { GovernancaRelatorioDialog } from "@/components/governanca-relatorio-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateShort } from "@/lib/format";
-import {
-  parseSynthesis,
-  type CeoAnalise,
-} from "@/lib/ceo-analise";
-import { cn } from "@/lib/utils";
+import { parseSynthesis, type CeoAnalise } from "@/lib/ceo-analise";
 
 type Props = { ticker: string };
 
@@ -121,7 +117,7 @@ export function GovernancaCeoCard({ ticker }: Props) {
         </button>
       </article>
 
-      <ReportDialog
+      <GovernancaRelatorioDialog
         data={data}
         open={openReport}
         onClose={() => setOpenReport(false)}
@@ -147,66 +143,5 @@ function Section({ title, items }: { title: string; items: string[] }) {
         ))}
       </ul>
     </section>
-  );
-}
-
-function ReportDialog({
-  data,
-  open,
-  onClose,
-}: {
-  data: CeoAnalise;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [tab, setTab] = React.useState<"track" | "align">("track");
-
-  React.useEffect(() => {
-    if (open) setTab("track");
-  }, [open]);
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="w-[min(92vw,64rem)]">
-        <div className="px-5 sm:px-6 pt-5 pr-12 border-b border-line shrink-0">
-          <DialogTitle className="font-display text-xl text-ink">
-            Relatório completo
-          </DialogTitle>
-          <p className="text-sm text-ink/50 mt-1 pb-3">
-            {data.ticker}
-            {data.companyName ? ` · ${data.companyName}` : ""}
-          </p>
-          <div className="flex gap-2 pb-3">
-            {(
-              [
-                ["track", "Track record"],
-                ["align", "Alinhamento"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setTab(id)}
-                className={cn(
-                  "h-8 px-3 rounded-full text-xs font-medium transition",
-                  tab === id
-                    ? "bg-brand/10 text-brand"
-                    : "text-ink/55 hover:text-ink hover:bg-surface"
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto scrollbar-thin px-5 sm:px-6 py-5">
-          <pre className="whitespace-pre-wrap font-sans text-sm text-ink/75 leading-relaxed">
-            {tab === "track"
-              ? data.trackRecordReport || "Sem relatório de track record."
-              : data.alignmentReport || "Sem relatório de alinhamento."}
-          </pre>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }

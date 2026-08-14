@@ -59,4 +59,47 @@ describe("buildLsegRows", () => {
     expect(rows[0].byMetricYear?.pe?.["2026"]?.value).toBe(10);
     expect(rows[0].byMetricYear?.revenue?.["2025"]?.value).toBe(200000);
   });
+
+  it("inclui empresa em carteira mesmo sem snapshot LSEG", () => {
+    const rows = buildLsegRows({
+      companies: [
+        {
+          ticker: "VTRU3",
+          ric: "VTRU3.SA",
+          sector: "Consumer Discretionary",
+          name: "Vitru Educacao SA",
+          gics_industry: null,
+          updated_at: null,
+          in_portfolio: true,
+        },
+      ],
+      snapshots: [],
+      forward: [],
+      historical: [],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].empresa).toBe("VTRU3");
+    expect(rows[0].inPortfolio).toBe(true);
+    expect(rows[0].name).toBe("Vitru Educacao SA");
+  });
+
+  it("omite empresa fora da carteira sem dados LSEG", () => {
+    const rows = buildLsegRows({
+      companies: [
+        {
+          ticker: "XXXX3",
+          ric: "XXXX3.SA",
+          sector: "Materials",
+          name: "Fora",
+          gics_industry: null,
+          updated_at: null,
+          in_portfolio: false,
+        },
+      ],
+      snapshots: [],
+      forward: [],
+      historical: [],
+    });
+    expect(rows).toHaveLength(0);
+  });
 });

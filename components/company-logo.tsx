@@ -24,9 +24,9 @@ type Props = {
 };
 
 const LOCAL_LOGOS: Record<string, string> = {
-  AXIA3: "/logos/axia3.svg",
-  AXIA6: "/logos/axia3.svg",
-  AXIA7: "/logos/axia3.svg",
+  AXIA3: "/logos/axia3.png",
+  AXIA6: "/logos/axia3.png",
+  AXIA7: "/logos/axia3.png",
 };
 
 /** Logo do papel (local ou ícones B3); cai para iniciais se não existir. */
