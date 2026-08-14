@@ -7,6 +7,7 @@ import { OwnershipPie } from "@/components/ownership-pie";
 import { formatDateShort, formatNumber } from "@/lib/format";
 import {
   buildOwnershipSlices,
+  holdersWithMinPct,
   investorTypePt,
   ownershipHeadline,
   parentView,
@@ -184,9 +185,9 @@ function OwnershipDialog({
               {open && <OwnershipPie slices={slices} size={220} />}
               <ParentBlock data={data} />
               <p className="text-[10px] uppercase tracking-[0.14em] text-ink/40 mb-2">
-                Lista completa
+                Acionistas com pelo menos 1%
               </p>
-              <HoldersTable holders={data.holders} />
+              <HoldersTable holders={holdersWithMinPct(data.holders)} />
             </>
           )}
         </div>

@@ -55,6 +55,14 @@ export function num(v: unknown): number | null {
 }
 
 export const OWNERSHIP_NAMED = 6;
+export const OWNERSHIP_LIST_MIN_PCT = 1;
+
+export function holdersWithMinPct(
+  holders: OwnershipHolder[],
+  minPct = OWNERSHIP_LIST_MIN_PCT
+): OwnershipHolder[] {
+  return holders.filter((h) => (h.pct ?? 0) >= minPct);
+}
 
 const SLICE_COLORS = [
   "#0F766E",

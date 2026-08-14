@@ -3,6 +3,7 @@ import {
   blankToNull,
   buildOwnershipSlices,
   formatParentName,
+  holdersWithMinPct,
   investorTypePt,
   num,
   ownershipHeadline,
@@ -53,6 +54,17 @@ describe("buildOwnershipSlices", () => {
     expect(outros?.pct).toBeCloseTo(40);
     expect(total).toBeCloseTo(100);
     expect(slices[0].name).toBe("Outros");
+  });
+});
+
+describe("holdersWithMinPct", () => {
+  it("mantém só quem tem pelo menos 1%", () => {
+    const out = holdersWithMinPct([
+      { name: "A", type: null, parentType: null, shares: null, pct: 1.52, holdingsDate: null },
+      { name: "B", type: null, parentType: null, shares: null, pct: 1, holdingsDate: null },
+      { name: "C", type: null, parentType: null, shares: null, pct: 0.92, holdingsDate: null },
+    ]);
+    expect(out.map((h) => h.name)).toEqual(["A", "B"]);
   });
 });
 
