@@ -7,8 +7,11 @@ import { AppHeader } from "@/components/app-header";
 import { CompanyLogo } from "@/components/company-logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { sectorPt } from "@/lib/sector-labels";
+import { formatDateShort, formatValue } from "@/lib/format";
+import { useLivePrices, type LivePrice } from "@/lib/use-live-prices";
 import type { LsegViewRow } from "@/lib/lseg-transform";
 import { GovernancaRemuneracaoDialog } from "@/components/governanca-remuneracao";
+import { GovernancaCeoCard } from "@/components/governanca-ceo-card";
 
 type Props = { ticker: string };
 
@@ -18,6 +21,7 @@ export function GovernancaEmpresa({ ticker }: Props) {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [openRemuneracao, setOpenRemuneracao] = React.useState(false);
+  const { prices: livePrices } = useLivePrices([ticker]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -72,45 +76,52 @@ export function GovernancaEmpresa({ ticker }: Props) {
             Empresa {ticker} não encontrada.
           </p>
         ) : (
-          <div className="space-y-8">
-            <div className="flex items-start gap-4">
-              <CompanyLogo ticker={row.empresa} size="lg" />
-              <div className="min-w-0">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-ink/45">
-                  Governança
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              <CompanyLogo ticker={row.empresa} />
+              <div className="flex items-center gap-6 min-w-0">
+                <div className="min-w-0">
+                  <h1 className="font-display text-xl text-ink tracking-tight leading-none">
+                    {row.empresa}
+                  </h1>
+                  <p className="text-xs text-ink/50 truncate mt-1">
+                    {row.name ?? "—"}
+                    {row.sector ? ` · ${sectorPt(row.sector)}` : ""}
+                  </p>
                 </div>
-                <h1 className="font-display text-3xl text-ink tracking-tight mt-1">
-                  {row.empresa}
-                </h1>
-                <p className="text-sm text-ink/50 mt-1">{row.name ?? "—"}</p>
-                {row.sector && (
-                  <div className="mt-3 inline-flex items-center h-6 px-2 rounded-sm bg-surface border border-line text-[10px] uppercase tracking-[0.1em] text-ink/55">
-                    {sectorPt(row.sector)}
-                  </div>
-                )}
+                <QuoteBesideTicker
+                  live={livePrices.get(row.empresa)}
+                  fallback={row.price?.value ?? null}
+                  fallbackDate={row.price?.date ?? null}
+                />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <button
-                type="button"
-                onClick={() => setOpenRemuneracao(true)}
-                className="border border-line bg-white p-5 hover:border-brand/40 hover:shadow-sm transition group text-left"
-              >
-                <div className="text-[10px] uppercase tracking-[0.18em] text-ink/40">
-                  CVM · exercício 2025
-                </div>
-                <h2 className="font-display text-xl text-ink tracking-tight mt-2">
-                  Remuneração dos Executivos
-                </h2>
-                <p className="text-xs text-ink/45 mt-2 leading-relaxed">
-                  Diretoria estatutária, órgãos e comparação com métricas da
-                  companhia.
-                </p>
-                <div className="mt-4 text-[10px] uppercase tracking-[0.14em] text-ink/30 group-hover:text-brand transition">
-                  Abrir →
-                </div>
-              </button>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+              <div className="lg:col-span-8">
+                <GovernancaCeoCard ticker={row.empresa} />
+              </div>
+              <div className="lg:col-span-4 space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setOpenRemuneracao(true)}
+                  className="w-full border border-line bg-white p-5 text-left hover:border-brand/40 hover:shadow-sm transition group"
+                >
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-ink/40">
+                    CVM · exercício 2025
+                  </div>
+                  <h2 className="font-display text-lg text-ink tracking-tight mt-2">
+                    Remuneração dos Executivos
+                  </h2>
+                  <p className="text-xs text-ink/45 mt-2 leading-relaxed">
+                    Diretoria estatutária, órgãos e comparação com métricas da
+                    companhia.
+                  </p>
+                  <div className="mt-4 text-[10px] uppercase tracking-[0.14em] text-ink/30 group-hover:text-brand transition">
+                    Abrir →
+                  </div>
+                </button>
+              </div>
             </div>
 
             <GovernancaRemuneracaoDialog
@@ -122,6 +133,37 @@ export function GovernancaEmpresa({ ticker }: Props) {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+function QuoteBesideTicker({
+  live,
+  fallback,
+  fallbackDate,
+}: {
+  live?: LivePrice;
+  fallback: number | null;
+  fallbackDate: string | null;
+}) {
+  const price = live?.price ?? fallback;
+  if (price == null) return null;
+  const ccy = live
+    ? live.currency === "BRL"
+      ? "R$"
+      : live.currency
+    : "R$";
+  const date = live?.asOf ?? fallbackDate;
+  const dateLabel = date ? formatDateShort(date) : null;
+
+  return (
+    <div className="flex flex-col justify-center">
+      <span className="font-mono tabular text-xl text-ink leading-none">
+        {formatValue(price, "money", ccy)}
+      </span>
+      <span className="text-xs text-ink/45 mt-1">
+        {dateLabel ? `Fechamento ${dateLabel}` : "Fechamento"}
+      </span>
     </div>
   );
 }

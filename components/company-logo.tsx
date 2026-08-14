@@ -23,10 +23,21 @@ type Props = {
   size?: "sm" | "lg";
 };
 
-/** Logo do papel (ícones B3); cai para iniciais se não existir. */
+const LOCAL_LOGOS: Record<string, string> = {
+  AXIA3: "/logos/axia3.svg",
+  AXIA6: "/logos/axia3.svg",
+  AXIA7: "/logos/axia3.svg",
+};
+
+/** Logo do papel (local ou ícones B3); cai para iniciais se não existir. */
 export function CompanyLogo({ ticker, size = "sm" }: Props) {
   const [failed, setFailed] = React.useState(false);
   const box = size === "lg" ? "w-16 h-16 text-lg" : "w-11 h-11 text-sm";
+  const src = LOCAL_LOGOS[ticker] ?? `https://icons.brapi.dev/icons/${ticker}.svg`;
+
+  React.useEffect(() => {
+    setFailed(false);
+  }, [ticker, src]);
 
   if (failed) {
     return (
@@ -51,7 +62,7 @@ export function CompanyLogo({ ticker, size = "sm" }: Props) {
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={`https://icons.brapi.dev/icons/${ticker}.svg`}
+        src={src}
         alt={ticker}
         className="w-full h-full object-contain"
         loading="lazy"
