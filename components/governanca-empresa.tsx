@@ -8,6 +8,7 @@ import { CompanyLogo } from "@/components/company-logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { sectorPt } from "@/lib/sector-labels";
 import type { LsegViewRow } from "@/lib/lseg-transform";
+import { GovernancaRemuneracaoDialog } from "@/components/governanca-remuneracao";
 
 type Props = { ticker: string };
 
@@ -16,6 +17,7 @@ export function GovernancaEmpresa({ ticker }: Props) {
   const [row, setRow] = React.useState<LsegViewRow | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [openRemuneracao, setOpenRemuneracao] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -90,8 +92,9 @@ export function GovernancaEmpresa({ ticker }: Props) {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Link
-                href={`/governanca/${row.empresa}/remuneracao`}
+              <button
+                type="button"
+                onClick={() => setOpenRemuneracao(true)}
                 className="border border-line bg-white p-5 hover:border-brand/40 hover:shadow-sm transition group text-left"
               >
                 <div className="text-[10px] uppercase tracking-[0.18em] text-ink/40">
@@ -107,8 +110,15 @@ export function GovernancaEmpresa({ ticker }: Props) {
                 <div className="mt-4 text-[10px] uppercase tracking-[0.14em] text-ink/30 group-hover:text-brand transition">
                   Abrir →
                 </div>
-              </Link>
+              </button>
             </div>
+
+            <GovernancaRemuneracaoDialog
+              ticker={row.empresa}
+              companyName={row.name}
+              open={openRemuneracao}
+              onClose={() => setOpenRemuneracao(false)}
+            />
           </div>
         )}
       </main>

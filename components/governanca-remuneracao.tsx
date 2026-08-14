@@ -1,10 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
-import { CompanyLogo } from "@/components/company-logo";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -25,17 +22,39 @@ function fmtNum(v: number | null): string {
   return formatNumber(v, 2);
 }
 
+function fmtMembros(v: number | null): string {
+  if (v == null) return "–";
+  if (Number.isInteger(v)) return formatNumber(v, 0);
+  return formatNumber(v, 2);
+}
+
 type TabId = "csuite" | "orgao" | "top3";
 
-/** Tela de remuneração dos executivos (CVM). */
-export function GovernancaRemuneracao({ ticker }: { ticker: string }) {
+type Props = {
+  ticker: string;
+  companyName?: string | null;
+  open: boolean;
+  onClose: () => void;
+};
+
+/** Popup de remuneração dos executivos (CVM). */
+export function GovernancaRemuneracaoDialog({
+  ticker,
+  companyName,
+  open,
+  onClose,
+}: Props) {
   const [data, setData] = React.useState<RemuneracaoPayload | null>(null);
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState<TabId>("csuite");
 
   React.useEffect(() => {
+    if (!open) return;
     let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setTab("csuite");
     (async () => {
       try {
         const res = await fetch(
@@ -57,90 +76,79 @@ export function GovernancaRemuneracao({ ticker }: { ticker: string }) {
     return () => {
       cancelled = true;
     };
-  }, [ticker]);
+  }, [open, ticker]);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <AppHeader active="governanca" subtitle="Governança" />
-
-      <main className="mx-auto max-w-[960px] w-full px-4 sm:px-6 lg:px-8 py-5 md:py-8 flex-1">
-        <Link
-          href={`/governanca/${ticker}`}
-          className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.12em] text-ink/50 hover:text-brand transition mb-6"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Voltar
-        </Link>
-
-        {error && (
-          <p className="text-sm text-destructive bg-destructive/5 border border-destructive/20 px-4 py-3 mb-5">
-            {error}
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <div className="px-5 sm:px-6 pt-5 pr-12 border-b border-line shrink-0">
+          <DialogTitle className="font-display text-xl text-ink tracking-tight">
+            Remuneração dos Executivos
+          </DialogTitle>
+          <p className="text-sm text-ink/50 mt-1 pb-4">
+            {ticker}
+            {companyName ? ` · ${companyName}` : ""}
           </p>
-        )}
-
-        <div className="flex items-center gap-3 mb-6">
-          <CompanyLogo ticker={ticker} />
-          <div>
-            <h1 className="font-display text-2xl text-ink tracking-tight">
-              Remuneração dos Executivos
-            </h1>
-            <p className="text-sm text-ink/50">
-              {ticker}
-              {data?.companyName ? ` · ${data.companyName}` : ""}
-            </p>
-          </div>
         </div>
 
-        {loading ? (
-          <Skeleton className="h-64 w-full" />
-        ) : !data || data.totalDiretoria == null ? (
-          <p className="text-sm text-ink/50 py-10 text-center border border-line bg-white">
-            Sem remuneração CVM para {ticker} no exercício 2025.
-          </p>
-        ) : (
-          <div className="border border-line bg-white p-5 sm:p-6">
-            <p className="text-sm text-ink/55 mb-4">
-              Ano-base da remuneração (exercício fiscal):{" "}
-              <span className="font-semibold text-ink">{data.year}</span>
-              {" — "}
-              {data.orgaoFoco} (C-suite)
+        <div className="flex-1 overflow-y-auto scrollbar-thin px-5 sm:px-6 py-5">
+          {error && (
+            <p className="text-sm text-destructive bg-destructive/5 border border-destructive/20 px-4 py-3 mb-4">
+              {error}
             </p>
+          )}
 
-            <div className="flex flex-wrap gap-2 mb-5">
-              {(
-                [
-                  ["csuite", "C-suite x métricas"],
-                  ["orgao", "Por órgão"],
-                  ["top3", "Comparação com Top 3"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setTab(id)}
-                  className={cn(
-                    "h-8 px-3 rounded-full text-xs font-medium transition",
-                    tab === id
-                      ? "bg-brand/10 text-brand"
-                      : "text-ink/55 hover:text-ink hover:bg-surface"
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {tab === "csuite" && <CsuiteTable data={data} />}
-            {tab === "orgao" && <OrgaoTable data={data} />}
-            {tab === "top3" && (
-              <p className="text-sm text-ink/40 py-8 text-center">
-                Comparação com o Top 3 do setor em construção.
+          {loading ? (
+            <Skeleton className="h-48 w-full" />
+          ) : !data || data.totalDiretoria == null ? (
+            <p className="text-sm text-ink/50 py-10 text-center">
+              Sem remuneração CVM para {ticker} no exercício 2025.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-ink/55 mb-4">
+                Ano-base da remuneração (exercício fiscal):{" "}
+                <span className="font-semibold text-ink">{data.year}</span>
+                {" — "}
+                {data.orgaoFoco} (C-suite)
               </p>
-            )}
-          </div>
-        )}
-      </main>
-    </div>
+
+              <div className="flex flex-wrap gap-2 mb-5">
+                {(
+                  [
+                    ["csuite", "C-suite x métricas"],
+                    ["orgao", "Por órgão"],
+                    ["top3", "Comparação com Top 3"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setTab(id)}
+                    className={cn(
+                      "h-8 px-3 rounded-full text-xs font-medium transition",
+                      tab === id
+                        ? "bg-brand/10 text-brand"
+                        : "text-ink/55 hover:text-ink hover:bg-surface"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {tab === "csuite" && <CsuiteTable data={data} />}
+              {tab === "orgao" && <OrgaoTable data={data} />}
+              {tab === "top3" && (
+                <p className="text-sm text-ink/40 py-8 text-center">
+                  Comparação com o Top 3 do setor em construção.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -168,12 +176,6 @@ function CsuiteTable({ data }: { data: RemuneracaoPayload }) {
       ))}
     </dl>
   );
-}
-
-function fmtMembros(v: number | null): string {
-  if (v == null) return "–";
-  if (Number.isInteger(v)) return formatNumber(v, 0);
-  return formatNumber(v, 2);
 }
 
 function OrgaoTable({ data }: { data: RemuneracaoPayload }) {
