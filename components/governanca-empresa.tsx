@@ -13,6 +13,7 @@ import type { LsegViewRow } from "@/lib/lseg-transform";
 import { GovernancaRemuneracaoDialog } from "@/components/governanca-remuneracao";
 import { GovernancaCeoCard } from "@/components/governanca-ceo-card";
 import { GovernancaOwnershipCard } from "@/components/governanca-ownership";
+import { GovernancaCompanySummary } from "@/components/governanca-company-summary";
 
 type Props = { ticker: string };
 
@@ -97,6 +98,8 @@ export function GovernancaEmpresa({ ticker }: Props) {
                 />
               </div>
             </div>
+
+            <GovernancaCompanySummary ticker={row.empresa} />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
               <div className="lg:col-span-8">

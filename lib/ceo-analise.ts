@@ -11,6 +11,7 @@ export type CeoAnalise = {
   riskLevel: string | null;
   trackRecordReport: string | null;
   alignmentReport: string | null;
+  companySummary: string | null;
   updatedAt: string | null;
 };
 
