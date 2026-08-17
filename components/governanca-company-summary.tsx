@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { ArrowUpRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { CeoAnalise } from "@/lib/ceo-analise";
+import { irSiteForTicker } from "@/lib/ir-sites";
 
 type Props = { ticker: string };
 
@@ -10,6 +12,7 @@ type Props = { ticker: string };
 export function GovernancaCompanySummary({ ticker }: Props) {
   const [text, setText] = React.useState<string | null | undefined>(undefined);
   const [error, setError] = React.useState<string | null>(null);
+  const irUrl = irSiteForTicker(ticker);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -45,7 +48,7 @@ export function GovernancaCompanySummary({ ticker }: Props) {
   }
 
   if (text === undefined) return <Skeleton className="h-28 w-full" />;
-  if (!text) return null;
+  if (!text && !irUrl) return null;
 
   return (
     <article className="border border-line bg-white p-5 sm:p-6">
@@ -55,7 +58,20 @@ export function GovernancaCompanySummary({ ticker }: Props) {
       <h2 className="font-display text-lg text-ink tracking-tight mt-2">
         Resumo da empresa
       </h2>
-      <p className="mt-3 text-sm text-ink/70 leading-relaxed">{text}</p>
+      {text && (
+        <p className="mt-3 text-sm text-ink/70 leading-relaxed">{text}</p>
+      )}
+      {irUrl && (
+        <a
+          href={irUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 inline-flex items-center gap-1 text-sm text-brand hover:underline"
+        >
+          Relações com Investidores
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        </a>
+      )}
     </article>
   );
 }
