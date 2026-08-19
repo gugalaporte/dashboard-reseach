@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ceoInitials, parseSynthesis } from "../ceo-analise";
+import {
+  ceoInitials,
+  hasBoardData,
+  parseBoardPanorama,
+  parseSynthesis,
+} from "../ceo-analise";
 
 const SAMPLE = `## SÍNTESE
 
@@ -41,5 +46,55 @@ describe("ceoInitials", () => {
   it("pega primeira e última letra", () => {
     expect(ceoInitials("Gustavo Pimenta")).toBe("GP");
     expect(ceoInitials("João Vitor Menin (Global CEO)")).toBe("JM");
+  });
+});
+
+describe("parseBoardPanorama", () => {
+  it("separa bullets", () => {
+    expect(
+      parseBoardPanorama(
+        "- Conselho amplo, com 13 membros\n- Allos tem capital pulverizado"
+      )
+    ).toEqual([
+      "Conselho amplo, com 13 membros",
+      "Allos tem capital pulverizado",
+    ]);
+  });
+
+  it("mantém parágrafo sem bullets", () => {
+    expect(parseBoardPanorama("Conselho enxuto de 6 membros.")).toEqual([
+      "Conselho enxuto de 6 membros.",
+    ]);
+  });
+
+  it("lida com texto vazio", () => {
+    expect(parseBoardPanorama(null)).toEqual([]);
+    expect(parseBoardPanorama("  ")).toEqual([]);
+  });
+});
+
+describe("hasBoardData", () => {
+  it("exige pelo menos um campo preenchido", () => {
+    expect(
+      hasBoardData({
+        boardMemberCount: null,
+        boardPanorama: null,
+        hasFiscalCouncil: null,
+      })
+    ).toBe(false);
+    expect(
+      hasBoardData({
+        boardMemberCount: 13,
+        boardPanorama: null,
+        hasFiscalCouncil: null,
+      })
+    ).toBe(true);
+    expect(
+      hasBoardData({
+        boardMemberCount: null,
+        boardPanorama: null,
+        hasFiscalCouncil: false,
+      })
+    ).toBe(true);
   });
 });

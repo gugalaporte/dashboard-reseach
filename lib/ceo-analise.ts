@@ -12,6 +12,10 @@ export type CeoAnalise = {
   trackRecordReport: string | null;
   alignmentReport: string | null;
   companySummary: string | null;
+  boardPanorama: string | null;
+  boardMemberCount: number | null;
+  hasFiscalCouncil: boolean | null;
+  fiscalCouncilMemberCount: number | null;
   updatedAt: string | null;
 };
 
@@ -50,6 +54,28 @@ export function parseSynthesis(raw: string | null | undefined): SynthesisParsed 
     strengths: bullets(strengthsBlock),
     risks: bullets(risksBlock),
   };
+}
+
+/** Quebra o panorama do conselho em itens (bullets ou um parágrafo). */
+export function parseBoardPanorama(
+  raw: string | null | undefined
+): string[] {
+  if (!raw?.trim()) return [];
+  const text = raw.replace(/\r\n/g, "\n").trim();
+  const items = bullets(text);
+  return items.length > 0 ? items : [text];
+}
+
+export function hasBoardData(row: {
+  boardMemberCount: number | null;
+  boardPanorama: string | null;
+  hasFiscalCouncil: boolean | null;
+}): boolean {
+  return (
+    row.boardMemberCount != null ||
+    Boolean(row.boardPanorama?.trim()) ||
+    row.hasFiscalCouncil != null
+  );
 }
 
 export function ceoInitials(name: string | null | undefined): string {

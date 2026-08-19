@@ -3,6 +3,16 @@ import "server-only";
 import { getResearchSupabase } from "./supabase-research";
 import type { CeoAnalise } from "./ceo-analise";
 
+function intOrNull(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  return null;
+}
+
+function boolOrNull(v: unknown): boolean | null {
+  if (v === true || v === false) return v;
+  return null;
+}
+
 /** Carrega o dossiê de CEO pelo ticker B3. */
 export async function loadCeoAnalise(ticker: string): Promise<CeoAnalise | null> {
   const t = ticker.trim().toUpperCase();
@@ -12,7 +22,7 @@ export async function loadCeoAnalise(ticker: string): Promise<CeoAnalise | null>
   const { data, error } = await db
     .from("ceo_analise")
     .select(
-      "ticker,company_name,ceo_name,synthesis_ceo,synthesis_veredito,synthesis_text,alignment_veredito,risk_level,track_record_report,alignment_report,company_summary,updated_at"
+      "ticker,company_name,ceo_name,synthesis_ceo,synthesis_veredito,synthesis_text,alignment_veredito,risk_level,track_record_report,alignment_report,company_summary,board_panorama,board_member_count,has_fiscal_council,fiscal_council_member_count,updated_at"
     )
     .eq("ticker", t)
     .maybeSingle();
@@ -31,6 +41,10 @@ export async function loadCeoAnalise(ticker: string): Promise<CeoAnalise | null>
     trackRecordReport: (data.track_record_report as string | null) ?? null,
     alignmentReport: (data.alignment_report as string | null) ?? null,
     companySummary: (data.company_summary as string | null) ?? null,
+    boardPanorama: (data.board_panorama as string | null) ?? null,
+    boardMemberCount: intOrNull(data.board_member_count),
+    hasFiscalCouncil: boolOrNull(data.has_fiscal_council),
+    fiscalCouncilMemberCount: intOrNull(data.fiscal_council_member_count),
     updatedAt: (data.updated_at as string | null) ?? null,
   };
 }
