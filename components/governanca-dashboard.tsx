@@ -6,6 +6,7 @@ import { AppHeader } from "@/components/app-header";
 import { CompanyLogo } from "@/components/company-logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { sectorPt } from "@/lib/sector-labels";
+import { GovernancaCalendario } from "@/components/governanca-calendario";
 import type { LsegViewRow } from "@/lib/lseg-transform";
 
 function GovernanceCard({ row }: { row: LsegViewRow }) {
@@ -84,14 +85,19 @@ export function GovernancaDashboard() {
           </p>
         )}
 
-        <div className="mb-4">
-          <h2 className="font-display text-lg text-ink tracking-tight">
-            Empresas em carteira
-          </h2>
-          <p className="text-xs text-ink/45 mt-0.5">
-            {loading ? "Carregando…" : `${portfolio.length} empresas`} · clique
-            para abrir detalhes de governança
-          </p>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg text-ink tracking-tight">
+              Empresas em carteira
+            </h2>
+            <p className="text-xs text-ink/45 mt-0.5">
+              {loading ? "Carregando…" : `${portfolio.length} empresas`} · clique
+              para abrir detalhes de governança
+            </p>
+          </div>
+          <GovernancaCalendario
+            portfolioTickers={portfolio.map((r) => r.empresa)}
+          />
         </div>
 
         {loading ? (

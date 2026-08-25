@@ -3,6 +3,13 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let client: SupabaseClient | null = null;
 
+/** true quando o BancoAsset está configurado (server-only). */
+export function hasAssetServiceKey(): boolean {
+  return Boolean(
+    process.env.SUPABASE_ASSET_URL && process.env.SUPABASE_ASSET_SERVICE_KEY
+  );
+}
+
 /** Cliente Supabase do BancoAsset (service role, apenas server-side). */
 export function getAssetSupabase(): SupabaseClient {
   if (client) return client;
