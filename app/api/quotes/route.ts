@@ -18,10 +18,10 @@ export async function GET(req: Request) {
     .map((t) => t.trim().toUpperCase())
     .filter(Boolean);
 
-  // Teto defensivo: 100 tickers/request.
-  if (tickers.length > 100) {
+  // Teto defensivo. Lotes grandes são fatiados em lib/yahoo-quotes.
+  if (tickers.length > 300) {
     return NextResponse.json(
-      { error: "too_many_tickers", max: 100 },
+      { error: "too_many_tickers", max: 300 },
       { status: 400 }
     );
   }

@@ -1,5 +1,6 @@
 import "server-only";
 import YahooFinance from "yahoo-finance2";
+import { chunkList } from "./chunk";
 
 // v3.x exige instancia (diferente da v2 que tinha singleton no default).
 // suppressNotices evita o aviso de survey do mantenedor a cada boot.
@@ -20,6 +21,8 @@ export type LiveQuote = {
 
 // TTL curto: refresh periodico sem bombardear Yahoo.
 const CACHE_TTL_MS = 60_000;
+/** Yahoo recusa lotes grandes; a aba LSEG passa de 100 tickers. */
+const QUOTE_CHUNK = 40;
 
 type CacheEntry = { quote: LiveQuote; expires: number };
 const cache = new Map<string, CacheEntry>();
@@ -57,9 +60,6 @@ export async function getLiveQuotes(
 
   if (needFetch.length === 0) return result;
 
-  const symbols = needFetch.map(toYahooSymbol);
-
-  // Shape minimo que consumimos do retorno de yahoo-finance2.quote().
   type RawQuote = {
     symbol?: unknown;
     regularMarketPrice?: unknown;
@@ -69,7 +69,10 @@ export async function getLiveQuotes(
     currency?: unknown;
   };
 
-  function pickSessionClose(q: RawQuote, nowMs: number): Omit<LiveQuote, "ticker" | "currency"> | null {
+  function pickSessionClose(
+    q: RawQuote,
+    nowMs: number
+  ): Omit<LiveQuote, "ticker" | "currency"> | null {
     const state = String(q.marketState ?? "").toUpperCase();
     const cur =
       typeof q.regularMarketPrice === "number" && Number.isFinite(q.regularMarketPrice)
@@ -89,7 +92,6 @@ export async function getLiveQuotes(
           ? rmt * 1000
           : nowMs;
 
-    // Em pregão (ou pré): o "ultimo fechamento" publicado é o do pregão anterior.
     const intraday =
       state === "REGULAR" || state === "PRE" || state === "PREPRE" || state === "OPEN";
 
@@ -117,32 +119,32 @@ export async function getLiveQuotes(
     return null;
   }
 
-  try {
-    // quote() tem overloads complicados que fazem o TS narrowar p/ never;
-    // convertemos para um shape minimo e seguimos com guardas explicitas.
-    const quotes = (await yahooFinance.quote(symbols)) as unknown;
-    const list: RawQuote[] = Array.isArray(quotes)
-      ? (quotes as RawQuote[])
-      : [quotes as RawQuote];
+  for (const batch of chunkList(needFetch, QUOTE_CHUNK)) {
+    const symbols = batch.map(toYahooSymbol);
+    try {
+      const quotes = (await yahooFinance.quote(symbols)) as unknown;
+      const list: RawQuote[] = Array.isArray(quotes)
+        ? (quotes as RawQuote[])
+        : [quotes as RawQuote];
 
-    for (const q of list) {
-      if (!q || typeof q.symbol !== "string") continue;
-      const ticker = fromYahooSymbol(q.symbol);
-      const picked = pickSessionClose(q, now);
-      if (!picked) continue;
-      const live: LiveQuote = {
-        ticker,
-        price: picked.price,
-        currency: typeof q.currency === "string" ? q.currency : "BRL",
-        asOf: picked.asOf,
-        isPreviousSessionClose: picked.isPreviousSessionClose,
-      };
-      result.set(ticker, live);
-      cache.set(ticker, { quote: live, expires: now + CACHE_TTL_MS });
+      for (const q of list) {
+        if (!q || typeof q.symbol !== "string") continue;
+        const ticker = fromYahooSymbol(q.symbol);
+        const picked = pickSessionClose(q, now);
+        if (!picked) continue;
+        const live: LiveQuote = {
+          ticker,
+          price: picked.price,
+          currency: typeof q.currency === "string" ? q.currency : "BRL",
+          asOf: picked.asOf,
+          isPreviousSessionClose: picked.isPreviousSessionClose,
+        };
+        result.set(ticker, live);
+        cache.set(ticker, { quote: live, expires: now + CACHE_TTL_MS });
+      }
+    } catch (err) {
+      console.error("[yahoo-quotes] lote falhou:", err);
     }
-  } catch (err) {
-    // Nao derruba o dashboard: apenas registra. Fallback p/ banco ocorre no client.
-    console.error("[yahoo-quotes] batch falhou:", err);
   }
 
   return result;

@@ -4,6 +4,8 @@ import type { MetricaRow, PdfDoc } from "@/types/research";
 import { canonicalMetricId, extractYear, type MetricId } from "./metrics";
 import { deriveEPSFromPriceAndPE, deriveNetIncomeFromEPS } from "./derive-metrics";
 
+export { latestActivityDate } from "./activity-date";
+
 // Fontes (corretoras) presentes na base (alinhado a dados_estruturados.fonte).
 export const FONTES = [
   "BTG Pactual",
@@ -751,29 +753,6 @@ export function detectYears(
     .sort((a, b) => b[1] - a[1])
     .map(([y]) => y);
   return [...picked, ...rest].slice(0, count);
-}
-
-// Data mais recente observada em qualquer celula da linha.
-// Usado pelo filtro de periodo client-side.
-export function latestActivityDate(row: ResearchRow): string | null {
-  const dates: (string | null | undefined)[] = [
-    row.rating?.date,
-    row.price?.date,
-    row.target?.date,
-    row.pe?.date,
-    row.ev_ebitda?.date,
-    row.dy?.date,
-    row.roic?.date,
-    row.revenue?.date,
-    row.ebitda?.date,
-    row.net_debt?.date,
-    row.net_income?.date,
-  ];
-  let max: string | null = null;
-  for (const d of dates) {
-    if (d && (!max || d > max)) max = d;
-  }
-  return max;
 }
 
 // Estatisticas dos 4 cards do topo. Le direto das tabelas, sem view.
