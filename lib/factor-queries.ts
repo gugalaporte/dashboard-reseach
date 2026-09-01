@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getResearchSupabase, hasResearchServiceKey } from "./supabase-research";
+import { fetchAllRows } from "./supabase-page";
 import type {
   LsegCompanyRow,
   LsegDailySnapshotRow,
@@ -27,35 +28,35 @@ export type FactorPayload = {
 };
 
 async function loadSnapshots(db: ReturnType<typeof getResearchSupabase>) {
-  const withAnalyst = await db
-    .from("daily_snapshot")
-    .select(`${SNAPSHOT_BASE},analyst_count`)
-    .returns<LsegDailySnapshotRow[]>();
-  if (!withAnalyst.error) return withAnalyst.data ?? [];
-
-  console.warn("[factors] analyst_count indisponível, usando num_buys/holds/sells");
-  const fallback = await db
-    .from("daily_snapshot")
-    .select(SNAPSHOT_BASE)
-    .returns<LsegDailySnapshotRow[]>();
-  if (fallback.error) throw fallback.error;
-  return fallback.data ?? [];
+  try {
+    return await fetchAllRows<LsegDailySnapshotRow>((from, to) =>
+      db
+        .from("daily_snapshot")
+        .select(`${SNAPSHOT_BASE},analyst_count`)
+        .range(from, to)
+    );
+  } catch {
+    console.warn("[factors] analyst_count indisponível, usando num_buys/holds/sells");
+    return fetchAllRows<LsegDailySnapshotRow>((from, to) =>
+      db.from("daily_snapshot").select(SNAPSHOT_BASE).range(from, to)
+    );
+  }
 }
 
 async function loadForward(db: ReturnType<typeof getResearchSupabase>) {
-  const withRev = await db
-    .from("forward_estimates")
-    .select(`${FORWARD_BASE},eps_rev_4w_pct`)
-    .returns<LsegForwardEstimateRow[]>();
-  if (!withRev.error) return withRev.data ?? [];
-
-  console.warn("[factors] eps_rev_4w_pct indisponível");
-  const fallback = await db
-    .from("forward_estimates")
-    .select(FORWARD_BASE)
-    .returns<LsegForwardEstimateRow[]>();
-  if (fallback.error) throw fallback.error;
-  return fallback.data ?? [];
+  try {
+    return await fetchAllRows<LsegForwardEstimateRow>((from, to) =>
+      db
+        .from("forward_estimates")
+        .select(`${FORWARD_BASE},eps_rev_4w_pct`)
+        .range(from, to)
+    );
+  } catch {
+    console.warn("[factors] eps_rev_4w_pct indisponível");
+    return fetchAllRows<LsegForwardEstimateRow>((from, to) =>
+      db.from("forward_estimates").select(FORWARD_BASE).range(from, to)
+    );
+  }
 }
 
 /** Carrega dados LSEG e calcula ranking (somente leitura). */
@@ -69,18 +70,18 @@ export async function loadFactorRanking(
   }
 
   const db = getResearchSupabase();
-  const [cRes, snapshots, forward] = await Promise.all([
-    db
-      .from("companies")
-      .select("ticker,ric,sector,name,gics_industry,updated_at,in_portfolio")
-      .returns<LsegCompanyRow[]>(),
+  const [companies, snapshots, forward] = await Promise.all([
+    fetchAllRows<LsegCompanyRow>((from, to) =>
+      db
+        .from("companies")
+        .select("ticker,ric,sector,name,gics_industry,updated_at,in_portfolio")
+        .range(from, to)
+    ),
     loadSnapshots(db),
     loadForward(db),
   ]);
 
-  if (cRes.error) throw cRes.error;
-
-  const inputs = buildFactorInputs(cRes.data ?? [], snapshots, forward);
+  const inputs = buildFactorInputs(companies, snapshots, forward);
   const rows = scoreFactors(inputs, eligibility);
 
   let asOfDate: string | null = null;

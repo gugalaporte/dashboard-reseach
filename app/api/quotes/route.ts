@@ -19,9 +19,9 @@ export async function GET(req: Request) {
     .filter(Boolean);
 
   // Teto defensivo. Lotes grandes são fatiados em lib/yahoo-quotes.
-  if (tickers.length > 300) {
+  if (tickers.length > 1000) {
     return NextResponse.json(
-      { error: "too_many_tickers", max: 300 },
+      { error: "too_many_tickers", max: 1000 },
       { status: 400 }
     );
   }

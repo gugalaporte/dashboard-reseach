@@ -2,6 +2,7 @@ import "server-only";
 
 import { ALLOWED_TICKERS } from "./queries";
 import { getResearchSupabase, hasResearchServiceKey } from "./supabase-research";
+import { fetchAllRows } from "./supabase-page";
 import {
   buildLsegRows,
   type LsegCompanyRow,
@@ -37,40 +38,29 @@ export async function loadLsegRaw(opts?: LoadOpts): Promise<LsegRaw> {
   const companiesSelect =
     "ticker,ric,sector,name,gics_industry,updated_at,in_portfolio" as const;
 
-  const companiesQuery = opts?.allCompanies
-    ? db.from("companies").select(companiesSelect).returns<LsegCompanyRow[]>()
-    : db
-        .from("companies")
-        .select(companiesSelect)
-        .in("ticker", tickers)
-        .returns<LsegCompanyRow[]>();
-
-  const [cRes, sRes, fRes, hRes] = await Promise.all([
-    companiesQuery,
-    db
-      .from("daily_snapshot")
-      .select(SNAPSHOT_SELECT)
-      .returns<LsegDailySnapshotRow[]>(),
-    db
-      .from("forward_estimates")
-      .select(FORWARD_SELECT)
-      .returns<LsegForwardEstimateRow[]>(),
-    db
-      .from("historical_series")
-      .select(HISTORICAL_SELECT)
-      .returns<LsegHistoricalSeriesRow[]>(),
+  const [companies, snapshots, forward, historical] = await Promise.all([
+    fetchAllRows<LsegCompanyRow>((from, to) => {
+      const q = opts?.allCompanies
+        ? db.from("companies").select(companiesSelect)
+        : db.from("companies").select(companiesSelect).in("ticker", tickers);
+      return q.range(from, to);
+    }),
+    fetchAllRows<LsegDailySnapshotRow>((from, to) =>
+      db.from("daily_snapshot").select(SNAPSHOT_SELECT).range(from, to)
+    ),
+    fetchAllRows<LsegForwardEstimateRow>((from, to) =>
+      db.from("forward_estimates").select(FORWARD_SELECT).range(from, to)
+    ),
+    fetchAllRows<LsegHistoricalSeriesRow>((from, to) =>
+      db.from("historical_series").select(HISTORICAL_SELECT).range(from, to)
+    ),
   ]);
 
-  if (cRes.error) throw cRes.error;
-  if (sRes.error) throw sRes.error;
-  if (fRes.error) throw fRes.error;
-  if (hRes.error) throw hRes.error;
-
   return {
-    companies: cRes.data ?? [],
-    snapshots: sRes.data ?? [],
-    forward: fRes.data ?? [],
-    historical: hRes.data ?? [],
+    companies,
+    snapshots,
+    forward,
+    historical,
   };
 }
 
