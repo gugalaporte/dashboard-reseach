@@ -28,6 +28,7 @@ export type NotesRow = {
 };
 
 export function parsePipelineStatus(v: unknown): PipelineStatus | null {
+  if (v === "analyzing") return "watchlist";
   if (typeof v === "string" && STATUSES.has(v)) return v as PipelineStatus;
   return null;
 }

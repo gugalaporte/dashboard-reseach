@@ -3,6 +3,7 @@ import {
   countByPipeline,
   defaultPipelineStage,
   emptyPipelineCounts,
+  finacapUpside,
   parsePipelineStage,
 } from "../pipeline";
 
@@ -14,13 +15,13 @@ describe("countByPipeline", () => {
       { status: "position" },
     ]);
     expect(counts.watchlist).toBe(2);
-    expect(counts.analyzing).toBe(0);
+    expect(counts.thesis_ready).toBe(0);
     expect(counts.position).toBe(1);
   });
 
   it("ignora empresa sem etapa", () => {
-    const counts = countByPipeline([{ status: null }, { status: "analyzing" }]);
-    expect(counts.analyzing).toBe(1);
+    const counts = countByPipeline([{ status: null }, { status: "position" }]);
+    expect(counts.position).toBe(1);
     expect(counts.watchlist).toBe(0);
   });
 });
@@ -39,6 +40,18 @@ describe("defaultPipelineStage", () => {
 
 describe("parsePipelineStage", () => {
   it("aceita etapa válida", () => {
-    expect(parsePipelineStage("analyzing")).toBe("analyzing");
+    expect(parsePipelineStage("thesis_ready")).toBe("thesis_ready");
+  });
+});
+
+describe("finacapUpside", () => {
+  it("calcula (TP − fechamento) / fechamento", () => {
+    expect(finacapUpside(32, 70)).toBeCloseTo(118.75, 5);
+  });
+
+  it("fica vazio sem um dos preços", () => {
+    expect(finacapUpside(null, 70)).toBe(null);
+    expect(finacapUpside(32, null)).toBe(null);
+    expect(finacapUpside(0, 70)).toBe(null);
   });
 });

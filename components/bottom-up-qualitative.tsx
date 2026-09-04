@@ -20,6 +20,8 @@ import { formatDateShort } from "@/lib/format";
 type Props = { ticker: string };
 
 type Draft = {
+  status: PipelineStatus | null;
+  rating: NotesRating | null;
   thesis: string;
   risk: string;
   governance: string;
@@ -27,6 +29,8 @@ type Draft = {
 };
 
 const EMPTY_DRAFT: Draft = {
+  status: null,
+  rating: null,
   thesis: "",
   risk: "",
   governance: "",
@@ -35,6 +39,8 @@ const EMPTY_DRAFT: Draft = {
 
 function draftFrom(n: BottomUpNotes): Draft {
   return {
+    status: n.status,
+    rating: n.rating,
     thesis: n.thesis,
     risk: n.risk,
     governance: n.governance,
@@ -77,6 +83,7 @@ export function BottomUpQualitative({ ticker }: Props) {
     try {
       const next = await persistBottomUpNotes(ticker, patch);
       setNotes(next);
+      setDraft(draftFrom(next));
       return next;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao salvar");
@@ -87,11 +94,17 @@ export function BottomUpQualitative({ ticker }: Props) {
   };
 
   const setStatus = (status: PipelineStatus) => {
-    void persist({ status: notes?.status === status ? null : status });
+    setDraft((d) => ({
+      ...d,
+      status: d.status === status ? null : status,
+    }));
   };
 
   const setRating = (rating: NotesRating) => {
-    void persist({ rating: notes?.rating === rating ? null : rating });
+    setDraft((d) => ({
+      ...d,
+      rating: d.rating === rating ? null : rating,
+    }));
   };
 
   const handleSave = async () => {
@@ -104,6 +117,8 @@ export function BottomUpQualitative({ ticker }: Props) {
       return;
     }
     const next = await persist({
+      status: draft.status,
+      rating: draft.rating,
       thesis: draft.thesis,
       risk: draft.risk,
       governance: draft.governance,
@@ -125,12 +140,11 @@ export function BottomUpQualitative({ ticker }: Props) {
     <div className="space-y-5">
       <ChoiceRow label="Pipeline">
         {PIPELINE_STEPS.map((step) => {
-          const active = notes.status === step.id;
+          const active = draft.status === step.id;
           return (
             <button
               key={step.id}
               type="button"
-              disabled={busy}
               onClick={() => setStatus(step.id)}
               className={cn(
                 "px-2.5 h-8 text-[10px] uppercase tracking-[0.08em] font-medium border transition",
@@ -147,12 +161,11 @@ export function BottomUpQualitative({ ticker }: Props) {
 
       <ChoiceRow label="Rating">
         {NOTES_RATINGS.map((r) => {
-          const active = notes.rating === r.id;
+          const active = draft.rating === r.id;
           return (
             <button
               key={r.id}
               type="button"
-              disabled={busy}
               onClick={() => setRating(r.id)}
               className={cn(
                 "px-2.5 h-8 text-[10px] uppercase tracking-[0.08em] font-medium border transition",

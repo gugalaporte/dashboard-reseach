@@ -2,7 +2,8 @@
 
 import { CompanyLogo } from "@/components/company-logo";
 import { NOTES_RATINGS, type NotesRating } from "@/lib/bottom-up-types";
-import type { PipelineNote } from "@/lib/pipeline";
+import { finacapUpside, type PipelineNote } from "@/lib/pipeline";
+import type { LivePrice } from "@/lib/use-live-prices";
 import { formatDateShort, formatValue } from "@/lib/format";
 import { sectorPt } from "@/lib/sector-labels";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,11 @@ const RATING_CLASS: Record<NotesRating, string> = {
 
 function ratingLabel(id: NotesRating): string {
   return NOTES_RATINGS.find((r) => r.id === id)?.label ?? id;
+}
+
+function closeSubtitle(q: LivePrice): string {
+  if (q.isPreviousSessionClose) return "últ. dia útil";
+  return `fech. ${formatDateShort(q.asOf)}`;
 }
 
 function NoteBlock({ label, text }: { label: string; text: string }) {
@@ -36,8 +42,43 @@ function NoteBlock({ label, text }: { label: string; text: string }) {
   );
 }
 
-/** Card de uma empresa no pipeline, com rating, target e notas. */
-export function PipelineCompanyCard({ note }: { note: PipelineNote }) {
+function Stat({
+  label,
+  value,
+  sub,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[10px] uppercase tracking-[0.14em] text-ink/45">
+        {label}
+      </div>
+      <div className={cn("font-mono text-sm tabular mt-0.5", valueClass)}>
+        {value}
+      </div>
+      {sub && (
+        <div className="text-[10px] text-ink/40 mt-0.5 tabular">{sub}</div>
+      )}
+    </div>
+  );
+}
+
+type Props = {
+  note: PipelineNote;
+  close?: LivePrice;
+};
+
+/** Card de uma empresa no pipeline, com fechamento, TP Finacap e upside. */
+export function PipelineCompanyCard({ note, close }: Props) {
+  const lastClose = close?.price ?? null;
+  const upside = finacapUpside(lastClose, note.targetPrice);
+  const ccy = close?.currency === "BRL" || !close ? "R$" : close.currency;
+
   return (
     <article className="border border-line bg-white p-4 md:p-5 space-y-4">
       <header className="flex items-start justify-between gap-3">
@@ -53,28 +94,54 @@ export function PipelineCompanyCard({ note }: { note: PipelineNote }) {
             </div>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          {note.rating ? (
-            <span
-              className={cn(
-                "px-2 h-6 inline-flex items-center text-[10px] uppercase tracking-[0.1em] font-medium",
-                RATING_CLASS[note.rating]
-              )}
-            >
-              {ratingLabel(note.rating)}
-            </span>
-          ) : (
-            <span className="text-[10px] uppercase tracking-[0.1em] text-ink/35">
-              Sem rating
-            </span>
-          )}
-          <span className="font-mono text-sm tabular text-ink">
-            {note.targetPrice == null
-              ? "—"
-              : formatValue(note.targetPrice, "money")}
+        {note.rating ? (
+          <span
+            className={cn(
+              "px-2 h-6 inline-flex items-center text-[10px] uppercase tracking-[0.1em] font-medium shrink-0",
+              RATING_CLASS[note.rating]
+            )}
+          >
+            {ratingLabel(note.rating)}
           </span>
-        </div>
+        ) : (
+          <span className="text-[10px] uppercase tracking-[0.1em] text-ink/35 shrink-0">
+            Sem rating
+          </span>
+        )}
       </header>
+
+      <div className="grid grid-cols-3 gap-3 border-t border-line pt-3">
+        <Stat
+          label="Últ. fechamento"
+          value={
+            lastClose == null ? "—" : formatValue(lastClose, "money", ccy)
+          }
+          sub={close ? closeSubtitle(close) : undefined}
+        />
+        <Stat
+          label="TP Finacap"
+          value={
+            note.targetPrice == null
+              ? "—"
+              : formatValue(note.targetPrice, "money")
+          }
+        />
+        <Stat
+          label="Upside"
+          value={
+            upside == null
+              ? "—"
+              : `${upside >= 0 ? "+" : ""}${upside.toFixed(1)}%`
+          }
+          valueClass={
+            upside == null
+              ? undefined
+              : upside >= 0
+                ? "text-emerald-700"
+                : "text-red-700"
+          }
+        />
+      </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <NoteBlock label="Tese" text={note.thesis} />

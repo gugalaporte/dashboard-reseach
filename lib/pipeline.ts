@@ -12,7 +12,7 @@ export type PipelineNote = BottomUpNotes & {
 export type PipelineCounts = Record<PipelineStatus, number>;
 
 export function emptyPipelineCounts(): PipelineCounts {
-  return { watchlist: 0, analyzing: 0, thesis_ready: 0, position: 0 };
+  return { watchlist: 0, thesis_ready: 0, position: 0 };
 }
 
 export function countByPipeline(
@@ -38,4 +38,14 @@ export function parsePipelineStage(v: unknown): PipelineStatus {
     return v as PipelineStatus;
   }
   return "watchlist";
+}
+
+/** Upside % = (TP Finacap − último fechamento) / fechamento. */
+export function finacapUpside(
+  close: number | null | undefined,
+  target: number | null | undefined
+): number | null {
+  if (close == null || target == null || close === 0) return null;
+  if (!Number.isFinite(close) || !Number.isFinite(target)) return null;
+  return ((target - close) / close) * 100;
 }

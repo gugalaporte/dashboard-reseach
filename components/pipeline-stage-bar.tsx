@@ -10,10 +10,10 @@ type Props = {
   onChange: (status: PipelineStatus) => void;
 };
 
-/** Quatro etapas do pipeline com contagem de empresas. */
+/** Etapas do pipeline com contagem de empresas. */
 export function PipelineStageBar({ value, counts, onChange }: Props) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
       {PIPELINE_STEPS.map((step, i) => {
         const active = value === step.id;
         return (

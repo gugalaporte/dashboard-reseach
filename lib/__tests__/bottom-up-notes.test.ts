@@ -15,6 +15,10 @@ describe("parsePipelineStatus", () => {
     expect(parsePipelineStatus("position")).toBe("position");
   });
 
+  it("trata em análise antiga como watchlist", () => {
+    expect(parsePipelineStatus("analyzing")).toBe("watchlist");
+  });
+
   it("fica vazio se inválido", () => {
     expect(parsePipelineStatus("xyz")).toBe(null);
     expect(parsePipelineStatus(null)).toBe(null);
@@ -56,7 +60,7 @@ describe("rowToNotes", () => {
       updated_at: "2026-09-04T12:00:00.000Z",
     });
     expect(n.ticker).toBe("POMO4");
-    expect(n.status).toBe("analyzing");
+    expect(n.status).toBe("watchlist");
     expect(n.rating).toBe("buy");
     expect(n.targetPrice).toBe(18.2);
     expect(n.thesis).toBe("");

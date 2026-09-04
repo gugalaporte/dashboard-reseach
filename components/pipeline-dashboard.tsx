@@ -12,6 +12,7 @@ import {
   type PipelineNote,
 } from "@/lib/pipeline";
 import { PIPELINE_STEPS, type PipelineStatus } from "@/lib/bottom-up-types";
+import { useLivePrices } from "@/lib/use-live-prices";
 
 export function PipelineDashboard() {
   const [notes, setNotes] = React.useState<PipelineNote[]>([]);
@@ -46,6 +47,11 @@ export function PipelineDashboard() {
   const stepLabel =
     PIPELINE_STEPS.find((s) => s.id === active)?.label ?? active;
   const lastUpdate = notes[0]?.updatedAt ?? null;
+  const tickers = React.useMemo(
+    () => notes.map((n) => n.ticker),
+    [notes]
+  );
+  const { prices: livePrices } = useLivePrices(tickers);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -96,7 +102,11 @@ export function PipelineDashboard() {
         )}
 
         {visible.map((note) => (
-          <PipelineCompanyCard key={note.ticker} note={note} />
+          <PipelineCompanyCard
+            key={note.ticker}
+            note={note}
+            close={livePrices.get(note.ticker)}
+          />
         ))}
       </main>
     </div>

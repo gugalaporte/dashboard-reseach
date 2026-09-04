@@ -1,14 +1,9 @@
 /** Tipos do módulo Bottom-up analysis (screening). */
 
-export type PipelineStatus =
-  | "watchlist"
-  | "analyzing"
-  | "thesis_ready"
-  | "position";
+export type PipelineStatus = "watchlist" | "thesis_ready" | "position";
 
 export const PIPELINE_STEPS: Array<{ id: PipelineStatus; label: string }> = [
   { id: "watchlist", label: "Watchlist" },
-  { id: "analyzing", label: "Em análise" },
   { id: "thesis_ready", label: "Tese pronta" },
   { id: "position", label: "Posição" },
 ];
