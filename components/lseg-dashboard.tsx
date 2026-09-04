@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/app-header";
 import { CompanySearch, CompanyChips } from "@/components/company-search";
 import { SectorFilter } from "@/components/sector-filter";
 import { MetricsSelector } from "@/components/metrics-selector";
+import { YearSelector } from "@/components/year-selector";
 import { ResearchTable } from "@/components/research-table";
 import {
   SummaryCards,
@@ -22,6 +23,7 @@ import {
   YEARS_PER_METRIC,
   type MetricId,
 } from "@/lib/metrics";
+import { visibleYears } from "@/lib/year-filter";
 import { LsegSeriesPanel } from "@/components/lseg-series-panel";
 
 export function LsegDashboard() {
@@ -35,6 +37,7 @@ export function LsegDashboard() {
     React.useState<RatingFilterBucket | null>(null);
   const [selectedMetrics, setSelectedMetrics] =
     React.useState<MetricId[]>(DEFAULT_LSEG_METRICS);
+  const [selectedYear, setSelectedYear] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -90,9 +93,13 @@ export function LsegDashboard() {
     });
   }, [allRows, empresas, setor, onlyPortfolio, ratingBucket]);
 
-  const years = React.useMemo(
+  const availableYears = React.useMemo(
     () => detectYears(allRows, selectedMetrics, YEARS_PER_METRIC),
     [allRows, selectedMetrics]
+  );
+  const years = React.useMemo(
+    () => visibleYears(availableYears, selectedYear),
+    [availableYears, selectedYear]
   );
 
   const uniqueTickers = React.useMemo(() => {
@@ -204,6 +211,18 @@ export function LsegDashboard() {
             onChange={setSelectedMetrics}
             metrics={LSEG_METRICS}
           />
+          {availableYears.length > 0 && (
+            <>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium shrink-0 md:ml-2">
+                Ano
+              </span>
+              <YearSelector
+                years={availableYears}
+                value={selectedYear}
+                onChange={setSelectedYear}
+              />
+            </>
+          )}
         </div>
       </div>
 

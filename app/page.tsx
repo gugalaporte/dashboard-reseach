@@ -6,6 +6,7 @@ import { SectorFilter } from "@/components/sector-filter";
 import { SourceFilter } from "@/components/source-filter";
 import { DateFilter } from "@/components/date-filter";
 import { MetricsSelector } from "@/components/metrics-selector";
+import { YearSelector } from "@/components/year-selector";
 import { ResearchTable } from "@/components/research-table";
 import { CompanyDrawer } from "@/components/company-drawer";
 import { ChangeFeed } from "@/components/change-feed";
@@ -30,6 +31,7 @@ import {
   YEARS_PER_METRIC,
   type MetricId,
 } from "@/lib/metrics";
+import { visibleYears } from "@/lib/year-filter";
 import type { PeriodoFilter } from "@/types/research";
 import { sectorPt } from "@/lib/sector-labels";
 import { AppHeader } from "@/components/app-header";
@@ -76,6 +78,7 @@ export default function DashboardPage() {
   // Metricas selecionadas pelo usuario (1..3). Default: P/E, EV/EBITDA, DY.
   const [selectedMetrics, setSelectedMetrics] =
     React.useState<MetricId[]>(DEFAULT_METRICS);
+  const [selectedYear, setSelectedYear] = React.useState<string | null>(null);
   const portfolioSet = React.useMemo(
     () => new Set<string>(PORTFOLIO_TICKERS),
     []
@@ -143,9 +146,13 @@ export default function DashboardPage() {
   const { prices: livePrices } = useLivePrices(uniqueTickers);
 
   // Anos dinamicos a partir das rows + metricas selecionadas (ex.: ["2026","2027","2028"]).
-  const years = React.useMemo(
+  const availableYears = React.useMemo(
     () => detectYears(allRows, selectedMetrics, YEARS_PER_METRIC),
     [allRows, selectedMetrics]
+  );
+  const years = React.useMemo(
+    () => visibleYears(availableYears, selectedYear),
+    [availableYears, selectedYear]
   );
 
   // Dados dos summary cards. empresas/metricas vem do stats global (DB),
@@ -250,6 +257,18 @@ export default function DashboardPage() {
             value={selectedMetrics}
             onChange={setSelectedMetrics}
           />
+          {availableYears.length > 0 && (
+            <>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-medium shrink-0 md:ml-2">
+                Ano
+              </span>
+              <YearSelector
+                years={availableYears}
+                value={selectedYear}
+                onChange={setSelectedYear}
+              />
+            </>
+          )}
         </div>
       </div>
 
