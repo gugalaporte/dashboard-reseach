@@ -29,6 +29,7 @@ import { FactorMobileList } from "@/components/factor-mobile-list";
 import { BottomUpDrawer } from "@/components/bottom-up-drawer";
 import { cn } from "@/lib/utils";
 import { Star } from "lucide-react";
+import Link from "next/link";
 
 type FactorPayload = {
   asOfDate: string | null;
@@ -251,6 +252,14 @@ export function FactorInvestingDashboard() {
             disabled={loading}
           >
             Recalcular
+          </Button>
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className="h-8 text-[11px] uppercase tracking-[0.08em] w-full sm:w-auto"
+          >
+            <Link href="/pipeline">Pipeline</Link>
           </Button>
         </div>
       </div>

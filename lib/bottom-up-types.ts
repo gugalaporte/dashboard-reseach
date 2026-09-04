@@ -13,11 +13,21 @@ export const PIPELINE_STEPS: Array<{ id: PipelineStatus; label: string }> = [
   { id: "position", label: "Posição" },
 ];
 
+export type NotesRating = "sell" | "neutral" | "buy";
+
+export const NOTES_RATINGS: Array<{ id: NotesRating; label: string }> = [
+  { id: "sell", label: "Sell" },
+  { id: "neutral", label: "Neutral" },
+  { id: "buy", label: "Buy" },
+];
+
 export type BottomUpNotes = {
   ticker: string;
-  status: PipelineStatus;
+  status: PipelineStatus | null;
+  rating: NotesRating | null;
+  targetPrice: number | null;
   thesis: string;
-  moat: string;
+  risk: string;
   governance: string;
   updatedAt: string | null;
 };

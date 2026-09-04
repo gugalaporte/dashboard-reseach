@@ -3,12 +3,19 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-export type Tab = "research" | "lseg" | "factors" | "governanca" | "trades";
+export type Tab =
+  | "research"
+  | "lseg"
+  | "factors"
+  | "pipeline"
+  | "governanca"
+  | "trades";
 
 export const NAV_ITEMS: { id: Tab; href: string; label: string }[] = [
   { id: "research", href: "/", label: "Research" },
   { id: "lseg", href: "/lseg", label: "Dados Lseg" },
   { id: "factors", href: "/factors", label: "Screening" },
+  { id: "pipeline", href: "/pipeline", label: "Pipeline" },
   { id: "governanca", href: "/governanca", label: "Governança" },
   { id: "trades", href: "/trades", label: "Execução" },
 ];
