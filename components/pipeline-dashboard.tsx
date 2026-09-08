@@ -9,6 +9,7 @@ import {
   countByPipeline,
   defaultPipelineStage,
   emptyPipelineCounts,
+  inPipelineStage,
   type PipelineNote,
 } from "@/lib/pipeline";
 import { PIPELINE_STEPS, type PipelineStatus } from "@/lib/bottom-up-types";
@@ -43,7 +44,7 @@ export function PipelineDashboard() {
 
   const counts = React.useMemo(() => countByPipeline(notes), [notes]);
   const active = stage ?? defaultPipelineStage(counts);
-  const visible = notes.filter((n) => n.status === active);
+  const visible = notes.filter((n) => inPipelineStage(n.status, active));
   const stepLabel =
     PIPELINE_STEPS.find((s) => s.id === active)?.label ?? active;
   const lastUpdate = notes[0]?.updatedAt ?? null;

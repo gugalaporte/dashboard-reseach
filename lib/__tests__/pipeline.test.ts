@@ -4,25 +4,41 @@ import {
   defaultPipelineStage,
   emptyPipelineCounts,
   finacapUpside,
+  inPipelineStage,
   parsePipelineStage,
 } from "../pipeline";
 
 describe("countByPipeline", () => {
-  it("conta por etapa", () => {
+  it("acumula etapas mais avançadas nas anteriores", () => {
     const counts = countByPipeline([
       { status: "watchlist" },
       { status: "watchlist" },
       { status: "position" },
     ]);
-    expect(counts.watchlist).toBe(2);
-    expect(counts.thesis_ready).toBe(0);
+    expect(counts.watchlist).toBe(3);
+    expect(counts.thesis_ready).toBe(1);
     expect(counts.position).toBe(1);
   });
 
   it("ignora empresa sem etapa", () => {
     const counts = countByPipeline([{ status: null }, { status: "position" }]);
     expect(counts.position).toBe(1);
-    expect(counts.watchlist).toBe(0);
+    expect(counts.thesis_ready).toBe(1);
+    expect(counts.watchlist).toBe(1);
+  });
+});
+
+describe("inPipelineStage", () => {
+  it("posição aparece em tese pronta e watchlist", () => {
+    expect(inPipelineStage("position", "position")).toBe(true);
+    expect(inPipelineStage("position", "thesis_ready")).toBe(true);
+    expect(inPipelineStage("position", "watchlist")).toBe(true);
+  });
+
+  it("tese pronta aparece em watchlist, não em posição", () => {
+    expect(inPipelineStage("thesis_ready", "watchlist")).toBe(true);
+    expect(inPipelineStage("thesis_ready", "thesis_ready")).toBe(true);
+    expect(inPipelineStage("thesis_ready", "position")).toBe(false);
   });
 });
 

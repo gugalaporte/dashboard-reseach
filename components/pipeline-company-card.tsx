@@ -18,11 +18,6 @@ function ratingLabel(id: NotesRating): string {
   return NOTES_RATINGS.find((r) => r.id === id)?.label ?? id;
 }
 
-function closeSubtitle(q: LivePrice): string {
-  if (q.isPreviousSessionClose) return "últ. dia útil";
-  return `fech. ${formatDateShort(q.asOf)}`;
-}
-
 function NoteBlock({ label, text }: { label: string; text: string }) {
   const empty = !text.trim();
   return (
@@ -45,12 +40,10 @@ function NoteBlock({ label, text }: { label: string; text: string }) {
 function Stat({
   label,
   value,
-  sub,
   valueClass,
 }: {
   label: string;
   value: string;
-  sub?: string;
   valueClass?: string;
 }) {
   return (
@@ -61,9 +54,6 @@ function Stat({
       <div className={cn("font-mono text-sm tabular mt-0.5", valueClass)}>
         {value}
       </div>
-      {sub && (
-        <div className="text-[10px] text-ink/40 mt-0.5 tabular">{sub}</div>
-      )}
     </div>
   );
 }
@@ -116,7 +106,6 @@ export function PipelineCompanyCard({ note, close }: Props) {
           value={
             lastClose == null ? "—" : formatValue(lastClose, "money", ccy)
           }
-          sub={close ? closeSubtitle(close) : undefined}
         />
         <Stat
           label="TP Finacap"

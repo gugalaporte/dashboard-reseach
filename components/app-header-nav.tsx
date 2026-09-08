@@ -8,6 +8,7 @@ export type Tab =
   | "lseg"
   | "factors"
   | "pipeline"
+  | "mercado"
   | "governanca"
   | "trades";
 
@@ -16,13 +17,14 @@ export const NAV_ITEMS: { id: Tab; href: string; label: string }[] = [
   { id: "lseg", href: "/lseg", label: "Dados Lseg" },
   { id: "factors", href: "/factors", label: "Screening" },
   { id: "pipeline", href: "/pipeline", label: "Pipeline" },
+  { id: "mercado", href: "/mercado", label: "Painel do Mercado" },
   { id: "governanca", href: "/governanca", label: "Governança" },
   { id: "trades", href: "/trades", label: "Execução" },
 ];
 
 function tabClass(active: boolean) {
   return cn(
-    "px-3 h-8 inline-flex items-center text-[11px] font-medium uppercase tracking-[0.12em] transition border-b-2",
+    "px-2.5 h-8 inline-flex items-center text-[11px] font-medium uppercase tracking-[0.08em] transition border-b-2 whitespace-nowrap",
     active
       ? "text-surface-soft border-surface-soft"
       : "text-surface-soft/45 border-transparent hover:text-surface-soft/80"
@@ -33,7 +35,7 @@ function tabClass(active: boolean) {
 export function AppHeaderNav({ active }: { active: Tab }) {
   return (
     <nav
-      className="hidden md:flex items-center gap-1"
+      className="hidden md:flex items-center gap-0.5 overflow-x-auto"
       aria-label="Navegação principal"
     >
       {NAV_ITEMS.map((item) =>

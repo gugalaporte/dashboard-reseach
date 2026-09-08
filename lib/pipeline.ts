@@ -11,6 +11,21 @@ export type PipelineNote = BottomUpNotes & {
 
 export type PipelineCounts = Record<PipelineStatus, number>;
 
+const RANK: Record<PipelineStatus, number> = {
+  watchlist: 0,
+  thesis_ready: 1,
+  position: 2,
+};
+
+/** Posição inclui tese pronta e watchlist; tese pronta inclui watchlist. */
+export function inPipelineStage(
+  status: PipelineStatus | null,
+  stage: PipelineStatus
+): boolean {
+  if (!status) return false;
+  return RANK[status] >= RANK[stage];
+}
+
 export function emptyPipelineCounts(): PipelineCounts {
   return { watchlist: 0, thesis_ready: 0, position: 0 };
 }
@@ -20,7 +35,10 @@ export function countByPipeline(
 ): PipelineCounts {
   const out = emptyPipelineCounts();
   for (const n of notes) {
-    if (n.status) out[n.status] += 1;
+    if (!n.status) continue;
+    for (const step of PIPELINE_STEPS) {
+      if (RANK[n.status] >= RANK[step.id]) out[step.id] += 1;
+    }
   }
   return out;
 }
