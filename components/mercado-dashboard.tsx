@@ -101,12 +101,17 @@ export function MercadoDashboard() {
 
   React.useEffect(() => {
     let cancelled = false;
-    (async () => {
+    async function load() {
       try {
-        const res = await fetch("/api/mercado", { cache: "no-store" });
+        const res = await fetch(`/api/mercado?ts=${Date.now()}`, {
+          cache: "no-store",
+        });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-        if (!cancelled) setPayload(json as MarketPayload);
+        if (!cancelled) {
+          setPayload(json as MarketPayload);
+          setError(null);
+        }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Erro ao carregar mercado");
@@ -114,9 +119,15 @@ export function MercadoDashboard() {
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    }
+    void load();
+    const onFocus = () => {
+      void load();
+    };
+    window.addEventListener("focus", onFocus);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", onFocus);
     };
   }, []);
 
