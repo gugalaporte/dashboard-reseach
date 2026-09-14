@@ -3,6 +3,7 @@ import {
   classifyByPercentile,
   percentileRank,
   scoreFactors,
+  weightsFromPct,
   zScore,
   type FactorInput,
 } from "../factor-scoring";
@@ -91,6 +92,40 @@ describe("scoreFactors", () => {
       { minDayVolume: 20_000, maxNetDebtEbitda: 8 }
     );
     expect(rows[0]!.eligible).toBe(true);
+  });
+
+  it("peso maior em quality sobe empresa de ROE alto", () => {
+    const highQ = base({
+      ticker: "HIGHQ",
+      ric: "HQ.SA",
+      sector: "Energy",
+      roe: 40,
+      ebitdaMargin: 40,
+      netDebtEbitda: 0.5,
+      dividendYield: 1,
+      dyFwd: null,
+    });
+    const highC = base({
+      ticker: "HIGHC",
+      ric: "HC.SA",
+      sector: "Energy",
+      roe: 5,
+      ebitdaMargin: 5,
+      netDebtEbitda: 3,
+      dividendYield: 12,
+      dyFwd: null,
+    });
+    const equal = scoreFactors([highQ, highC]);
+    const tilt = scoreFactors(
+      [highQ, highC],
+      { minDayVolume: 20_000, maxNetDebtEbitda: 8 },
+      weightsFromPct({ quality: 80, value: 5, carry: 5, momentum: 10 })
+    );
+    const qEqual = equal.find((r) => r.ticker === "HIGHQ")!;
+    const cEqual = equal.find((r) => r.ticker === "HIGHC")!;
+    const qTilt = tilt.find((r) => r.ticker === "HIGHQ")!;
+    const cTilt = tilt.find((r) => r.ticker === "HIGHC")!;
+    expect(qTilt.score! - cTilt.score!).toBeGreaterThan(qEqual.score! - cEqual.score!);
   });
 
   it("inverte métricas de valuation (menor P/E → z positivo relativo)", () => {

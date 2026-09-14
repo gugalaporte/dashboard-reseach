@@ -21,6 +21,58 @@ export const FACTOR_WEIGHTS = {
   liquidity: 0,
 } as const;
 
+export type FactorWeights = {
+  quality: number;
+  value: number;
+  momentum: number;
+  carry: number;
+  liquidity: number;
+};
+
+/** Pesos na UI (0–100). O composto renormaliza se a soma ≠ 100. */
+export type FactorWeightPct = {
+  quality: number;
+  value: number;
+  carry: number;
+  momentum: number;
+};
+
+export const DEFAULT_WEIGHT_PCT: FactorWeightPct = {
+  quality: 30,
+  value: 30,
+  carry: 30,
+  momentum: 10,
+};
+
+export function sanitizeWeightPct(
+  raw: Partial<Record<keyof FactorWeightPct, number>>
+): FactorWeightPct {
+  const n = (v: number | undefined, fallback: number) => {
+    if (v == null || !Number.isFinite(v) || v < 0) return fallback;
+    return Math.min(100, v);
+  };
+  const pct: FactorWeightPct = {
+    quality: n(raw.quality, DEFAULT_WEIGHT_PCT.quality),
+    value: n(raw.value, DEFAULT_WEIGHT_PCT.value),
+    carry: n(raw.carry, DEFAULT_WEIGHT_PCT.carry),
+    momentum: n(raw.momentum, DEFAULT_WEIGHT_PCT.momentum),
+  };
+  if (pct.quality + pct.value + pct.carry + pct.momentum <= 0) {
+    return { ...DEFAULT_WEIGHT_PCT };
+  }
+  return pct;
+}
+
+export function weightsFromPct(pct: FactorWeightPct): FactorWeights {
+  return {
+    quality: pct.quality / 100,
+    value: pct.value / 100,
+    carry: pct.carry / 100,
+    momentum: pct.momentum / 100,
+    liquidity: 0,
+  };
+}
+
 /** Inputs por empresa após join snapshot + forward + companies. */
 export type FactorInput = {
   ticker: string;
@@ -290,7 +342,8 @@ export function classifyByPercentile(p: number): FactorClass {
  */
 export function scoreFactors(
   inputs: FactorInput[],
-  cfg: FactorEligibility = DEFAULT_ELIGIBILITY
+  cfg: FactorEligibility = DEFAULT_ELIGIBILITY,
+  weights: FactorWeights = FACTOR_WEIGHTS
 ): FactorRow[] {
   const eligible = inputs.filter((r) => isEligible(r, cfg).ok);
 
@@ -420,11 +473,11 @@ export function scoreFactors(
     const liquidity = avgNullable(liquidityZs);
 
     const parts: Array<{ w: number; v: number | null }> = [
-      { w: FACTOR_WEIGHTS.quality, v: quality },
-      { w: FACTOR_WEIGHTS.value, v: value },
-      { w: FACTOR_WEIGHTS.momentum, v: momentum },
-      { w: FACTOR_WEIGHTS.carry, v: carry },
-      { w: FACTOR_WEIGHTS.liquidity, v: liquidity },
+      { w: weights.quality, v: quality },
+      { w: weights.value, v: value },
+      { w: weights.momentum, v: momentum },
+      { w: weights.carry, v: carry },
+      { w: weights.liquidity, v: liquidity },
     ];
     const present = parts.filter((p) => p.v != null && p.w > 0);
     let score: number | null = null;

@@ -7,10 +7,12 @@ import { sectorPt } from "@/lib/sector-labels";
 import {
   FACTOR_FORMULA,
   FACTOR_LABELS,
-  FACTOR_WEIGHTS,
+  DEFAULT_WEIGHT_PCT,
+  weightsFromPct,
   type FactorClass,
   type FactorId,
   type FactorRow,
+  type FactorWeightPct,
   type MetricBreakdown,
 } from "@/lib/factor-scoring";
 import { Badge } from "@/components/ui/badge";
@@ -135,30 +137,38 @@ function FactorTipBody({ row, factor }: { row: FactorRow; factor: FactorId }) {
   );
 }
 
-function ScoreTipBody({ row }: { row: FactorRow }) {
+function ScoreTipBody({
+  row,
+  weights,
+}: {
+  row: FactorRow;
+  weights: FactorWeightPct;
+}) {
+  const w = weightsFromPct(weights);
   const parts = (
     [
-      { id: "quality" as const, w: FACTOR_WEIGHTS.quality, v: row.quality },
-      { id: "value" as const, w: FACTOR_WEIGHTS.value, v: row.value },
-      { id: "momentum" as const, w: FACTOR_WEIGHTS.momentum, v: row.momentum },
-      { id: "carry" as const, w: FACTOR_WEIGHTS.carry, v: row.carry },
-      { id: "liquidity" as const, w: FACTOR_WEIGHTS.liquidity, v: row.liquidity },
+      { id: "quality" as const, w: w.quality, v: row.quality },
+      { id: "value" as const, w: w.value, v: row.value },
+      { id: "momentum" as const, w: w.momentum, v: row.momentum },
+      { id: "carry" as const, w: w.carry, v: row.carry },
     ] satisfies { id: FactorId; w: number; v: number | null }[]
   ).filter((p) => p.w > 0);
   const present = parts.filter((p) => p.v != null);
   const wSum = present.reduce((a, p) => a + p.w, 0);
+  const pct = (x: number) => `${formatNumber(x * 100, 0)}%`;
 
   return (
     <div className="space-y-2">
       <p className="text-surface-soft/70 text-[10px] leading-snug">
-        Score composto = Quality×0,30 + Value×0,30 + Carry×0,30 + Momentum×0,10
-        (pesos renormalizados se faltar algum fator).
+        Score composto = Quality×{pct(w.quality)} + Value×{pct(w.value)} +
+        Carry×{pct(w.carry)} + Momentum×{pct(w.momentum)} (renormaliza se faltar
+        fator ou se a soma ≠ 100%).
       </p>
       <ul className="space-y-0.5 font-mono tabular text-[10px]">
         {parts.map((p) => (
           <li key={p.id} className="flex justify-between gap-3">
             <span className="text-surface-soft/75">
-              {FACTOR_LABELS[p.id]}×{formatNumber(p.w, 2).replace(".", ",")}
+              {FACTOR_LABELS[p.id]}×{pct(p.w)}
             </span>
             <span>
               {p.v == null ? (
@@ -175,7 +185,7 @@ function ScoreTipBody({ row }: { row: FactorRow }) {
           {present
             .map(
               (p) =>
-                `${FACTOR_LABELS[p.id]}×${formatNumber(p.w / wSum, 2).replace(".", ",")}`
+                `${FACTOR_LABELS[p.id]}×${pct(p.w / wSum)}`
             )
             .join(" + ")}
         </p>
@@ -227,9 +237,15 @@ export function FactorScoreCell({
   );
 }
 
-export function CompositeScoreCell({ row }: { row: FactorRow }) {
+export function CompositeScoreCell({
+  row,
+  weights = DEFAULT_WEIGHT_PCT,
+}: {
+  row: FactorRow;
+  weights?: FactorWeightPct;
+}) {
   return (
-    <HoverTip content={<ScoreTipBody row={row} />}>
+    <HoverTip content={<ScoreTipBody row={row} weights={weights} />}>
       <span className="tabular text-sm font-semibold text-ink">{fmtZ(row.score)}</span>
     </HoverTip>
   );

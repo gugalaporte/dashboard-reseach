@@ -17,9 +17,15 @@ import {
 import { sectorPt } from "@/lib/sector-labels";
 import {
   DEFAULT_ELIGIBILITY,
+  DEFAULT_WEIGHT_PCT,
   type FactorClass,
   type FactorRow,
+  type FactorWeightPct,
 } from "@/lib/factor-scoring";
+import {
+  FactorWeightInputs,
+  defaultWeightInputs,
+} from "@/components/factor-weight-inputs";
 import {
   ClassCell,
   CompositeScoreCell,
@@ -33,6 +39,7 @@ import { Star } from "lucide-react";
 type FactorPayload = {
   asOfDate: string | null;
   eligibility: { minDayVolume: number; maxNetDebtEbitda: number };
+  weights: FactorWeightPct;
   rows: FactorRow[];
   sectors: string[];
 };
@@ -85,6 +92,7 @@ export function FactorInvestingDashboard() {
   const [onlyPortfolio, setOnlyPortfolio] = React.useState(false);
   const [minVol, setMinVol] = React.useState(String(DEFAULT_ELIGIBILITY.minDayVolume));
   const [maxNd, setMaxNd] = React.useState(String(DEFAULT_ELIGIBILITY.maxNetDebtEbitda));
+  const [weightInputs, setWeightInputs] = React.useState(defaultWeightInputs);
   const [sortKey, setSortKey] = React.useState<SortKey>("score");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
   const [selected, setSelected] = React.useState<FactorRow | null>(null);
@@ -96,6 +104,10 @@ export function FactorInvestingDashboard() {
       const params = new URLSearchParams({
         minDayVolume: String(Number(minVol) || DEFAULT_ELIGIBILITY.minDayVolume),
         maxNetDebtEbitda: String(Number(maxNd) || DEFAULT_ELIGIBILITY.maxNetDebtEbitda),
+        wQuality: weightInputs.quality,
+        wValue: weightInputs.value,
+        wCarry: weightInputs.carry,
+        wMomentum: weightInputs.momentum,
       });
       const res = await fetch(`/api/factors?${params}`, { cache: "no-store" });
       const json = (await res.json()) as FactorPayload & { error?: string };
@@ -106,11 +118,13 @@ export function FactorInvestingDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [minVol, maxNd]);
+  }, [minVol, maxNd, weightInputs]);
 
   React.useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    void fetchData();
+    // Primeira carga com defaults; Recalcular aplica os campos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
@@ -150,13 +164,19 @@ export function FactorInvestingDashboard() {
     };
   }, [data]);
 
+  const appliedWeights = data?.weights ?? DEFAULT_WEIGHT_PCT;
+
   const hasFilters =
     setor !== undefined ||
     classFilter !== "all" ||
     !onlyEligible ||
     onlyPortfolio ||
     minVol !== String(DEFAULT_ELIGIBILITY.minDayVolume) ||
-    maxNd !== String(DEFAULT_ELIGIBILITY.maxNetDebtEbitda);
+    maxNd !== String(DEFAULT_ELIGIBILITY.maxNetDebtEbitda) ||
+    weightInputs.quality !== String(DEFAULT_WEIGHT_PCT.quality) ||
+    weightInputs.value !== String(DEFAULT_WEIGHT_PCT.value) ||
+    weightInputs.carry !== String(DEFAULT_WEIGHT_PCT.carry) ||
+    weightInputs.momentum !== String(DEFAULT_WEIGHT_PCT.momentum);
 
   function clearFilters() {
     setSetor(undefined);
@@ -165,6 +185,7 @@ export function FactorInvestingDashboard() {
     setOnlyPortfolio(false);
     setMinVol(String(DEFAULT_ELIGIBILITY.minDayVolume));
     setMaxNd(String(DEFAULT_ELIGIBILITY.maxNetDebtEbitda));
+    setWeightInputs(defaultWeightInputs());
   }
 
   return (
@@ -253,6 +274,15 @@ export function FactorInvestingDashboard() {
             Recalcular
           </Button>
         </div>
+
+        <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 pb-3">
+          <FactorWeightInputs
+            values={weightInputs}
+            onChange={(key, value) =>
+              setWeightInputs((prev) => ({ ...prev, [key]: value }))
+            }
+          />
+        </div>
       </div>
 
       <main className="mx-auto max-w-[1600px] w-full px-4 sm:px-6 lg:px-8 py-5 md:py-8 space-y-5 md:space-y-6 flex-1">
@@ -268,8 +298,9 @@ export function FactorInvestingDashboard() {
               Screening multifatorial
             </h2>
             <p className="text-xs text-ink/45 mt-0.5 leading-relaxed">
-              Quality 30% · Value 30% · Carry 30% · Momentum 10% — z-score por
-              setor · ND/EBITDA ignore bancos/financeiras
+              Quality {appliedWeights.quality}% · Value {appliedWeights.value}% · Carry{" "}
+              {appliedWeights.carry}% · Momentum {appliedWeights.momentum}% — z-score
+              por setor · ND/EBITDA ignore bancos/financeiras
             </p>
           </div>
 
@@ -353,7 +384,7 @@ export function FactorInvestingDashboard() {
                         <FactorScoreCell row={r} factor="carry" />
                       </TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                        <CompositeScoreCell row={r} />
+                        <CompositeScoreCell row={r} weights={appliedWeights} />
                       </TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                         <ClassCell row={r} />

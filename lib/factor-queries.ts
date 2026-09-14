@@ -9,9 +9,12 @@ import type {
 } from "./lseg-transform";
 import {
   DEFAULT_ELIGIBILITY,
+  DEFAULT_WEIGHT_PCT,
   scoreFactors,
+  weightsFromPct,
   type FactorEligibility,
   type FactorRow,
+  type FactorWeightPct,
 } from "./factor-scoring";
 import { buildFactorInputs } from "./factor-build";
 
@@ -23,6 +26,7 @@ const FORWARD_BASE = "ric,as_of_date,fiscal_year,pe_fwd,dy_fwd";
 export type FactorPayload = {
   asOfDate: string | null;
   eligibility: FactorEligibility;
+  weights: FactorWeightPct;
   rows: FactorRow[];
   sectors: string[];
 };
@@ -61,7 +65,8 @@ async function loadForward(db: ReturnType<typeof getResearchSupabase>) {
 
 /** Carrega dados LSEG e calcula ranking (somente leitura). */
 export async function loadFactorRanking(
-  eligibility: FactorEligibility = DEFAULT_ELIGIBILITY
+  eligibility: FactorEligibility = DEFAULT_ELIGIBILITY,
+  weightPct: FactorWeightPct = DEFAULT_WEIGHT_PCT
 ): Promise<FactorPayload> {
   if (!hasResearchServiceKey()) {
     throw new Error(
@@ -82,7 +87,7 @@ export async function loadFactorRanking(
   ]);
 
   const inputs = buildFactorInputs(companies, snapshots, forward);
-  const rows = scoreFactors(inputs, eligibility);
+  const rows = scoreFactors(inputs, eligibility, weightsFromPct(weightPct));
 
   let asOfDate: string | null = null;
   for (const r of rows) {
@@ -93,5 +98,5 @@ export async function loadFactorRanking(
     ...new Set(rows.map((r) => r.sector).filter((s): s is string => !!s?.trim())),
   ].sort();
 
-  return { asOfDate, eligibility, rows, sectors };
+  return { asOfDate, eligibility, weights: weightPct, rows, sectors };
 }

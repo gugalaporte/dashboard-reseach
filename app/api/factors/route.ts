@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
 import { loadFactorRanking } from "@/lib/factor-queries";
-import { DEFAULT_ELIGIBILITY } from "@/lib/factor-scoring";
+import {
+  DEFAULT_ELIGIBILITY,
+  sanitizeWeightPct,
+} from "@/lib/factor-scoring";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function readPct(params: URLSearchParams, key: string): number | undefined {
+  const raw = params.get(key);
+  if (raw == null || raw.trim() === "") return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 export async function GET(req: Request) {
   try {
@@ -20,7 +30,14 @@ export async function GET(req: Request) {
         : DEFAULT_ELIGIBILITY.maxNetDebtEbitda,
     };
 
-    const payload = await loadFactorRanking(eligibility);
+    const weights = sanitizeWeightPct({
+      quality: readPct(searchParams, "wQuality"),
+      value: readPct(searchParams, "wValue"),
+      carry: readPct(searchParams, "wCarry"),
+      momentum: readPct(searchParams, "wMomentum"),
+    });
+
+    const payload = await loadFactorRanking(eligibility, weights);
     return NextResponse.json(payload, {
       headers: { "Cache-Control": "no-store" },
     });
