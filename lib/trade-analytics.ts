@@ -153,21 +153,33 @@ function closePct(a: number, b: number, maxPct: number): boolean {
   return Math.abs(a - b) / m <= maxPct;
 }
 
-/** Conversão de classe (AXIA3↔AXIA6) ou de ticker (ELET6→AXIA6). */
+function sameQty(a: number, b: number): boolean {
+  return Math.abs(a - b) < 1e-6;
+}
+
+/** Preço igual na precisão de 4 casas (tick B3). */
+function samePrice(a: number, b: number): boolean {
+  return Math.round(a * 10_000) === Math.round(b * 10_000);
+}
+
+/** Conversão de classe, de ticker, ou ida-e-volta do mesmo papel. */
 function isTickerConversionPair(
   buy: { ric: string; qty: number; avgPrice: number; notional: number },
   sell: { ric: string; qty: number; avgPrice: number; notional: number }
 ): boolean {
-  if (buy.ric === sell.ric) return false;
+  // Mesmo papel: só sai se qtd e preço forem iguais (não é giro com P&L).
+  if (buy.ric === sell.ric) {
+    return sameQty(buy.qty, sell.qty) && samePrice(buy.avgPrice, sell.avgPrice);
+  }
   const sameFamily = tickerFamily(buy.ric) === tickerFamily(sell.ric);
   if (sameFamily && closePct(buy.notional, sell.notional, 0.02)) return true;
   // Troca de código: mesma qtd e mesmo preço, famílias diferentes.
-  return closePct(buy.qty, sell.qty, 0.002) && closePct(buy.avgPrice, sell.avgPrice, 0.002);
+  return sameQty(buy.qty, sell.qty) && samePrice(buy.avgPrice, sell.avgPrice);
 }
 
 /**
  * Remove pares compra/venda no mesmo dia+desk que são conversão
- * de classe ou de ticker — não execução de mercado.
+ * de classe/ticker, ou ida-e-volta do mesmo papel (qtd e preço iguais).
  */
 export function excludeStockConversions<T extends ReturnType<typeof aggregateExecutions>[number]>(
   executions: T[]

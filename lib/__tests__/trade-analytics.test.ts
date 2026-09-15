@@ -141,6 +141,30 @@ describe("excludeStockConversions", () => {
     expect(out).toHaveLength(1);
     expect(out[0].ric).toBe("ITUB3");
   });
+
+  it("remove ida-e-volta do mesmo papel só com qtd e preço iguais", () => {
+    const base = aggregateExecutions([
+      row({ product: "VALE3", amount: "1000", price: "80" }),
+      row({ product: "VALE3", amount: "-1000", price: "80" }),
+    ]);
+    expect(excludeStockConversions(base)).toHaveLength(0);
+  });
+
+  it("mantém giro do mesmo papel quando o preço difere", () => {
+    const base = aggregateExecutions([
+      row({ product: "VALE3", amount: "1000", price: "80" }),
+      row({ product: "VALE3", amount: "-1000", price: "81" }),
+    ]);
+    expect(excludeStockConversions(base)).toHaveLength(2);
+  });
+
+  it("mantém giro do mesmo papel quando a quantidade difere", () => {
+    const base = aggregateExecutions([
+      row({ product: "VALE3", amount: "1000", price: "80" }),
+      row({ product: "VALE3", amount: "-400", price: "80" }),
+    ]);
+    expect(excludeStockConversions(base)).toHaveLength(2);
+  });
 });
 
 describe("enrichExecutions", () => {
