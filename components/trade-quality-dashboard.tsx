@@ -466,19 +466,14 @@ export function TradeQualityDashboard() {
         )}
 
         {/* Summary cards — estilo Research */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3 [&>*]:min-w-0">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 [&>*]:min-w-0">
           {loading
-            ? Array.from({ length: 7 }).map((_, i) => (
+            ? Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="h-[76px] rounded-md" />
               ))
             : (
               <>
                 <SummaryCard label="Execuções" value={formatNumber(filteredSummary.total)} />
-                <SummaryCard
-                  label="Qualidade média"
-                  value={fmtBps(filteredSummary.avgBps)}
-                  hint="vs média (H+L+C)/3"
-                />
                 <SummaryCard
                   label="Boas"
                   value={formatNumber(filteredSummary.good)}
@@ -521,8 +516,8 @@ export function TradeQualityDashboard() {
             <h2 className="font-display text-[15px] text-ink">Execuções intraday</h2>
             <p className="text-[11px] text-ink/50 mt-0.5">
               <span className="text-ink/65">Preço médio negociado</span> = sua execução ·{" "}
-              <span className="text-ink/65">Fechamento</span> = último do pregão ·{" "}
-              <span className="text-ink/65">Média do dia</span> = (máx + mín + fech) ÷ 3
+              <span className="text-ink/65">Média do dia</span> = (máx + mín + fech) ÷ 3 ·{" "}
+              <span className="text-ink/65">Fechamento</span> = último do pregão
             </p>
           </div>
           <div className="overflow-x-auto scrollbar-thin max-h-[460px]">
@@ -537,8 +532,8 @@ export function TradeQualityDashboard() {
                     "Qtd",
                     "Valor",
                     "Preço médio negociado",
-                    "Fechamento",
                     "Média do dia",
+                    "Fechamento",
                     "vs média",
                     "Resultado",
                     "vs close",
@@ -613,10 +608,10 @@ export function TradeQualityDashboard() {
                         <PriceValue value={ex.avgPrice} />
                       </TableCell>
                       <TableCell className={PRICE_COL}>
-                        <PriceValue value={ex.marketClose} />
+                        <PriceValue value={ex.marketTypical} />
                       </TableCell>
                       <TableCell className={PRICE_COL}>
-                        <PriceValue value={ex.marketTypical} />
+                        <PriceValue value={ex.marketClose} />
                       </TableCell>
                       <TableCell
                         className={cn(
