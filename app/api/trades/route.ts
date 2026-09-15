@@ -79,18 +79,29 @@ async function fetchLatestEquityTradeIso(): Promise<string | null> {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const days = Math.min(365, Math.max(7, Number(searchParams.get("days") ?? 90)));
+    const rawDays = searchParams.get("days") ?? "90";
+    const allHistory = rawDays === "all";
+    const days = allHistory
+      ? null
+      : Math.min(365, Math.max(7, Number(rawDays) || 90));
 
-    const fromIso = isoDaysAgo(days);
     const toIso = isoDaysAgo(0);
+    // out/24 fica de fora: mês parcial com volume distorcido.
+    const requestedFrom = allHistory ? "2024-11-01" : isoDaysAgo(days!);
 
-    const raw = await loadEquityTrades(fromIso);
+    const raw = await loadEquityTrades(requestedFrom);
     const latestTradeIso =
       latestEquityTradeIso(raw) ?? (await fetchLatestEquityTradeIso());
     const base = excludeStockConversions(aggregateExecutions(raw));
+    const fromIso =
+      base.reduce<string | null>(
+        (min, e) => (!min || e.tradeDateIso < min ? e.tradeDateIso : min),
+        null
+      ) ?? requestedFrom;
     const rics = [...new Set(base.map((e) => e.ric))];
 
-    const barsByRic = await getDailyBars([...rics, IBOV_RIC], fromIso, toIso);
+    const barsFromIso = fromIso < isoDaysAgo(365) ? isoDaysAgo(365) : fromIso;
+    const barsByRic = await getDailyBars([...rics, IBOV_RIC], barsFromIso, toIso);
     const executions = enrichExecutions(base, barsByRic);
     const ibovBars = barsByRic.get(IBOV_RIC) ?? [];
     const rotationBuckets = buildRotationBuckets(executions, barsByRic, ibovBars);

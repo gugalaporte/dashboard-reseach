@@ -7,6 +7,7 @@ import {
   enrichExecutions,
   excludeStockConversions,
   executionValue,
+  isListedEquityTicker,
   recomputeRotationPair,
   parseMovTradeDate,
   summaryStats,
@@ -33,6 +34,22 @@ describe("parseMovTradeDate", () => {
   });
 });
 
+describe("isListedEquityTicker", () => {
+  it("aceita ON, PN, unit e BDR", () => {
+    expect(isListedEquityTicker("VALE3")).toBe(true);
+    expect(isListedEquityTicker("PETR4")).toBe(true);
+    expect(isListedEquityTicker("BPAC11")).toBe(true);
+    expect(isListedEquityTicker("INBR32")).toBe(true);
+  });
+
+  it("rejeita recibo e direito (distorcem o volume)", () => {
+    expect(isListedEquityTicker("AZUL53")).toBe(false);
+    expect(isListedEquityTicker("AZUL54")).toBe(false);
+    expect(isListedEquityTicker("AXIA13")).toBe(false);
+    expect(isListedEquityTicker("PETR1")).toBe(false);
+  });
+});
+
 describe("aggregateExecutions", () => {
   it("calcula preço médio ponderado por quantidade", () => {
     const base = aggregateExecutions([
@@ -50,6 +67,15 @@ describe("aggregateExecutions", () => {
       row({ product: "VALE3", amount: "-1000", price: "80" }),
     ]);
     expect(base).toHaveLength(2);
+  });
+
+  it("ignora recibo AZUL53 no volume", () => {
+    const base = aggregateExecutions([
+      row({ product: "AZUL53", amount: "604765000", price: "109659" }),
+      row({ product: "VALE3", amount: "-100", price: "80" }),
+    ]);
+    expect(base).toHaveLength(1);
+    expect(base[0].ric).toBe("VALE3");
   });
 });
 
@@ -85,6 +111,35 @@ describe("excludeStockConversions", () => {
       row({ product: "PETR4", amount: "1000", price: "30" }),
     ]);
     expect(excludeStockConversions(base)).toHaveLength(2);
+  });
+
+  it("remove conversão de ticker ELET6→AXIA6 (mesma qtd e preço)", () => {
+    const base = aggregateExecutions([
+      row({
+        trade_date: "11/10/2025",
+        product: "ELET6",
+        amount: "-680196",
+        price: "61.94",
+        trading_desk: "FINACAP MAURITSSTAD FIF - CIA",
+      }),
+      row({
+        trade_date: "11/10/2025",
+        product: "AXIA6",
+        amount: "680196",
+        price: "61.94",
+        trading_desk: "FINACAP MAURITSSTAD FIF - CIA",
+      }),
+      row({
+        trade_date: "11/10/2025",
+        product: "ITUB3",
+        amount: "-100",
+        price: "35",
+        trading_desk: "FINACAP MAURITSSTAD FIF - CIA",
+      }),
+    ]);
+    const out = excludeStockConversions(base);
+    expect(out).toHaveLength(1);
+    expect(out[0].ric).toBe("ITUB3");
   });
 });
 

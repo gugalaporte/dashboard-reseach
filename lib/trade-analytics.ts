@@ -105,11 +105,20 @@ function num(v: string | number): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// ON/PN (3–8), unit (11) e BDR (31–35). Fora: direitos, recibos (9, 10, 13, 53…).
+const LISTED_EQUITY_SUFFIX = /^(?:[3-8]|11|3[1-5])$/;
+
+export function isListedEquityTicker(product: string): boolean {
+  const p = product.trim().toUpperCase();
+  if (p.includes("DIVIDEND") || p.includes("NAV_") || p.includes("SPLIT")) return false;
+  const m = p.match(/^([A-Z]{4})(\d{1,2})$/);
+  if (!m) return false;
+  return LISTED_EQUITY_SUFFIX.test(m[2]);
+}
+
 function isEquityTrade(row: MovAtivoRow): boolean {
   if (row.productclass !== "Equity") return false;
-  const p = row.product.toUpperCase();
-  if (p.includes("DIVIDEND") || p.includes("NAV_") || p.includes("SPLIT")) return false;
-  return /^[A-Z]{4}\d{1,2}$/.test(p);
+  return isListedEquityTicker(row.product);
 }
 
 /** Data ISO da execução de equity mais recente em um lote de mov_ativo. */
@@ -138,9 +147,27 @@ function executionKey(ex: {
   return `${ex.tradeDateIso}|${ex.tradingDesk}|${ex.ric}|${ex.side}`;
 }
 
+function closePct(a: number, b: number, maxPct: number): boolean {
+  const m = Math.max(Math.abs(a), Math.abs(b));
+  if (m <= 0) return false;
+  return Math.abs(a - b) / m <= maxPct;
+}
+
+/** Conversão de classe (AXIA3↔AXIA6) ou de ticker (ELET6→AXIA6). */
+function isTickerConversionPair(
+  buy: { ric: string; qty: number; avgPrice: number; notional: number },
+  sell: { ric: string; qty: number; avgPrice: number; notional: number }
+): boolean {
+  if (buy.ric === sell.ric) return false;
+  const sameFamily = tickerFamily(buy.ric) === tickerFamily(sell.ric);
+  if (sameFamily && closePct(buy.notional, sell.notional, 0.02)) return true;
+  // Troca de código: mesma qtd e mesmo preço, famílias diferentes.
+  return closePct(buy.qty, sell.qty, 0.002) && closePct(buy.avgPrice, sell.avgPrice, 0.002);
+}
+
 /**
- * Remove pares compra/venda no mesmo dia+desk, mesma família (AXIA3↔AXIA6)
- * e notional quase igual — típico de conversão de classe, não execução de mercado.
+ * Remove pares compra/venda no mesmo dia+desk que são conversão
+ * de classe ou de ticker — não execução de mercado.
  */
 export function excludeStockConversions<T extends ReturnType<typeof aggregateExecutions>[number]>(
   executions: T[]
@@ -161,12 +188,7 @@ export function excludeStockConversions<T extends ReturnType<typeof aggregateExe
 
     for (const buy of buys) {
       for (const sell of sells) {
-        if (buy.ric === sell.ric) continue;
-        if (tickerFamily(buy.ric) !== tickerFamily(sell.ric)) continue;
-        const maxN = Math.max(buy.notional, sell.notional);
-        if (maxN <= 0) continue;
-        const diffPct = Math.abs(buy.notional - sell.notional) / maxN;
-        if (diffPct <= 0.02) {
+        if (isTickerConversionPair(buy, sell)) {
           toRemove.add(executionKey(buy));
           toRemove.add(executionKey(sell));
         }

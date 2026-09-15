@@ -23,6 +23,7 @@ import {
 import { formatDateShort, formatNumber, formatNumberFull, formatValue } from "@/lib/format";
 import { comparisonMetrics, summaryStats, type RotationBucket } from "@/lib/trade-analytics";
 import { AppHeader } from "@/components/app-header";
+import { TradeVolumeChart } from "@/components/trade-volume-chart";
 import { cn } from "@/lib/utils";
 import { Plus, TrendingDown, TrendingUp, Trash2 } from "lucide-react";
 
@@ -93,9 +94,10 @@ const PERIOD_OPTIONS = [
   { value: "90", label: "90d" },
   { value: "180", label: "180d" },
   { value: "365", label: "1a" },
+  { value: "all", label: "Tudo" },
 ] as const;
 
-const DEFAULT_PERIOD_DAYS = "30";
+const DEFAULT_PERIOD_DAYS = "all";
 const COMPARISONS_STORAGE_KEY = "finacap:rotation-comparisons";
 
 function loadStoredComparisons(): UserComparison[] {
@@ -142,6 +144,7 @@ function isoDaysAgo(n: number, ref = new Date()): string {
 
 /** Alinhado com GET /api/trades?days=N (últimos N dias corridos). */
 function periodDateRange(days: string): { from: string; to: string } {
+  if (days === "all") return { from: "2024-11-01", to: todayIso() };
   const n = Number(days);
   return { from: isoDaysAgo(n), to: todayIso() };
 }
@@ -263,7 +266,7 @@ export function TradeQualityDashboard() {
           });
           setDesk("all");
           const range = periodDateRange(days);
-          setDateFrom(range.from);
+          setDateFrom(days === "all" && json.fromIso ? json.fromIso : range.from);
           setDateTo(range.to);
           setShowAddForm(false);
           setDraft(EMPTY_DRAFT);
@@ -504,6 +507,13 @@ export function TradeQualityDashboard() {
               </>
             )}
         </div>
+
+        <TradeVolumeChart
+          executions={filteredExecutions}
+          fromIso={dateFrom || data?.fromIso || ""}
+          toIso={dateTo || data?.toIso || ""}
+          isLoading={loading}
+        />
 
         {/* Tabela execuções */}
         <section className="rounded-md border border-line bg-surface-soft overflow-hidden">
