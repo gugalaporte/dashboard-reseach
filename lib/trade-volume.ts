@@ -11,12 +11,15 @@ export type VolumeBar = {
   partial: boolean;
 };
 
-export type VolumeHeadline = {
-  title: string;
-  subtitle: string;
-  peakKey: string | null;
-  vsPeakPct: number | null;
-};
+export function volumePeakKey(bars: VolumeBar[]): string | null {
+  const active = bars.filter((b) => b.totalNotional > 0);
+  if (active.length === 0) return null;
+  let peak = active[0]!;
+  for (const b of active) {
+    if (b.totalNotional > peak.totalNotional) peak = b;
+  }
+  return peak.key;
+}
 
 const MONTH_SHORT = [
   "jan", "fev", "mar", "abr", "mai", "jun",
@@ -120,42 +123,6 @@ export function buildVolumeBars(
       partial: isPartialBucket(key, grain, asOfIso),
     };
   });
-}
-
-export function volumeHeadline(bars: VolumeBar[]): VolumeHeadline {
-  const empty: VolumeHeadline = {
-    title: "Volume de execução",
-    subtitle: "Sem execuções no período selecionado",
-    peakKey: null,
-    vsPeakPct: null,
-  };
-  const active = bars.filter((b) => b.totalNotional > 0);
-  if (active.length === 0) return empty;
-
-  let peak = active[0]!;
-  for (const b of active) {
-    if (b.totalNotional > peak.totalNotional) peak = b;
-  }
-  const latest = active[active.length - 1]!;
-  if (peak.totalNotional <= 0) return empty;
-
-  if (latest.key === peak.key || latest.totalNotional >= peak.totalNotional * 0.995) {
-    return {
-      title: "Volume de execução no recorde do período",
-      subtitle: "O volume financeiro está no maior nível da janela selecionada",
-      peakKey: peak.key,
-      vsPeakPct: 0,
-    };
-  }
-
-  const belowPct = ((peak.totalNotional - latest.totalNotional) / peak.totalNotional) * 100;
-  const rounded = Math.round(belowPct);
-  return {
-    title: "Volume de execução segue abaixo do pico",
-    subtitle: `O volume financeiro ainda está cerca de ${rounded}% abaixo do recorde de ${peak.label}`,
-    peakKey: peak.key,
-    vsPeakPct: belowPct,
-  };
 }
 
 export type VolumeAxis = {

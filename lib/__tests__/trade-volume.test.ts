@@ -6,7 +6,7 @@ import {
   pickVolumeGrain,
   rangeKeys,
   volumeAxis,
-  volumeHeadline,
+  volumePeakKey,
 } from "../trade-volume";
 
 describe("pickVolumeGrain", () => {
@@ -78,61 +78,28 @@ describe("buildVolumeBars", () => {
   });
 });
 
-describe("volumeHeadline", () => {
-  it("compara o último mês com volume ao pico", () => {
-    const h = volumeHeadline([
-      {
-        key: "2021",
-        label: "2021",
-        adtv: 29,
-        totalNotional: 29,
-        sessionCount: 1,
-        partial: false,
-      },
-      {
-        key: "2025",
-        label: "2025",
-        adtv: 0,
-        totalNotional: 0,
-        sessionCount: 0,
-        partial: false,
-      },
-      {
-        key: "2026",
-        label: "2026",
-        adtv: 24.65,
-        totalNotional: 24.65,
-        sessionCount: 1,
-        partial: true,
-      },
-    ]);
-    expect(h.title).toMatch(/abaixo do pico/i);
-    expect(h.peakKey).toBe("2021");
-    expect(h.vsPeakPct).toBeCloseTo(15, 0);
-    expect(h.subtitle).toMatch(/15%/);
-  });
-
-  it("reconhece recorde na última barra com volume", () => {
-    const h = volumeHeadline([
-      {
-        key: "2024",
-        label: "2024",
-        adtv: 10,
-        totalNotional: 10,
-        sessionCount: 1,
-        partial: false,
-      },
-      {
-        key: "2026",
-        label: "2026",
-        adtv: 20,
-        totalNotional: 20,
-        sessionCount: 1,
-        partial: true,
-      },
-    ]);
-    expect(h.vsPeakPct).toBe(0);
-    expect(h.title).toMatch(/recorde/i);
+describe("volumePeakKey", () => {
+  it("aponta o mês de maior volume", () => {
+    expect(
+      volumePeakKey([
+        {
+          key: "2021",
+          label: "2021",
+          adtv: 29,
+          totalNotional: 29,
+          sessionCount: 1,
+          partial: false,
+        },
+        {
+          key: "2026",
+          label: "2026",
+          adtv: 24.65,
+          totalNotional: 24.65,
+          sessionCount: 1,
+          partial: true,
+        },
+      ])
+    ).toBe("2021");
   });
 });
 

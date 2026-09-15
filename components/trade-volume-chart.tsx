@@ -18,13 +18,13 @@ import {
   partialNote,
   pickVolumeGrain,
   volumeAxis,
-  volumeHeadline,
+  volumePeakKey,
   type VolumeBar,
 } from "@/lib/trade-volume";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const BAR = "#f0a202";
-const BAR_PEAK = "#ffc44d";
+const BAR = "#4492cc";
+const BAR_PEAK = "#1b61b6";
 const GRID = "rgba(241,241,241,0.12)";
 const TICK = "rgba(241,241,241,0.55)";
 
@@ -48,14 +48,14 @@ export function TradeVolumeChart({
   const bars: VolumeBar[] = isLoading
     ? []
     : buildVolumeBars(executions, grain, toIso, { fromIso, toIso });
-  const headline = volumeHeadline(bars);
+  const peakKey = volumePeakKey(bars);
   const axis = volumeAxis(Math.max(0, ...bars.map((b) => b.totalNotional)));
   const note = partialNote(bars, grain);
   const chartData: ChartRow[] = bars.map((b) => ({
     ...b,
     plot: b.totalNotional / axis.divisor,
     plotLabel: formatBarLabel(b.totalNotional),
-    isPeak: b.key === headline.peakKey,
+    isPeak: b.key === peakKey,
   }));
   const seriesHint =
     grain === "year" ? "Volume financeiro no ano" : "Volume financeiro no mês";
@@ -64,11 +64,8 @@ export function TradeVolumeChart({
     <section className="rounded-md overflow-hidden bg-navy text-surface-soft">
       <div className="px-4 sm:px-5 pt-5 pb-2">
         <h2 className="font-display text-[22px] sm:text-[26px] leading-tight tracking-tight">
-          {isLoading ? "Volume de execução" : headline.title}
+          Volume financeiro
         </h2>
-        <p className="text-[13px] text-surface-soft/60 mt-1.5 max-w-3xl">
-          {isLoading ? "Carregando volume negociado no período…" : headline.subtitle}
-        </p>
         <div className="flex items-center gap-2 mt-4">
           <span className="inline-block w-3 h-3 rounded-[2px]" style={{ background: BAR }} />
           <span className="text-[12px] text-surface-soft/75">
