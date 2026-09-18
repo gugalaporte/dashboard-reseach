@@ -126,7 +126,7 @@ export const FACTOR_FORMULA: Record<FactorId, string> = {
   quality:
     "Média dos z-scores no setor: ROE, margem EBITDA, dívida líquida/EBITDA (inv., menor é melhor).",
   value:
-    "Média dos z-scores no setor: P/E fwd ou P/E (inv., menor é melhor), P/B (inv.), EV/EBITDA (inv.).",
+    "Média dos z-scores no setor: P/E fwd ou P/E (inv., menor é melhor), P/B (inv.), EV/EBITDA (inv.). Múltiplo ≤ 0 é ignorado.",
   momentum:
     "Média dos z-scores no setor: revisão EPS 4 semanas %, retorno 3M, retorno 6M.",
   carry:
@@ -217,6 +217,20 @@ type MetricDef = {
   inverted?: boolean;
 };
 
+/** P/E, P/B e EV/EBITDA ≤ 0 não são múltiplos de valuation. */
+const VALUE_POSITIVE_KEYS: ReadonlySet<keyof FactorInput> = new Set([
+  "peRatio",
+  "peFwd",
+  "pbRatio",
+  "evEbitda",
+]);
+
+function usableMetric(key: keyof FactorInput, v: unknown): v is number {
+  if (typeof v !== "number" || !Number.isFinite(v)) return false;
+  if (VALUE_POSITIVE_KEYS.has(key) && v <= 0) return false;
+  return true;
+}
+
 function collectPeers(
   rows: FactorInput[],
   key: keyof FactorInput
@@ -225,7 +239,7 @@ function collectPeers(
   for (const r of rows) {
     const sector = r.sector?.trim() || "Sem setor";
     const v = r[key];
-    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+    if (!usableMetric(key, v)) continue;
     const list = map.get(sector) ?? [];
     list.push(v);
     map.set(sector, list);
@@ -242,12 +256,13 @@ function metricZ(
   const sector = row.sector?.trim() || "Sem setor";
   const peers = peersBySector.get(sector) ?? [];
   const raw = row[key];
-  const z = typeof raw === "number" ? zScore(raw, peers) : null;
+  if (!usableMetric(key, raw)) return null;
+  const z = zScore(raw, peers);
   if (z == null) return null;
   return inverted ? -z : z;
 }
 
-/** Value: pe_fwd invertido se existir, senão pe_ratio invertido. */
+/** Value: pe_fwd invertido se existir e for > 0, senão pe_ratio. */
 function valuePeZ(row: FactorInput, pePeers: Map<string, number[]>, peFwdPeers: Map<string, number[]>): {
   z: number | null;
   key: string;
@@ -255,7 +270,7 @@ function valuePeZ(row: FactorInput, pePeers: Map<string, number[]>, peFwdPeers: 
   raw: number | null;
   inverted: boolean;
 } {
-  if (row.peFwd != null) {
+  if (usableMetric("peFwd", row.peFwd)) {
     return {
       z: metricZ(row, "peFwd", peFwdPeers, true),
       key: "peFwd",
@@ -264,8 +279,26 @@ function valuePeZ(row: FactorInput, pePeers: Map<string, number[]>, peFwdPeers: 
       inverted: true,
     };
   }
+  if (usableMetric("peRatio", row.peRatio)) {
+    return {
+      z: metricZ(row, "peRatio", pePeers, true),
+      key: "peRatio",
+      label: "P/E",
+      raw: row.peRatio,
+      inverted: true,
+    };
+  }
+  if (row.peFwd != null) {
+    return {
+      z: null,
+      key: "peFwd",
+      label: "P/E fwd",
+      raw: row.peFwd,
+      inverted: true,
+    };
+  }
   return {
-    z: metricZ(row, "peRatio", pePeers, true),
+    z: null,
     key: "peRatio",
     label: "P/E",
     raw: row.peRatio,

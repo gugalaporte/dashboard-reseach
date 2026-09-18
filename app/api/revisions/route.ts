@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { fetchAllRows } from "@/lib/supabase-page";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -98,22 +99,23 @@ export async function GET(req: Request) {
     const baseSelect =
       "event_date,ticker,empresa,sector,fonte,pdf_id,prev_pdf_id,prev_report_date," +
       "event_type,prev_rating,rating,prev_target_price,target_price,tp_change_pct,tp_direction,rating_direction";
-    let q = supabase
-      .from("v_revisions")
-      .select(baseSelect)
-      .gte("event_date", minIso)
-      .not("target_price", "is", null)
-      .limit(500);
 
-    if (fontes.length > 0) q = q.in("fonte", fontes);
-    if (tipos.length > 0) q = q.in("event_type", tipos);
-    if (ticker) q = q.eq("ticker", ticker);
-    if (fonte) q = q.eq("fonte", fonte);
+    // Pagina o período inteiro. Um .limit(500) sem order deixava o Bradesco
+    // ocupar o lote e o "Todas" perdia eventos novos dos outros bancos.
+    const data = await fetchAllRows<ApiRevision>((from, to) => {
+      let q = supabase
+        .from("v_revisions")
+        .select(baseSelect)
+        .gte("event_date", minIso)
+        .not("target_price", "is", null);
+      if (fontes.length > 0) q = q.in("fonte", fontes);
+      if (tipos.length > 0) q = q.in("event_type", tipos);
+      if (ticker) q = q.eq("ticker", ticker);
+      if (fonte) q = q.eq("fonte", fonte);
+      return q.order("event_date", { ascending: false }).range(from, to);
+    });
 
-    const { data, error } = await q;
-    if (error) throw error;
-
-    const rows = ((data ?? []) as unknown as ApiRevision[])
+    const rows = data
       .map(normalizeRatingNoise)
       .filter((r): r is ApiRevision => r != null)
       .filter(isRelevant)

@@ -119,7 +119,11 @@ function FactorTipBody({ row, factor }: { row: FactorRow; factor: FactorId }) {
                   <>
                     {fmtRaw(m.key, m.raw)} → z{" "}
                     {m.z == null ? (
-                      <span className="text-surface-soft/45">sem dado</span>
+                      <span className="text-surface-soft/45">
+                        {m.factor === "value" && m.raw != null && m.raw <= 0
+                          ? "ignorado (≤0)"
+                          : "sem dado"}
+                      </span>
                     ) : (
                       fmtZ(m.z)
                     )}

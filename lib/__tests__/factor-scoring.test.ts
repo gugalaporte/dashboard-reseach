@@ -148,6 +148,48 @@ describe("scoreFactors", () => {
     expect(low.value).toBeCloseTo(high.value!, 8);
     expect(low.breakdown.some((b) => b.key === "upsidePct")).toBe(false);
   });
+
+  it("ignora P/E, P/B e EV/EBITDA ≤ 0 no Value", () => {
+    const cheap = base({
+      ticker: "CHEAP",
+      ric: "C.SA",
+      sector: "Energy",
+      peFwd: 8,
+      peRatio: 8,
+      pbRatio: 1.5,
+      evEbitda: 6,
+    });
+    const expensive = base({
+      ticker: "EXPENSIVE",
+      ric: "E.SA",
+      sector: "Energy",
+      peFwd: 25,
+      peRatio: 25,
+      pbRatio: 1.5,
+      evEbitda: 6,
+    });
+    const loss = base({
+      ticker: "LOSS",
+      ric: "L.SA",
+      sector: "Energy",
+      peFwd: -1.01,
+      peRatio: -4,
+      pbRatio: -0.09,
+      evEbitda: 6,
+    });
+
+    const without = scoreFactors([cheap, expensive]);
+    const withLoss = scoreFactors([cheap, expensive, loss]);
+    const cheap0 = without.find((r) => r.ticker === "CHEAP")!;
+    const cheap1 = withLoss.find((r) => r.ticker === "CHEAP")!;
+    const lossRow = withLoss.find((r) => r.ticker === "LOSS")!;
+
+    expect(cheap1.value).toBeCloseTo(cheap0.value!, 8);
+    expect(lossRow.breakdown.find((b) => b.key === "peFwd")?.z).toBeNull();
+    expect(lossRow.breakdown.find((b) => b.key === "pbRatio")?.z).toBeNull();
+    expect(lossRow.breakdown.find((b) => b.key === "evEbitda")?.z).not.toBeNull();
+    expect(cheap1.value!).toBeGreaterThan(lossRow.value!);
+  });
 });
 
 describe("latestForwardByRic", () => {
