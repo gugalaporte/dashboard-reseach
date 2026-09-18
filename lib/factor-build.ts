@@ -46,12 +46,33 @@ function analystCount(snap: LsegDailySnapshotRow): number | null {
   return sum > 0 ? sum : null;
 }
 
+/**
+ * Último valor não-nulo por RIC (datas mais novas sobrescrevem).
+ * Snapshot da manhã às vezes chega sem day_volume; o screening usaria
+ * null e cortaria o universo inteiro no filtro de elegibilidade.
+ */
+function lastKnownByRic(
+  rows: LsegDailySnapshotRow[],
+  read: (row: LsegDailySnapshotRow) => number | null
+): Map<string, number> {
+  const sorted = [...rows].sort((a, b) =>
+    (a.as_of_date ?? "").localeCompare(b.as_of_date ?? "")
+  );
+  const map = new Map<string, number>();
+  for (const row of sorted) {
+    const v = read(row);
+    if (v != null) map.set(row.ric, v);
+  }
+  return map;
+}
+
 export function buildFactorInputs(
   companies: LsegCompanyRow[],
   snapshots: LsegDailySnapshotRow[],
   forward: LsegForwardEstimateRow[]
 ): FactorInput[] {
   const snaps = latestSnapshots(snapshots);
+  const lastVolume = lastKnownByRic(snapshots, (r) => num(r.day_volume));
   const fwdMap = latestForwardByRic(forward);
   const byRic = new Map(companies.map((c) => [c.ric, c]));
 
@@ -86,7 +107,7 @@ export function buildFactorInputs(
       dividendYield: num(snap.dividend_yield),
       dyFwd: num(fwd?.dy_fwd),
       marketCap: num(snap.market_cap),
-      dayVolume: num(snap.day_volume),
+      dayVolume: num(snap.day_volume) ?? lastVolume.get(snap.ric) ?? null,
       analystCount: analystCount(snap),
       inPortfolio: Boolean(company?.in_portfolio),
     });

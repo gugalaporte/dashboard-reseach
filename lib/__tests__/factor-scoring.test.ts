@@ -202,4 +202,42 @@ describe("buildFactorInputs", () => {
     expect(inputs[0]!.epsRev4wPct).toBe(1.5);
     expect(inputs[0]!.analystCount).toBe(12);
   });
+
+  it("usa day_volume do snapshot anterior se o mais recente vier vazio", () => {
+    const company = {
+      ticker: "PETR4",
+      ric: "PETR4.SA",
+      sector: "Energy",
+      name: "Petrobras",
+      gics_industry: null,
+      updated_at: null,
+    };
+    const baseSnap = {
+      ric: "PETR4.SA",
+      last_price: 48,
+      price_target: 56,
+      rating_label: "Buy",
+      upside_pct: 16,
+      pe_ratio: 6,
+      ev_ebitda: 4,
+      dividend_yield: 8,
+      revenue: 1,
+      ebitda: 1,
+      net_income: 1,
+      roic: 10,
+      roe: 20,
+      analyst_count: 12,
+    };
+    const inputs = buildFactorInputs(
+      [company],
+      [
+        { ...baseSnap, as_of_date: "2026-09-17", day_volume: 23_808_400 },
+        { ...baseSnap, as_of_date: "2026-09-18", day_volume: null },
+      ],
+      []
+    );
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]!.asOfDate).toBe("2026-09-18");
+    expect(inputs[0]!.dayVolume).toBe(23_808_400);
+  });
 });
