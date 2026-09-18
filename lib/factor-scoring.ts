@@ -126,7 +126,7 @@ export const FACTOR_FORMULA: Record<FactorId, string> = {
   quality:
     "Média dos z-scores no setor: ROE, margem EBITDA, dívida líquida/EBITDA (inv., menor é melhor).",
   value:
-    "Média dos z-scores no setor: P/E fwd ou P/E (inv., menor é melhor), P/B (inv.), EV/EBITDA (inv.), upside %.",
+    "Média dos z-scores no setor: P/E fwd ou P/E (inv., menor é melhor), P/B (inv.), EV/EBITDA (inv.).",
   momentum:
     "Média dos z-scores no setor: revisão EPS 4 semanas %, retorno 3M, retorno 6M.",
   carry:
@@ -308,7 +308,6 @@ const QUALITY_METRICS: MetricDef[] = [
 const VALUE_EXTRA: MetricDef[] = [
   { key: "pbRatio", label: "P/B", inverted: true },
   { key: "evEbitda", label: "EV/EBITDA", inverted: true },
-  { key: "upsidePct", label: "Upside %" },
 ];
 
 const MOMENTUM_METRICS: MetricDef[] = [
@@ -355,7 +354,6 @@ export function scoreFactors(
     peFwd: collectPeers(eligible, "peFwd"),
     pbRatio: collectPeers(eligible, "pbRatio"),
     evEbitda: collectPeers(eligible, "evEbitda"),
-    upsidePct: collectPeers(eligible, "upsidePct"),
     epsRev4wPct: collectPeers(eligible, "epsRev4wPct"),
     ret3m: collectPeers(eligible, "ret3m"),
     ret6m: collectPeers(eligible, "ret6m"),

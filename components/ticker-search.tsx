@@ -18,6 +18,7 @@ type Props = {
   value: string;
   onChange: (ticker: string) => void;
   placeholder?: string;
+  compact?: boolean;
 };
 
 /** Busca digitável de 1 ticker (combobox). */
@@ -26,17 +27,20 @@ export function TickerSearch({
   value,
   onChange,
   placeholder = "Digite o ticker…",
+  compact = false,
 }: Props) {
   const [open, setOpen] = React.useState(false);
+  const h = compact ? "h-8" : "h-10";
 
   return (
-    <div className="flex items-center gap-2 w-full max-w-sm">
+    <div className={cn("flex items-center gap-2 w-full", compact ? "max-w-[220px]" : "max-w-sm")}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             className={cn(
-              "group flex items-center gap-2 h-10 px-3 rounded-md border border-line bg-surface",
+              "group flex items-center gap-2 px-3 rounded-md border border-line bg-surface",
+              h,
               "hover:border-brand-soft transition text-left flex-1 min-w-0",
               "focus:outline-none focus:ring-2 focus:ring-brand-soft"
             )}
@@ -86,7 +90,10 @@ export function TickerSearch({
           type="button"
           aria-label="Limpar ticker"
           onClick={() => onChange("")}
-          className="h-10 w-10 shrink-0 grid place-items-center rounded-md border border-line text-ink/40 hover:text-ink hover:border-brand-soft transition"
+          className={cn(
+            "shrink-0 grid place-items-center rounded-md border border-line text-ink/40 hover:text-ink hover:border-brand-soft transition",
+            compact ? "h-8 w-8" : "h-10 w-10"
+          )}
         >
           <X className="h-4 w-4" />
         </button>

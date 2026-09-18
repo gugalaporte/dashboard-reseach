@@ -24,6 +24,7 @@ import { formatDateShort, formatNumber, formatNumberFull, formatValue } from "@/
 import { comparisonMetrics, summaryStats, type RotationBucket } from "@/lib/trade-analytics";
 import { AppHeader } from "@/components/app-header";
 import { TradeVolumeChart } from "@/components/trade-volume-chart";
+import { TradeTargetsSection } from "@/components/trade-targets-section";
 import { cn } from "@/lib/utils";
 import { Plus, TrendingDown, TrendingUp, Trash2 } from "lucide-react";
 
@@ -508,6 +509,10 @@ export function TradeQualityDashboard() {
           fromIso={dateFrom || data?.fromIso || ""}
           toIso={dateTo || data?.toIso || ""}
           isLoading={loading}
+        />
+
+        <TradeTargetsSection
+          extraTickers={[...new Set((data?.executions ?? []).map((e) => e.ric))]}
         />
 
         {/* Tabela execuções */}

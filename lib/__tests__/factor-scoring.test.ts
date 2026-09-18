@@ -137,6 +137,17 @@ describe("scoreFactors", () => {
     const exp = rows.find((r) => r.ticker === "EXPENSIVE")!;
     expect(cheap.value!).toBeGreaterThan(exp.value!);
   });
+
+  it("não usa upside no fator Value", () => {
+    const rows = scoreFactors([
+      base({ ticker: "LOW", ric: "L.SA", sector: "Energy", upsidePct: 5 }),
+      base({ ticker: "HIGH", ric: "H.SA", sector: "Energy", upsidePct: 200 }),
+    ]);
+    const low = rows.find((r) => r.ticker === "LOW")!;
+    const high = rows.find((r) => r.ticker === "HIGH")!;
+    expect(low.value).toBeCloseTo(high.value!, 8);
+    expect(low.breakdown.some((b) => b.key === "upsidePct")).toBe(false);
+  });
 });
 
 describe("latestForwardByRic", () => {
