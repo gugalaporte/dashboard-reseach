@@ -51,6 +51,12 @@ export async function GET(req: Request) {
 
     const fileName = (data?.file_name as string | null) ?? null;
     const filePath = (data?.file_path as string | null) ?? null;
+    if (searchParams.get("meta") === "1") {
+      return NextResponse.json(
+        { file_name: fileName, file_path: filePath },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
     const base = pdfBaseName(fileName, filePath);
     const abs = findLocalPdf({ fileName, filePath, fonte });
     if (!abs) return missingHtml(base);

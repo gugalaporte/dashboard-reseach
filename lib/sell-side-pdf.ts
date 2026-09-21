@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { foldName, pdfBaseName, samePdfName } from "./pdf-name";
+
+export { pdfBaseName, samePdfName };
 
 /** Trecho compartilhado no OneDrive de todo mundo. */
 export const SELL_SIDE_RELATIVE = path.join(
@@ -17,19 +20,19 @@ const FONTE_FOLDERS: Record<string, string[]> = {
   "Itaú BBA": ["itaú", "itau"],
 };
 
-function fold(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase();
-}
-
 function existsDir(p: string): boolean {
   try {
     return fs.statSync(p).isDirectory();
   } catch {
     return false;
   }
+}
+
+export function isPreferredFolder(folderName: string, fonte: string | null | undefined): boolean {
+  if (!fonte) return false;
+  const aliases = FONTE_FOLDERS[fonte] ?? [];
+  const key = foldName(folderName);
+  return aliases.some((a) => foldName(a) === key);
 }
 
 /** Candidatos: {home}\FINACAP\... e uma pasta abaixo (OneDrive). */
@@ -44,7 +47,7 @@ export function reportsCandidates(home = os.homedir()): string[] {
       if (!e.isDirectory()) continue;
       const dir = path.join(home, e.name);
       add(path.join(dir, SELL_SIDE_RELATIVE));
-      if (fold(e.name).includes(fold("FINACAP CONSULT FINANC MERC CAP LTDA"))) {
+      if (foldName(e.name).includes(foldName("FINACAP CONSULT FINANC MERC CAP LTDA"))) {
         add(
           path.join(
             dir,
@@ -76,30 +79,6 @@ export function reportsRoot(): string {
   return fromEnv || path.join(os.homedir(), SELL_SIDE_RELATIVE);
 }
 
-/** Nome do arquivo no disco: file_name do banco, senão o basename de file_path. */
-export function pdfBaseName(
-  fileName: string | null | undefined,
-  filePath: string | null | undefined
-): string | null {
-  const raw = (fileName?.trim() || filePath?.trim() || "").replace(/\\/g, "/");
-  if (!raw) return null;
-  const base = path.posix.basename(raw);
-  if (!base || base === "." || base === ".." || base.includes("..")) return null;
-  if (base.includes("/") || base.includes("\\")) return null;
-  return base;
-}
-
-export function samePdfName(a: string, b: string): boolean {
-  return fold(a) === fold(b);
-}
-
-export function isPreferredFolder(folderName: string, fonte: string | null | undefined): boolean {
-  if (!fonte) return false;
-  const aliases = FONTE_FOLDERS[fonte] ?? [];
-  const key = fold(folderName);
-  return aliases.some((a) => fold(a) === key);
-}
-
 function isInsideRoot(root: string, file: string): boolean {
   const rel = path.relative(path.resolve(root), path.resolve(file));
   return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
@@ -120,7 +99,7 @@ function listFiles(dir: string, depth: number, out: string[]): void {
   }
 }
 
-/** Procura o PDF nas pastas de banco em Sell Side_Reports. */
+/** Procura o PDF nas pastas de banco em Sell Side_Reports (só no Node local). */
 export function findLocalPdf(opts: {
   fileName?: string | null;
   filePath?: string | null;

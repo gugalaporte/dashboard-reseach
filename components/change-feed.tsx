@@ -10,6 +10,7 @@ import { FONTES, FONTE_SHORT_LABEL } from "@/lib/queries";
 import { sectorPt } from "@/lib/sector-labels";
 import { CompanySearch } from "@/components/company-search";
 import { SectorFilter } from "@/components/sector-filter";
+import { PdfOpenLink } from "@/components/pdf-open-link";
 import type { RevisionEvent, RevisionKindFilter, RevisionPeriodFilter } from "@/types/revisions";
 
 const PERIODS: RevisionPeriodFilter[] = ["24h", "7d", "30d", "90d"];
@@ -82,14 +83,6 @@ function eventSummary(e: RevisionEvent): string {
   }
   const tpVerb = (e.tp_change_pct ?? 0) >= 0 ? "Elevou Target" : "Cortou Target";
   return `${tpVerb} de ${prevTp} → ${currTp} (${pct})`;
-}
-
-function pdfHref(pdfId: number, fonte: string): string {
-  const qs = new URLSearchParams({
-    pdf_id: String(pdfId),
-    fonte,
-  });
-  return `/api/revisions/pdf?${qs.toString()}`;
 }
 
 interface ChangeFeedProps {
@@ -357,16 +350,14 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
                           </div>
                           <div className="min-w-0 flex-1 text-xs text-ink truncate">{eventSummary(e)}</div>
                           {e.prev_pdf_id != null && (
-                            <a
-                              href={pdfHref(e.prev_pdf_id, e.fonte)}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(ev) => ev.stopPropagation()}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity text-ink/50 hover:text-ink"
+                            <PdfOpenLink
+                              pdfId={e.prev_pdf_id}
+                              filePath={e.previous_file_path}
                               title={`Abrir PDF anterior (${formatDateLong(e.prev_report_date)})`}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity text-ink/50 hover:text-ink"
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
+                            </PdfOpenLink>
                           )}
                           <div className="w-28 shrink-0 flex items-center gap-2">
                             <div className={cn("font-mono tabular text-xs w-14 text-right", pctTone(e))}>
@@ -427,24 +418,22 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {selected.pdf_id != null && (
-                    <a
+                    <PdfOpenLink
+                      pdfId={selected.pdf_id}
+                      filePath={selected.current_file_path}
                       className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-line text-sm hover:bg-surface"
-                      href={pdfHref(selected.pdf_id, selected.fonte)}
-                      target="_blank"
-                      rel="noreferrer"
                     >
                       PDF atual <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                    </PdfOpenLink>
                   )}
                   {selected.prev_pdf_id != null && (
-                    <a
+                    <PdfOpenLink
+                      pdfId={selected.prev_pdf_id}
+                      filePath={selected.previous_file_path}
                       className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-line text-sm hover:bg-surface"
-                      href={pdfHref(selected.prev_pdf_id, selected.fonte)}
-                      target="_blank"
-                      rel="noreferrer"
                     >
                       PDF anterior <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                    </PdfOpenLink>
                   )}
                 </div>
                 <div>

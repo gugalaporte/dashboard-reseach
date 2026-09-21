@@ -16,6 +16,7 @@ import type { LivePricesMap } from "@/lib/use-live-prices";
 import { formatDateLong, formatDateShort, formatNumber, formatValue } from "@/lib/format";
 import { FileText, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PdfOpenLink } from "@/components/pdf-open-link";
 
 interface Props {
   empresa: string | null;
@@ -311,12 +312,11 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
                 <ul className="space-y-2">
                   {pdfs.map((p) => (
                     <li key={p.id}>
-                      <a
-                        href={`/api/revisions/pdf?pdf_id=${p.id}`}
-                        target="_blank"
-                        rel="noreferrer"
+                      <PdfOpenLink
+                        pdfId={p.id}
+                        fileName={p.file_name}
                         title={p.file_name}
-                        className="flex items-start gap-3 rounded-md border border-line bg-surface-soft p-3 hover:bg-brand/5 transition"
+                        className="flex w-full items-start gap-3 rounded-md border border-line bg-surface-soft p-3 hover:bg-brand/5 transition"
                       >
                         <FileText className="h-4 w-4 mt-0.5 text-brand flex-shrink-0" />
                         <div className="min-w-0 flex-1">
@@ -326,7 +326,7 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
                           </div>
                         </div>
                         <ExternalLink className="h-3.5 w-3.5 mt-0.5 text-ink/35 flex-shrink-0" />
-                      </a>
+                      </PdfOpenLink>
                     </li>
                   ))}
                 </ul>
