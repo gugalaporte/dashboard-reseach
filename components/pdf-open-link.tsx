@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { openLocalPdf } from "@/lib/local-pdf-access";
+import { openLocalPdf, tryOpenServerPdf } from "@/lib/local-pdf-access";
 import { pdfNamesToTry } from "@/lib/pdf-name";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,7 @@ export function PdfOpenLink({ className, title, children, ...props }: Props) {
     if (busy) return;
     setBusy(true);
     try {
+      if (props.pdfId != null && (await tryOpenServerPdf(props.pdfId))) return;
       const names = await namesForPdf(props);
       await openLocalPdf(names.fileName, names.filePath);
     } catch (err) {

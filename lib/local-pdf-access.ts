@@ -6,6 +6,9 @@ const DB_NAME = "finacap-pdf";
 const STORE = "handles";
 const HANDLE_KEY = "sell-side";
 
+const FOLDER_HINT =
+  "Na primeira vez, selecione a pasta Sell Side_Reports:\nPesquisa - Documentos → 10_Dados_Primários → Sell Side_Reports\n(não use a pasta Documentos)";
+
 type DirHandle = FileSystemDirectoryHandle & {
   entries: () => AsyncIterableIterator<[string, FileSystemHandle]>;
   queryPermission?: (d: { mode: "read" }) => Promise<PermissionState>;
@@ -80,17 +83,35 @@ async function findFile(dir: DirHandle, want: string, depth: number): Promise<Fi
   return null;
 }
 
-async function resolveFolder(forcePick: boolean): Promise<DirHandle> {
-  if (!forcePick) {
-    const saved = await loadHandle();
-    if (saved && (await ensureRead(saved))) return saved;
-  }
-  const picked = await pickFolder();
-  await saveHandle(picked);
-  return picked;
+async function savedFolder(): Promise<DirHandle | null> {
+  const saved = await loadHandle();
+  if (saved && (await ensureRead(saved))) return saved;
+  return null;
 }
 
-/** Abre o PDF a partir da pasta OneDrive autorizada neste navegador. */
+async function searchNames(dir: DirHandle, names: string[]): Promise<File | null> {
+  for (const n of names) {
+    const file = await findFile(dir, n, 6);
+    if (file) return file;
+  }
+  return null;
+}
+
+function openBlob(file: File): void {
+  window.open(URL.createObjectURL(file), "_blank", "noopener,noreferrer");
+}
+
+/** Se o servidor local achar o arquivo, abre sem seletor. */
+export async function tryOpenServerPdf(pdfId: number): Promise<boolean> {
+  const res = await fetch(`/api/revisions/pdf?pdf_id=${pdfId}`, { cache: "no-store" });
+  const ct = res.headers.get("content-type") ?? "";
+  if (!res.ok || !ct.includes("pdf")) return false;
+  const blob = await res.blob();
+  window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
+  return true;
+}
+
+/** Abre o PDF da pasta OneDrive já autorizada; pede a pasta só se ainda não houver. */
 export async function openLocalPdf(
   fileName?: string | null,
   filePath?: string | null
@@ -98,24 +119,27 @@ export async function openLocalPdf(
   const names = pdfNamesToTry(fileName, filePath);
   if (names.length === 0) throw new Error("Este registro não tem nome de PDF.");
 
-  let dir = await resolveFolder(false);
-  let file: File | null = null;
-  for (const n of names) {
-    file = await findFile(dir, n, 5);
-    if (file) break;
+  let dir = await savedFolder();
+  if (!dir) {
+    window.alert(FOLDER_HINT);
+    dir = await pickFolder();
+    await saveHandle(dir);
   }
+
+  let file = await searchNames(dir, names);
   if (!file) {
-    dir = await resolveFolder(true);
-    for (const n of names) {
-      file = await findFile(dir, n, 5);
-      if (file) break;
-    }
+    const again = window.confirm(
+      `Não achei ${names.join(" / ")} nessa pasta.\n\nSelecionar Sell Side_Reports agora?`
+    );
+    if (!again) return;
+    dir = await pickFolder();
+    await saveHandle(dir);
+    file = await searchNames(dir, names);
   }
   if (!file) {
     throw new Error(
-      `Não achei ${names.join(" / ")} na pasta selecionada. Escolha Sell Side_Reports (pastas btg, bradesco, itaú, safra).`
+      `Não achei ${names.join(" / ")}. A pasta certa é Sell Side_Reports (btg, bradesco, itaú, safra).`
     );
   }
-  const url = URL.createObjectURL(file);
-  window.open(url, "_blank", "noopener,noreferrer");
+  openBlob(file);
 }
