@@ -53,6 +53,7 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
     const map = new Map<string, Map<string, MetricaRow>>();
     for (const r of hist) {
       if (r.metrica === "Target Price") continue;
+      if (!r.periodo || !r.metrica) continue;
       pSet.add(r.periodo);
       if (!map.has(r.metrica)) map.set(r.metrica, new Map());
       const per = map.get(r.metrica)!;
@@ -66,7 +67,7 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
       const yA = parseInt(a, 10);
       const yB = parseInt(b, 10);
       if (!Number.isNaN(yA) && !Number.isNaN(yB) && yA !== yB) return yA - yB;
-      return a.localeCompare(b);
+      return String(a).localeCompare(String(b));
     });
     return { periodos, byMetrica: map };
   }, [hist]);

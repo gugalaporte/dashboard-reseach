@@ -84,17 +84,12 @@ function eventSummary(e: RevisionEvent): string {
   return `${tpVerb} de ${prevTp} → ${currTp} (${pct})`;
 }
 
-function supabaseDashboardUrl(): string | null {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!base) return null;
-  try {
-    const u = new URL(base);
-    const projectRef = u.hostname.split(".")[0];
-    if (!projectRef) return null;
-    return `https://supabase.com/dashboard/project/${projectRef}`;
-  } catch {
-    return null;
-  }
+function pdfHref(pdfId: number, fonte: string): string {
+  const qs = new URLSearchParams({
+    pdf_id: String(pdfId),
+    fonte,
+  });
+  return `/api/revisions/pdf?${qs.toString()}`;
 }
 
 interface ChangeFeedProps {
@@ -204,7 +199,6 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
     }
     return Array.from(map.entries()).map(([date, events]) => ({ date, events }));
   }, [visible]);
-  const dashboardUrl = React.useMemo(() => supabaseDashboardUrl(), []);
 
   function toggleFonte(fonte: string) {
     setFontes((prev) => (prev.includes(fonte) ? prev.filter((x) => x !== fonte) : [...prev, fonte]));
@@ -364,7 +358,7 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
                           <div className="min-w-0 flex-1 text-xs text-ink truncate">{eventSummary(e)}</div>
                           {e.prev_pdf_id != null && (
                             <a
-                              href={`/api/revisions/pdf?pdf_id=${e.prev_pdf_id}`}
+                              href={pdfHref(e.prev_pdf_id, e.fonte)}
                               target="_blank"
                               rel="noreferrer"
                               onClick={(ev) => ev.stopPropagation()}
@@ -435,7 +429,7 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
                   {selected.pdf_id != null && (
                     <a
                       className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-line text-sm hover:bg-surface"
-                      href={`/api/revisions/pdf?pdf_id=${selected.pdf_id}`}
+                      href={pdfHref(selected.pdf_id, selected.fonte)}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -445,21 +439,11 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
                   {selected.prev_pdf_id != null && (
                     <a
                       className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-line text-sm hover:bg-surface"
-                      href={`/api/revisions/pdf?pdf_id=${selected.prev_pdf_id}`}
+                      href={pdfHref(selected.prev_pdf_id, selected.fonte)}
                       target="_blank"
                       rel="noreferrer"
                     >
                       PDF anterior <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  )}
-                  {dashboardUrl && (
-                    <a
-                      className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-line text-sm hover:bg-surface"
-                      href={dashboardUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Ver no Supabase <ExternalLink className="h-3.5 w-3.5" />
                     </a>
                   )}
                 </div>
