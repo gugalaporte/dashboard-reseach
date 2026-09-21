@@ -5,16 +5,19 @@ import { openLocalPdf } from "@/lib/local-pdf-access";
 import { pdfNamesToTry } from "@/lib/pdf-name";
 import { cn } from "@/lib/utils";
 
-type Props = {
+type PdfRef = {
   pdfId?: number | null;
   fileName?: string | null;
   filePath?: string | null;
+};
+
+type Props = PdfRef & {
   className?: string;
   title?: string;
   children: React.ReactNode;
 };
 
-async function namesForPdf(props: Props): Promise<{ fileName: string | null; filePath: string | null }> {
+async function namesForPdf(props: PdfRef): Promise<{ fileName: string | null; filePath: string | null }> {
   if (pdfNamesToTry(props.fileName, props.filePath).length > 0) {
     return { fileName: props.fileName ?? null, filePath: props.filePath ?? null };
   }
