@@ -101,7 +101,9 @@ function FactorTipBody({ row, factor }: { row: FactorRow; factor: FactorId }) {
   return (
     <div className="space-y-2">
       <p className="text-surface-soft/70 text-[10px] leading-snug">{FACTOR_FORMULA[factor]}</p>
-      <p className="font-medium text-surface-soft">Média dos z-scores (setor: {sector})</p>
+      <p className="font-medium text-surface-soft">
+        Média dos z-scores (universo na tela{sector !== "Sem setor" ? ` · ${sector}` : ""})
+      </p>
       {metrics.length === 0 ? (
         <p className="text-surface-soft/50">sem dados para este fator</p>
       ) : (
@@ -288,8 +290,8 @@ function ClassTipBody({ row }: { row: FactorRow }) {
   return (
     <div className="space-y-2">
       <p className="text-surface-soft/70 text-[10px] leading-snug">
-        Classe pelo percentil do score composto entre as empresas elegíveis
-        (universo completo do screening, sem filtro de setor).
+        Classe pelo percentil do score composto entre as empresas exibidas
+        (filtros atuais da tela).
       </p>
       <ul className="space-y-0.5 font-mono tabular text-[10px]">
         <li className="flex justify-between gap-3">

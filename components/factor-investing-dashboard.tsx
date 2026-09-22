@@ -18,6 +18,8 @@ import { sectorPt } from "@/lib/sector-labels";
 import {
   DEFAULT_ELIGIBILITY,
   DEFAULT_WEIGHT_PCT,
+  scoreFactors,
+  weightsFromPct,
   type FactorClass,
   type FactorRow,
   type FactorWeightPct,
@@ -135,12 +137,21 @@ export function FactorInvestingDashboard() {
     }
   };
 
-  const rows = React.useMemo(() => {
+  const scored = React.useMemo(() => {
     if (!data) return [];
     let list = data.rows;
     if (onlyEligible) list = list.filter((r) => r.eligible || r.inPortfolio);
     if (onlyPortfolio) list = list.filter((r) => r.inPortfolio);
     if (setor) list = list.filter((r) => r.sector === setor);
+    return scoreFactors(
+      list.map((r) => r.raw),
+      data.eligibility,
+      weightsFromPct(data.weights)
+    );
+  }, [data, onlyEligible, onlyPortfolio, setor]);
+
+  const rows = React.useMemo(() => {
+    let list = scored;
     if (classFilter !== "all") list = list.filter((r) => r.factorClass === classFilter);
 
     const dir = sortDir === "asc" ? 1 : -1;
@@ -153,17 +164,17 @@ export function FactorInvestingDashboard() {
       if (bv == null) return -1;
       return dir * (Number(av) - Number(bv));
     });
-  }, [data, onlyEligible, onlyPortfolio, setor, classFilter, sortKey, sortDir]);
+  }, [scored, classFilter, sortKey, sortDir]);
 
   const counts = React.useMemo(() => {
-    const eligible = data?.rows.filter((r) => r.eligible) ?? [];
+    const eligible = scored.filter((r) => r.eligible);
     return {
       total: eligible.length,
       A: eligible.filter((r) => r.factorClass === "A").length,
       B: eligible.filter((r) => r.factorClass === "B").length,
       C: eligible.filter((r) => r.factorClass === "C").length,
     };
-  }, [data]);
+  }, [scored]);
 
   const appliedWeights = data?.weights ?? DEFAULT_WEIGHT_PCT;
 
@@ -304,7 +315,7 @@ export function FactorInvestingDashboard() {
             <p className="text-xs text-ink/45 mt-0.5 leading-relaxed">
               Quality {appliedWeights.quality}% · Value {appliedWeights.value}% · Carry{" "}
               {appliedWeights.carry}% · Momentum {appliedWeights.momentum}% — z-score
-              por setor · ND/EBITDA ignore bancos/financeiras
+              no universo da tela · ND/EBITDA ignore bancos/financeiras
             </p>
           </div>
 

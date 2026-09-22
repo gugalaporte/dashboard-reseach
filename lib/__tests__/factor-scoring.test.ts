@@ -170,6 +170,36 @@ describe("scoreFactors", () => {
     expect(cheap.value!).toBeGreaterThan(exp.value!);
   });
 
+  it("compara o universo inteiro, não só o setor", () => {
+    const energyCheap = base({
+      ticker: "PETR4",
+      ric: "PETR4.SA",
+      sector: "Energy",
+      peRatio: 6,
+      peFwd: null,
+    });
+    const energyPeer = base({
+      ticker: "PRIO3",
+      ric: "PRIO3.SA",
+      sector: "Energy",
+      peRatio: 8,
+      peFwd: null,
+    });
+    const retailExpensive = base({
+      ticker: "LREN3",
+      ric: "LREN3.SA",
+      sector: "Retail",
+      peRatio: 30,
+      peFwd: null,
+    });
+    const all = scoreFactors([energyCheap, energyPeer, retailExpensive]);
+    const onlyEnergy = scoreFactors([energyCheap, energyPeer]);
+    const petrAll = all.find((r) => r.ticker === "PETR4")!;
+    const petrEnergy = onlyEnergy.find((r) => r.ticker === "PETR4")!;
+    expect(petrAll.value).not.toBeCloseTo(petrEnergy.value!, 8);
+    expect(all.find((r) => r.ticker === "LREN3")!.value!).toBeLessThan(petrAll.value!);
+  });
+
   it("não usa upside no fator Value", () => {
     const rows = scoreFactors([
       base({ ticker: "LOW", ric: "L.SA", sector: "Energy", upsidePct: 5 }),

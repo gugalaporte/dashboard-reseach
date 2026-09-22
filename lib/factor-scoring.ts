@@ -1,4 +1,4 @@
-/** Scoring multifatorial (z-score por setor) — read-only, puro. */
+/** Scoring multifatorial (z-score no universo passado) — read-only, puro. */
 
 export type FactorClass = "A" | "B" | "C";
 
@@ -124,15 +124,15 @@ export const FACTOR_LABELS: Record<FactorId, string> = {
 /** Descrição genérica da composição de cada fator (para tooltip). */
 export const FACTOR_FORMULA: Record<FactorId, string> = {
   quality:
-    "Média dos z-scores no setor: ROE, margem EBITDA, dívida líquida/EBITDA (inv., menor é melhor).",
+    "Média dos z-scores no universo da tela: ROE, margem EBITDA, dívida líquida/EBITDA (inv., menor é melhor).",
   value:
-    "Média dos z-scores no setor: P/E fwd ou P/E (inv., menor é melhor), P/B (inv.), EV/EBITDA (inv.). Múltiplo ≤ 0 é ignorado.",
+    "Média dos z-scores no universo da tela: P/E fwd ou P/E (inv., menor é melhor), P/B (inv.), EV/EBITDA (inv.). Múltiplo ≤ 0 é ignorado.",
   momentum:
-    "Média dos z-scores no setor: revisão EPS 4 semanas %, retorno 3M, retorno 6M.",
+    "Média dos z-scores no universo da tela: revisão EPS 4 semanas %, retorno 3M, retorno 6M.",
   carry:
-    "Z-score no setor: DY fwd ou dividend yield.",
+    "Z-score no universo da tela: DY fwd ou dividend yield.",
   liquidity:
-    "Média dos z-scores no setor: market cap, volume diário.",
+    "Média dos z-scores no universo da tela: market cap, volume diário.",
 };
 
 export type FactorRow = {
@@ -167,7 +167,7 @@ function std(vals: number[], m: number): number {
   return Math.sqrt(v);
 }
 
-/** Z-score; null se valor ausente ou desvio zero no setor. */
+/** Z-score; null se valor ausente. Um par só → 0. */
 export function zScore(value: number | null, peers: number[]): number | null {
   if (value == null || !Number.isFinite(value)) return null;
   if (peers.length < 2) return 0;
@@ -232,30 +232,21 @@ function usableMetric(key: keyof FactorInput, v: unknown): v is number {
   return true;
 }
 
-function collectPeers(
-  rows: FactorInput[],
-  key: keyof FactorInput
-): Map<string, number[]> {
-  const map = new Map<string, number[]>();
+function collectPeers(rows: FactorInput[], key: keyof FactorInput): number[] {
+  const list: number[] = [];
   for (const r of rows) {
-    const sector = r.sector?.trim() || "Sem setor";
     const v = r[key];
-    if (!usableMetric(key, v)) continue;
-    const list = map.get(sector) ?? [];
-    list.push(v);
-    map.set(sector, list);
+    if (usableMetric(key, v)) list.push(v);
   }
-  return map;
+  return list;
 }
 
 function metricZ(
   row: FactorInput,
   key: keyof FactorInput,
-  peersBySector: Map<string, number[]>,
+  peers: number[],
   inverted: boolean
 ): number | null {
-  const sector = row.sector?.trim() || "Sem setor";
-  const peers = peersBySector.get(sector) ?? [];
   const raw = row[key];
   if (!usableMetric(key, raw)) return null;
   const z = zScore(raw, peers);
@@ -264,7 +255,7 @@ function metricZ(
 }
 
 /** Value: pe_fwd invertido se existir e for > 0, senão pe_ratio. */
-function valuePeZ(row: FactorInput, pePeers: Map<string, number[]>, peFwdPeers: Map<string, number[]>): {
+function valuePeZ(row: FactorInput, pePeers: number[], peFwdPeers: number[]): {
   z: number | null;
   key: string;
   label: string;
@@ -308,7 +299,7 @@ function valuePeZ(row: FactorInput, pePeers: Map<string, number[]>, peFwdPeers: 
 }
 
 /** Carry: dy_fwd se existir, senão dividend_yield. */
-function carryYieldZ(row: FactorInput, dyPeers: Map<string, number[]>, dyFwdPeers: Map<string, number[]>): {
+function carryYieldZ(row: FactorInput, dyPeers: number[], dyFwdPeers: number[]): {
   z: number | null;
   key: string;
   label: string;
@@ -370,7 +361,7 @@ export function classifyByPercentile(p: number): FactorClass {
 }
 
 /**
- * Calcula z-scores por setor, fatores e score composto.
+ * Calcula z-scores no universo recebido (o que a tela está mostrando).
  * Só empresas elegíveis entram na normalização e no ranking de classe.
  */
 export function scoreFactors(
@@ -380,7 +371,7 @@ export function scoreFactors(
 ): FactorRow[] {
   const eligible = inputs.filter((r) => isEligible(r, cfg).ok);
 
-  const peerMaps: Record<string, Map<string, number[]>> = {
+  const peerMaps: Record<string, number[]> = {
     roe: collectPeers(eligible, "roe"),
     ebitdaMargin: collectPeers(eligible, "ebitdaMargin"),
     netDebtEbitda: collectPeers(eligible, "netDebtEbitda"),
