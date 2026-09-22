@@ -14,7 +14,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { sectorPt } from "@/lib/sector-labels";
 import {
   DEFAULT_ELIGIBILITY,
   DEFAULT_WEIGHT_PCT,
@@ -384,7 +383,7 @@ export function FactorInvestingDashboard() {
                         )}
                       </TableCell>
                       <TableCell className="text-[11px] text-ink/55 max-w-[140px] truncate">
-                        {r.sector ? sectorPt(r.sector) : "–"}
+                        {r.sector || "–"}
                       </TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                         <FactorScoreCell row={r} factor="quality" />

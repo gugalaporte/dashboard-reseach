@@ -7,7 +7,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { sectorPt } from "@/lib/sector-labels";
 
 interface Props {
   options: string[];
@@ -15,8 +14,7 @@ interface Props {
   onChange: (value: string | undefined) => void;
 }
 
-// Filtro simples por setor (single-select).
-// O value guarda o setor bruto vindo do banco; o label exibido e traduzido.
+// Filtro simples por setor. Label = nome do banco (LSEG), sem traduzir.
 export function SectorFilter({ options, value, onChange }: Props) {
   return (
     <Select
@@ -32,7 +30,7 @@ export function SectorFilter({ options, value, onChange }: Props) {
         <SelectItem value="__all__">Todos setores</SelectItem>
         {options.map((sector) => (
           <SelectItem key={sector} value={sector}>
-            {sectorPt(sector)}
+            {sector}
           </SelectItem>
         ))}
       </SelectContent>

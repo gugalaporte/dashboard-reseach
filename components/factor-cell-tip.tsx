@@ -3,7 +3,6 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { formatNumber } from "@/lib/format";
-import { sectorPt } from "@/lib/sector-labels";
 import {
   FACTOR_FORMULA,
   FACTOR_LABELS,
@@ -96,7 +95,7 @@ function HoverTip({
 function FactorTipBody({ row, factor }: { row: FactorRow; factor: FactorId }) {
   const metrics = metricsForFactor(row, factor);
   const score = row[factor];
-  const sector = row.sector ? sectorPt(row.sector) : "Sem setor";
+  const sector = row.sector?.trim() || "Sem setor";
 
   return (
     <div className="space-y-2">

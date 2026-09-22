@@ -4,7 +4,6 @@ import { Star } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber } from "@/lib/format";
-import { sectorPt } from "@/lib/sector-labels";
 import {
   type FactorClass,
   type FactorRow,
@@ -89,7 +88,7 @@ export function FactorMobileList({ data, isLoading, onRowClick }: Props) {
                     )}
                   </div>
                   <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-ink/45 truncate">
-                    {row.sector ? sectorPt(row.sector) : "Sem setor"}
+                    {row.sector || "Sem setor"}
                     {!row.eligible && row.ineligibleReason
                       ? ` · ${row.ineligibleReason}`
                       : ""}
