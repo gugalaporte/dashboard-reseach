@@ -9,8 +9,18 @@ export type TradeTarget = {
   side: TradeSide;
   amountType: TradeAmountType;
   amount: number;
+  startDate: string | null;
+  dueDate: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Meta menos o executado no intervalo (qty ou R$), só Mauritsstad. */
+  remaining: number | null;
+  /** VWAP das execuções do mesmo lado no intervalo. */
+  avgPrice: number | null;
+  /** Último fechamento do papel. */
+  currentPrice: number | null;
+  /** % vs preço médio: compra sobe com o papel; venda ganha se cair. */
+  pnlPct: number | null;
 };
 
 export type TradeTargetInput = {
@@ -18,6 +28,8 @@ export type TradeTargetInput = {
   side: TradeSide;
   amountType: TradeAmountType;
   amount: number;
+  startDate: string;
+  dueDate: string;
 };
 
 export type TradeTargetRow = {
@@ -26,6 +38,8 @@ export type TradeTargetRow = {
   side: string;
   amount_type: string;
   amount: number | string;
+  start_date?: string | null;
+  due_date?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -72,6 +86,15 @@ export function parseAmount(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/** Data ISO YYYY-MM-DD. */
+export function parseDate(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const t = Date.parse(`${s}T00:00:00`);
+  return Number.isFinite(t) ? s : null;
+}
+
 export function parseTargetInput(body: unknown): TradeTargetInput | string {
   if (!body || typeof body !== "object") return "Body JSON inválido";
   const raw = body as Record<string, unknown>;
@@ -83,7 +106,12 @@ export function parseTargetInput(body: unknown): TradeTargetInput | string {
   if (!amountType) return "amountType deve ser qty ou value";
   const amount = parseAmount(raw.amount);
   if (amount == null) return "amount deve ser um número maior que zero";
-  return { ticker, side, amountType, amount };
+  const startDate = parseDate(raw.startDate);
+  if (!startDate) return "data inicial inválida";
+  const dueDate = parseDate(raw.dueDate);
+  if (!dueDate) return "data 'fazer até' inválida";
+  if (dueDate < startDate) return "fazer até deve ser igual ou depois da data inicial";
+  return { ticker, side, amountType, amount, startDate, dueDate };
 }
 
 export function rowToTarget(row: TradeTargetRow): TradeTarget {
@@ -94,7 +122,13 @@ export function rowToTarget(row: TradeTargetRow): TradeTarget {
     side: parseSide(row.side) ?? "buy",
     amountType: parseAmountType(row.amount_type) ?? "qty",
     amount,
+    startDate: parseDate(row.start_date) ?? null,
+    dueDate: parseDate(row.due_date) ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    remaining: null,
+    avgPrice: null,
+    currentPrice: null,
+    pnlPct: null,
   };
 }

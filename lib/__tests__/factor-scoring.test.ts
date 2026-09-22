@@ -29,7 +29,7 @@ function base(partial: Partial<FactorInput> & Pick<FactorInput, "ticker" | "ric"
     dividendYield: 4,
     dyFwd: null,
     marketCap: 50e9,
-    dayVolume: 500_000,
+    dayVolume: 2_000_000,
     analystCount: 8,
     inPortfolio: false,
     ...partial,
@@ -75,6 +75,38 @@ describe("scoreFactors", () => {
     expect(ranked).toHaveLength(2);
     expect(ranked[0]!.score!).toBeGreaterThanOrEqual(ranked[1]!.score!);
     expect(ranked.every((r) => r.factorClass != null)).toBe(true);
+  });
+
+  it("empresa em carteira não cai por volume abaixo do mínimo", () => {
+    const rows = scoreFactors(
+      [
+        base({
+          ticker: "VTRU3",
+          ric: "VTRU3.SA",
+          sector: "Consumer",
+          dayVolume: 100,
+          inPortfolio: true,
+        }),
+      ],
+      { minDayVolume: 1_000_000, maxNetDebtEbitda: 8 }
+    );
+    expect(rows[0]!.eligible).toBe(true);
+  });
+
+  it("fora da carteira ainda cai por volume baixo", () => {
+    const rows = scoreFactors(
+      [
+        base({
+          ticker: "FOO3",
+          ric: "FOO3.SA",
+          sector: "Consumer",
+          dayVolume: 100,
+          inPortfolio: false,
+        }),
+      ],
+      { minDayVolume: 1_000_000, maxNetDebtEbitda: 8 }
+    );
+    expect(rows[0]!.eligible).toBe(false);
   });
 
   it("não corta banco por ND/EBITDA alto", () => {

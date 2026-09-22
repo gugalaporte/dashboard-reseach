@@ -8,7 +8,7 @@ export type FactorEligibility = {
 };
 
 export const DEFAULT_ELIGIBILITY: FactorEligibility = {
-  minDayVolume: 20_000,
+  minDayVolume: 1_000_000,
   maxNetDebtEbitda: 8,
 };
 
@@ -188,7 +188,8 @@ export function isEligible(
   cfg: FactorEligibility
 ): { ok: boolean; reason?: string } {
   const vol = row.dayVolume;
-  if (vol == null || vol < cfg.minDayVolume) {
+  // Carteira Finacap sempre passa no volume — o piso não as descarta.
+  if (!row.inPortfolio && (vol == null || vol < cfg.minDayVolume)) {
     return { ok: false, reason: `Volume < ${cfg.minDayVolume}` };
   }
   const analysts = row.analystCount ?? 0;

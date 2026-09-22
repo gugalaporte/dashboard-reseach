@@ -22,13 +22,27 @@ import {
 } from "@/components/ui/table";
 import { TickerSearch } from "@/components/ticker-search";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatNumber, formatValue } from "@/lib/format";
-import { parseAmount, type TradeAmountType, type TradeSide, type TradeTarget } from "@/lib/trade-targets";
+import { formatDateShort, formatNumber, formatValue } from "@/lib/format";
+import { parseAmount, parseDate, type TradeAmountType, type TradeSide, type TradeTarget } from "@/lib/trade-targets";
 import { cn } from "@/lib/utils";
 
 type Props = { extraTickers?: string[] };
 
-const EMPTY = { ticker: "", side: "" as "" | TradeSide, amountType: "qty" as TradeAmountType, amount: "" };
+function formatAmount(type: TradeAmountType, n: number | null | undefined): string {
+  if (n == null) return "–";
+  return type === "value"
+    ? formatValue(n, "money", "R$")
+    : formatNumber(n, n % 1 === 0 ? 0 : 2);
+}
+
+const EMPTY = {
+  ticker: "",
+  side: "" as "" | TradeSide,
+  amountType: "qty" as TradeAmountType,
+  amount: "",
+  startDate: "",
+  dueDate: "",
+};
 
 export function TradeTargetsSection({ extraTickers = [] }: Props) {
   const [targets, setTargets] = React.useState<TradeTarget[]>([]);
@@ -74,7 +88,13 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
     };
   }, [reload]);
 
-  const canSave = Boolean(draft.ticker && draft.side && parseAmount(draft.amount));
+  const canSave = Boolean(
+    draft.ticker &&
+      draft.side &&
+      parseAmount(draft.amount) &&
+      parseDate(draft.startDate) &&
+      parseDate(draft.dueDate)
+  );
 
   const save = async () => {
     if (!canSave || saving) return;
@@ -89,6 +109,8 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
           side: draft.side,
           amountType: draft.amountType,
           amount: draft.amount,
+          startDate: draft.startDate,
+          dueDate: draft.dueDate,
         }),
       });
       const json = (await res.json()) as TradeTarget & { error?: string };
@@ -121,7 +143,7 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
       <div className="px-4 py-3 border-b border-line bg-surface">
         <h2 className="font-display text-[15px] text-ink">Metas de Compra/Venda</h2>
         <p className="text-[11px] text-ink/50 mt-0.5">
-          Uma meta por papel e lado · salvar de novo atualiza o valor
+          Fundo FINACAP MAURITSSTAD FIF - CIA · restante e preço médio no intervalo das datas
         </p>
       </div>
 
@@ -178,6 +200,24 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
             className="w-[140px] h-8 text-xs bg-surface border-line tabular"
           />
         </div>
+        <div className="space-y-1">
+          <label className="text-[10px] uppercase tracking-wide text-ink/50">Data inicial</label>
+          <Input
+            type="date"
+            value={draft.startDate}
+            onChange={(e) => setDraft((p) => ({ ...p, startDate: e.target.value }))}
+            className="w-[150px] h-8 text-xs bg-surface border-line tabular"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] uppercase tracking-wide text-ink/50">Fazer até</label>
+          <Input
+            type="date"
+            value={draft.dueDate}
+            onChange={(e) => setDraft((p) => ({ ...p, dueDate: e.target.value }))}
+            className="w-[150px] h-8 text-xs bg-surface border-line tabular"
+          />
+        </div>
         <Button type="button" size="sm" className="h-8 text-xs gap-1.5" disabled={!canSave || saving} onClick={save}>
           <Plus className="w-3.5 h-3.5" />
           {saving ? "Salvando…" : "Salvar"}
@@ -192,7 +232,18 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
         <Table>
           <TableHeader>
             <TableRow className="bg-navy hover:bg-navy border-none">
-              {["Papel", "Lado", "Tipo", "Meta", ""].map((h) => (
+              {[
+                "Papel",
+                "Lado",
+                "Tipo",
+                "Meta",
+                "Restante para a meta",
+                "Preço médio",
+                "Preço atual",
+                "Data inicial",
+                "Fazer até",
+                "",
+              ].map((h) => (
                 <TableHead
                   key={h || "actions"}
                   className="text-[9px] uppercase tracking-[0.14em] text-surface-soft/80 font-medium h-9 text-center"
@@ -205,13 +256,13 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-8">
+                <TableCell colSpan={10} className="py-8">
                   <Skeleton className="h-6 w-full" />
                 </TableCell>
               </TableRow>
             ) : targets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-ink/50 py-8 text-sm">
+                <TableCell colSpan={10} className="text-center text-ink/50 py-8 text-sm">
                   Nenhuma meta cadastrada.
                 </TableCell>
               </TableRow>
@@ -236,9 +287,45 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
                     {t.amountType === "qty" ? "Quantidade" : "Valor"}
                   </TableCell>
                   <TableCell className="text-center tabular text-sm font-medium text-ink">
-                    {t.amountType === "value"
-                      ? formatValue(t.amount, "money", "R$")
-                      : formatNumber(t.amount, t.amount % 1 === 0 ? 0 : 2)}
+                    {formatAmount(t.amountType, t.amount)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "text-center tabular text-sm font-medium",
+                      t.remaining != null && t.remaining <= 0 ? "text-brand" : "text-ink"
+                    )}
+                  >
+                    {formatAmount(t.amountType, t.remaining)}
+                  </TableCell>
+                  <TableCell className="text-center tabular text-sm text-ink">
+                    {t.avgPrice != null ? formatValue(t.avgPrice, "money", "R$") : "–"}
+                  </TableCell>
+                  <TableCell className="text-center tabular">
+                    <div className="text-sm text-ink">
+                      {t.currentPrice != null ? formatValue(t.currentPrice, "money", "R$") : "–"}
+                    </div>
+                    <div
+                      className={cn(
+                        "text-[11px] font-medium",
+                        t.pnlPct == null
+                          ? "text-ink/40"
+                          : t.pnlPct > 0
+                            ? "text-emerald-700"
+                            : t.pnlPct < 0
+                              ? "text-red-700"
+                              : "text-ink/60"
+                      )}
+                    >
+                      {t.pnlPct == null
+                        ? "–"
+                        : `${t.pnlPct > 0 ? "+" : ""}${formatValue(t.pnlPct, "pct")}`}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center tabular text-xs text-ink/70">
+                    {t.startDate ? formatDateShort(t.startDate) : "–"}
+                  </TableCell>
+                  <TableCell className="text-center tabular text-xs text-ink/70">
+                    {t.dueDate ? formatDateShort(t.dueDate) : "–"}
                   </TableCell>
                   <TableCell className="text-center">
                     <button

@@ -33,6 +33,7 @@ import {
 } from "@/components/factor-cell-tip";
 import { FactorMobileList } from "@/components/factor-mobile-list";
 import { BottomUpDrawer } from "@/components/bottom-up-drawer";
+import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Star } from "lucide-react";
 
@@ -137,7 +138,7 @@ export function FactorInvestingDashboard() {
   const rows = React.useMemo(() => {
     if (!data) return [];
     let list = data.rows;
-    if (onlyEligible) list = list.filter((r) => r.eligible);
+    if (onlyEligible) list = list.filter((r) => r.eligible || r.inPortfolio);
     if (onlyPortfolio) list = list.filter((r) => r.inPortfolio);
     if (setor) list = list.filter((r) => r.sector === setor);
     if (classFilter !== "all") list = list.filter((r) => r.factorClass === classFilter);
@@ -196,7 +197,7 @@ export function FactorInvestingDashboard() {
         lastUpdate={data?.asOfDate}
       />
 
-      <div className="bg-surface-soft border-b border-line sticky top-14 md:top-16 z-30">
+      <div className="bg-surface-soft border-b border-line sticky top-14 md:top-16 z-[35]">
         <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-3 md:py-4 flex flex-wrap items-center gap-2 md:gap-3">
           <div className="w-full sm:w-auto">
             <SectorFilter
@@ -296,6 +297,9 @@ export function FactorInvestingDashboard() {
           <div className="mb-3">
             <h2 className="font-display text-lg text-ink tracking-tight">
               Screening multifatorial
+              <span className="ml-2 font-sans text-sm text-ink/45 tabular font-normal tracking-normal">
+                {formatNumber(rows.length)} {rows.length === 1 ? "empresa" : "empresas"}
+              </span>
             </h2>
             <p className="text-xs text-ink/45 mt-0.5 leading-relaxed">
               Quality {appliedWeights.quality}% · Value {appliedWeights.value}% · Carry{" "}

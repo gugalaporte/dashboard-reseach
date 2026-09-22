@@ -45,13 +45,30 @@ describe("parseTargetInput", () => {
         side: "buy",
         amountType: "qty",
         amount: "10.000",
+        startDate: "2026-09-21",
+        dueDate: "2026-10-15",
       })
     ).toEqual({
       ticker: "VALE3",
       side: "buy",
       amountType: "qty",
       amount: 10000,
+      startDate: "2026-09-21",
+      dueDate: "2026-10-15",
     });
+  });
+
+  it("rejeita fazer até antes da data inicial", () => {
+    expect(
+      parseTargetInput({
+        ticker: "VALE3",
+        side: "buy",
+        amountType: "qty",
+        amount: 1,
+        startDate: "2026-10-15",
+        dueDate: "2026-09-21",
+      })
+    ).toBe("fazer até deve ser igual ou depois da data inicial");
   });
 
   it("rejeita lado inválido", () => {
@@ -74,6 +91,8 @@ describe("rowToTarget", () => {
       side: "sell",
       amount_type: "value",
       amount: "250000.00",
+      start_date: "2026-09-01",
+      due_date: "2026-09-30",
       created_at: "2026-09-18T12:00:00.000Z",
       updated_at: "2026-09-18T12:00:00.000Z",
     });
@@ -81,6 +100,8 @@ describe("rowToTarget", () => {
     expect(t.side).toBe("sell");
     expect(t.amountType).toBe("value");
     expect(t.amount).toBe(250000);
+    expect(t.startDate).toBe("2026-09-01");
+    expect(t.dueDate).toBe("2026-09-30");
   });
 });
 

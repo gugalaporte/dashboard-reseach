@@ -395,7 +395,7 @@ export function TradeQualityDashboard() {
       />
 
       {/* Barra de filtros */}
-      <div className="bg-surface-soft border-b border-line sticky top-16 z-30">
+      <div className="bg-surface-soft border-b border-line sticky top-14 md:top-16 z-[35]">
         <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-3 md:py-4 flex flex-wrap items-center gap-2 md:gap-3">
           <div className="flex items-center gap-1 rounded-md bg-surface p-1">
             {PERIOD_OPTIONS.map((opt) => (
@@ -525,9 +525,9 @@ export function TradeQualityDashboard() {
               <span className="text-ink/65">Fechamento</span> = último do pregão
             </p>
           </div>
-          <div className="overflow-x-auto scrollbar-thin max-h-[460px]">
+          <div className="overflow-auto scrollbar-thin max-h-[460px]">
             <Table>
-              <TableHeader className="sticky top-0 z-[1]">
+              <TableHeader className="sticky top-0 z-10">
                 <TableRow className="bg-navy hover:bg-navy border-none">
                   {[
                     "Data",

@@ -1,8 +1,8 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-// O consumidor controla o container com overflow (necessario para sticky
-// cells funcionarem corretamente em scroll horizontal).
+// Sticky de coluna/header fica no consumidor, dentro de um scroll com max-height.
+// Sticky no thead aqui grudava no viewport e cobria a barra de filtros.
 export const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
     <table
@@ -16,7 +16,7 @@ Table.displayName = "Table";
 
 export const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
   ({ className, ...props }, ref) => (
-    <thead ref={ref} className={cn("sticky top-0 z-30 bg-navy text-surface-soft", className)} {...props} />
+    <thead ref={ref} className={cn("bg-navy text-surface-soft", className)} {...props} />
   )
 );
 TableHeader.displayName = "TableHeader";

@@ -1,7 +1,21 @@
 import "server-only";
 
+import { getDailyBars, latestBar } from "./market-history";
 import { ALLOWED_TICKERS } from "./queries";
+import { getAssetSupabase, hasAssetServiceKey } from "./supabase-asset";
 import { getResearchSupabase } from "./supabase-research";
+import {
+  aggregateExecutions,
+  parseMovTradeDate,
+  type MovAtivoRow,
+} from "./trade-analytics";
+import {
+  attachMarketMarks,
+  attachTargetProgress,
+  earliestStart,
+  MAURITSSTAD_DESK,
+  uniqueTickers,
+} from "./trade-target-progress";
 import {
   parseTicker,
   rowToTarget,
@@ -10,7 +24,7 @@ import {
   type TradeTargetRow,
 } from "./trade-targets";
 
-const SELECT = "id,ticker,side,amount_type,amount,created_at,updated_at";
+const SELECT = "id,ticker,side,amount_type,amount,start_date,due_date,created_at,updated_at";
 
 const MISSING_TABLE =
   "Tabela trade_targets não existe. Rode supabase/migrations/20260918_trade_targets.sql no SQL Editor do banco Research.";
@@ -20,6 +34,94 @@ function throwQueryError(error: { code?: string; message: string }): never {
   throw new Error(error.message);
 }
 
+const PAGE_SIZE = 1000;
+
+async function loadMauritsstadFills(
+  fromIso: string,
+  tickers: string[]
+): Promise<ReturnType<typeof aggregateExecutions>> {
+  if (!hasAssetServiceKey() || tickers.length === 0) return [];
+
+  const sb = getAssetSupabase();
+  const rows: MovAtivoRow[] = [];
+  let cursor: number | undefined;
+
+  while (true) {
+    let query = sb
+      .from("mov_ativo")
+      .select(
+        "id,trade_date,product,amount,price,productclass,book,trader,financialsettle,trading_desk"
+      )
+      .eq("productclass", "Equity")
+      .eq("trading_desk", MAURITSSTAD_DESK)
+      .in("product", tickers)
+      .order("id", { ascending: false })
+      .limit(PAGE_SIZE);
+
+    if (cursor != null) query = query.lt("id", cursor);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const batch = (data ?? []) as MovAtivoRow[];
+    if (batch.length === 0) break;
+
+    for (const row of batch) {
+      const iso = parseMovTradeDate(row.trade_date);
+      if (!iso || iso < fromIso) continue;
+      rows.push(row);
+    }
+
+    cursor = batch[batch.length - 1]!.id;
+    if (batch.length < PAGE_SIZE) break;
+  }
+
+  return aggregateExecutions(rows);
+}
+
+function isoDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+async function loadLastCloses(tickers: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (tickers.length === 0) return out;
+  const bars = await getDailyBars(tickers, isoDaysAgo(21), isoDaysAgo(0));
+  for (const [ric, list] of bars) {
+    const bar = latestBar(list);
+    if (bar) out.set(ric, bar.close);
+  }
+  return out;
+}
+
+async function withMauritsstadProgress(targets: TradeTarget[]): Promise<TradeTarget[]> {
+  const fromIso = earliestStart(targets);
+  const fillTickers = uniqueTickers(targets.filter((t) => t.startDate && t.dueDate));
+  let next = targets;
+  if (fromIso && fillTickers.length > 0) {
+    try {
+      const fills = await loadMauritsstadFills(fromIso, fillTickers);
+      next = attachTargetProgress(next, fills);
+    } catch (err) {
+      console.error("[trade-targets] progresso Mauritsstad", err);
+    }
+  }
+  const priceTickers = uniqueTickers(next);
+  if (priceTickers.length === 0) return next;
+  try {
+    const closes = await loadLastCloses(priceTickers);
+    return attachMarketMarks(next, closes);
+  } catch (err) {
+    console.error("[trade-targets] preço atual", err);
+    return next;
+  }
+}
+
 export async function loadTradeTargets(): Promise<TradeTarget[]> {
   const db = getResearchSupabase();
   const { data, error } = await db
@@ -27,7 +129,7 @@ export async function loadTradeTargets(): Promise<TradeTarget[]> {
     .select(SELECT)
     .order("updated_at", { ascending: false });
   if (error) throwQueryError(error);
-  return ((data ?? []) as TradeTargetRow[]).map(rowToTarget);
+  return withMauritsstadProgress(((data ?? []) as TradeTargetRow[]).map(rowToTarget));
 }
 
 export async function loadTargetTickers(): Promise<string[]> {
@@ -58,6 +160,8 @@ export async function upsertTradeTarget(
         side: input.side,
         amount_type: input.amountType,
         amount: input.amount,
+        start_date: input.startDate,
+        due_date: input.dueDate,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "ticker,side" }

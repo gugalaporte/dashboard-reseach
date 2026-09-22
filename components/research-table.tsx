@@ -399,7 +399,7 @@ export function ResearchTable({
       <div className="hidden md:block rounded-lg border border-line bg-surface-soft overflow-hidden">
       <div className="max-h-[calc(100vh-280px)] overflow-auto scrollbar-thin">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-20">
             {/* Linha 1: colunas base (rowSpan=2) + titulo de cada metrica (colSpan=years.length) */}
             <tr>
               {leafHeaders
