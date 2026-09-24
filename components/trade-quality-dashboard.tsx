@@ -21,7 +21,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDateShort, formatNumber, formatNumberFull, formatValue } from "@/lib/format";
-import { isMauritsstadDesk } from "@/lib/trade-target-progress";
 import { volumeChartFrom } from "@/lib/trade-volume";
 import { comparisonMetrics, summaryStats, type RotationBucket } from "@/lib/trade-analytics";
 import { AppHeader } from "@/components/app-header";
@@ -306,14 +305,6 @@ export function TradeQualityDashboard() {
     );
   }, [data, chartFromIso, chartToIso]);
 
-  const filteredExecutions24m = React.useMemo(() => {
-    if (!data) return [];
-    return data.executions.filter((ex) => {
-      if (!isMauritsstadDesk(ex.tradingDesk)) return false;
-      return inDateRange(ex.tradeDateIso, chartFromIso, chartToIso);
-    });
-  }, [data, chartFromIso, chartToIso]);
-
   const filteredBuckets = React.useMemo(() => {
     if (!data) return [];
     return data.rotationBuckets.filter((b) => {
@@ -534,17 +525,6 @@ export function TradeQualityDashboard() {
           legendExtra="(últimos 24 meses)"
           source="B3"
           emptyText="Sem volume B3 no período"
-          grain="month"
-        />
-
-        <TradeVolumeChart
-          executions={filteredExecutions24m}
-          fromIso={chartFromIso}
-          toIso={chartToIso}
-          isLoading={loading}
-          title="Volume financeiro Mauritsstad"
-          legendExtra="(compra + venda · últimos 24 meses)"
-          source="Finacap"
           grain="month"
         />
 
