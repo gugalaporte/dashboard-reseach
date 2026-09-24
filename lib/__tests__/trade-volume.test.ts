@@ -3,13 +3,29 @@ import {
   buildVolumeBars,
   formatBarLabel,
   formatVolume,
+  monthsAgoStart,
+  volumeChartFrom,
   pickVolumeGrain,
   rangeKeys,
   volumeAxis,
   volumePeakKey,
 } from "../trade-volume";
 
+describe("monthsAgoStart", () => {
+  it("abre 24 meses no primeiro dia", () => {
+    expect(monthsAgoStart("2026-09-24", 23)).toBe("2024-10-01");
+  });
+
+  it("corta out/24", () => {
+    expect(volumeChartFrom("2026-09-24")).toBe("2024-11-01");
+  });
+});
+
 describe("pickVolumeGrain", () => {
+  it("usa dia em janela de 30 dias", () => {
+    expect(pickVolumeGrain("2026-08-24", "2026-09-23")).toBe("day");
+  });
+
   it("usa mês em janela de 1 ano", () => {
     expect(pickVolumeGrain("2025-09-15", "2026-09-15")).toBe("month");
   });
@@ -26,6 +42,36 @@ describe("rangeKeys", () => {
       "2026-02",
       "2026-03",
     ]);
+  });
+});
+
+describe("buildVolumeBars day", () => {
+  it("uma barra por pregão, sem preencher fim de semana", () => {
+    const bars = buildVolumeBars(
+      [
+        { tradeDateIso: "2026-09-21", notional: 10 },
+        { tradeDateIso: "2026-09-22", notional: 20 },
+      ],
+      "day",
+      "2026-09-23",
+      { fromIso: "2026-09-20", toIso: "2026-09-23" }
+    );
+    expect(bars.map((b) => b.key)).toEqual(["2026-09-21", "2026-09-22"]);
+    expect(bars[0].label).toBe("21/09");
+    expect(bars[1].totalNotional).toBe(20);
+  });
+
+  it("preenche pregões do eixo mesmo sem execução", () => {
+    const bars = buildVolumeBars(
+      [{ tradeDateIso: "2026-09-22", notional: 10 }],
+      "day",
+      "2026-09-22",
+      { fromIso: "2026-09-21", toIso: "2026-09-22" },
+      ["2026-09-21", "2026-09-22"]
+    );
+    expect(bars).toHaveLength(2);
+    expect(bars[0].totalNotional).toBe(0);
+    expect(bars[1].totalNotional).toBe(10);
   });
 });
 
@@ -114,5 +160,10 @@ describe("volumeAxis", () => {
 
   it("rotula barra em milhões", () => {
     expect(formatBarLabel(31_259_190)).toBe("31 mi");
+  });
+
+  it("não estica 524 bi até 1000", () => {
+    const axis = volumeAxis(524e9);
+    expect(axis.max).toBe(600);
   });
 });

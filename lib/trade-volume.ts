@@ -1,6 +1,6 @@
-/** Volume financeiro das execuções — barras mensais ou anuais. */
+/** Volume financeiro — barras diárias, mensais ou anuais. */
 
-export type VolumeGrain = "month" | "year";
+export type VolumeGrain = "day" | "month" | "year";
 
 export type VolumeBar = {
   key: string;
@@ -26,21 +26,53 @@ const MONTH_SHORT = [
   "jul", "ago", "set", "out", "nov", "dez",
 ];
 
+export function addDaysIso(iso: string, delta: number): string {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  d.setDate(d.getDate() + delta);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Primeiro dia do mês, N meses antes (23 → janela de 24 meses). */
+export const VOLUME_CHART_FROM = "2024-11-01";
+
+export function monthsAgoStart(iso: string, months: number): string {
+  const y = Number(iso.slice(0, 4));
+  const m = Number(iso.slice(5, 7));
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return iso.slice(0, 10);
+  const d = new Date(y, m - 1 - months, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+/** 24 meses até a data, sem out/24. */
+export function volumeChartFrom(toIso: string): string {
+  const start = monthsAgoStart(toIso, 23);
+  return start < VOLUME_CHART_FROM ? VOLUME_CHART_FROM : start;
+}
+
 export function pickVolumeGrain(fromIso: string, toIso: string): VolumeGrain {
   const from = Date.parse(`${fromIso.slice(0, 10)}T12:00:00`);
   const to = Date.parse(`${toIso.slice(0, 10)}T12:00:00`);
   if (!Number.isFinite(from) || !Number.isFinite(to)) return "month";
   const days = (to - from) / 86_400_000;
+  if (days <= 45) return "day";
   return days >= 800 ? "year" : "month";
 }
 
 function bucketKey(iso: string, grain: VolumeGrain): string | null {
   if (!/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
-  return grain === "year" ? iso.slice(0, 4) : iso.slice(0, 7);
+  if (grain === "year") return iso.slice(0, 4);
+  if (grain === "month") return iso.slice(0, 7);
+  return iso.slice(0, 10);
 }
 
 export function volumeBarLabel(key: string): string {
   if (/^\d{4}$/.test(key)) return key;
+  const day = key.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (day) return `${day[3]}/${day[2]}`;
   const m = key.match(/^(\d{4})-(\d{2})$/);
   if (!m) return key;
   const month = Number(m[2]);
@@ -50,6 +82,7 @@ export function volumeBarLabel(key: string): string {
 
 function isPartialBucket(key: string, grain: VolumeGrain, asOfIso: string): boolean {
   const asOf = asOfIso.slice(0, 10);
+  if (grain === "day") return false;
   if (grain === "year") {
     return key === asOf.slice(0, 4) && asOf.slice(5, 7) !== "12";
   }
@@ -68,6 +101,16 @@ export function rangeKeys(fromIso: string, toIso: string, grain: VolumeGrain): s
     const y1 = Number(to.slice(0, 4));
     const out: string[] = [];
     for (let y = y0; y <= y1; y++) out.push(String(y));
+    return out;
+  }
+
+  if (grain === "day") {
+    const out: string[] = [];
+    let cur = from;
+    while (cur <= to) {
+      out.push(cur);
+      cur = addDaysIso(cur, 1);
+    }
     return out;
   }
 
@@ -92,7 +135,8 @@ export function buildVolumeBars(
   executions: Array<{ tradeDateIso: string; notional: number }>,
   grain: VolumeGrain,
   asOfIso: string,
-  range?: { fromIso: string; toIso: string }
+  range?: { fromIso: string; toIso: string },
+  axisKeys?: string[]
 ): VolumeBar[] {
   const map = new Map<string, { notional: number; days: Set<string> }>();
 
@@ -106,9 +150,20 @@ export function buildVolumeBars(
     map.set(key, cur);
   }
 
-  const keys = range
-    ? rangeKeys(range.fromIso, range.toIso, grain)
-    : [...map.keys()].sort((a, b) => a.localeCompare(b));
+  const keys = axisKeys?.length
+    ? axisKeys
+    : grain === "day"
+      ? [...map.keys()]
+          .filter((k) => {
+            if (!range) return true;
+            const a = range.fromIso.slice(0, 10);
+            const b = range.toIso.slice(0, 10);
+            return k >= a && k <= b;
+          })
+          .sort((a, b) => a.localeCompare(b))
+      : range
+        ? rangeKeys(range.fromIso, range.toIso, grain)
+        : [...map.keys()].sort((a, b) => a.localeCompare(b));
 
   return keys.map((key) => {
     const cur = map.get(key);
@@ -140,7 +195,14 @@ export function volumeAxis(maxValue: number): VolumeAxis {
   const pow = 10 ** Math.floor(Math.log10(scaled));
   const n = scaled / pow;
   const nice =
-    n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 4 ? 4 : n <= 5 ? 5 : 10;
+    n <= 1 ? 1
+    : n <= 2 ? 2
+    : n <= 2.5 ? 2.5
+    : n <= 4 ? 4
+    : n <= 5 ? 5
+    : n <= 6 ? 6
+    : n <= 8 ? 8
+    : 10;
   return { divisor, suffix, max: nice * pow };
 }
 
@@ -175,8 +237,9 @@ export function formatBarLabel(value: number): string {
 export function partialNote(bars: VolumeBar[], grain: VolumeGrain): string | null {
   const last = bars.at(-1);
   if (!last?.partial) return null;
+  if (grain === "day") return null;
   if (grain === "year") {
-    return `${last.key} considera as médias até o último pregão com execução`;
+    return `${last.key} considera até o último pregão do período`;
   }
-  return `${last.label} considera as médias até o último pregão com execução`;
+  return `${last.label} considera até o último pregão do período`;
 }

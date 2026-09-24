@@ -20,6 +20,7 @@ import {
   volumeAxis,
   volumePeakKey,
   type VolumeBar,
+  type VolumeGrain,
 } from "@/lib/trade-volume";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -33,6 +34,14 @@ type Props = {
   fromIso: string;
   toIso: string;
   isLoading?: boolean;
+  title?: string;
+  seriesHint?: string;
+  legendExtra?: string;
+  source?: string;
+  emptyText?: string;
+  grain?: VolumeGrain;
+  /** Eixo X fixo (ex.: pregões da B3) para alinhar os dois gráficos. */
+  sessionKeys?: string[];
 };
 
 type ChartRow = VolumeBar & { plot: number; plotLabel: string; isPeak: boolean };
@@ -43,11 +52,18 @@ export function TradeVolumeChart({
   fromIso,
   toIso,
   isLoading,
+  title = "Volume financeiro",
+  seriesHint,
+  legendExtra,
+  source = "Finacap",
+  emptyText = "Sem volume no período / filtros selecionados",
+  grain: grainProp,
+  sessionKeys,
 }: Props) {
-  const grain = pickVolumeGrain(fromIso, toIso);
+  const grain = grainProp ?? pickVolumeGrain(fromIso, toIso);
   const bars: VolumeBar[] = isLoading
     ? []
-    : buildVolumeBars(executions, grain, toIso, { fromIso, toIso });
+    : buildVolumeBars(executions, grain, toIso, { fromIso, toIso }, sessionKeys);
   const peakKey = volumePeakKey(bars);
   const axis = volumeAxis(Math.max(0, ...bars.map((b) => b.totalNotional)));
   const note = partialNote(bars, grain);
@@ -57,19 +73,25 @@ export function TradeVolumeChart({
     plotLabel: formatBarLabel(b.totalNotional),
     isPeak: b.key === peakKey,
   }));
-  const seriesHint =
-    grain === "year" ? "Volume financeiro no ano" : "Volume financeiro no mês";
+  const hint =
+    seriesHint ??
+    (grain === "year"
+      ? "Volume financeiro no ano"
+      : grain === "day"
+        ? "Volume financeiro no dia"
+        : "Volume financeiro no mês");
 
   return (
     <section className="rounded-md overflow-hidden bg-navy text-surface-soft">
       <div className="px-4 sm:px-5 pt-5 pb-2">
         <h2 className="font-display text-[22px] sm:text-[26px] leading-tight tracking-tight">
-          Volume financeiro
+          {title}
         </h2>
         <div className="flex items-center gap-2 mt-4">
           <span className="inline-block w-3 h-3 rounded-[2px]" style={{ background: BAR }} />
           <span className="text-[12px] text-surface-soft/75">
-            {seriesHint} (compra + venda)
+            {hint}
+            {legendExtra ? ` ${legendExtra}` : ""}
           </span>
         </div>
       </div>
@@ -84,7 +106,7 @@ export function TradeVolumeChart({
           </div>
         ) : chartData.length === 0 ? (
           <p className="h-full grid place-items-center text-sm text-surface-soft/40">
-            Sem volume no período / filtros selecionados
+            {emptyText}
           </p>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
@@ -110,24 +132,8 @@ export function TradeVolumeChart({
                 width={40}
               />
               <Tooltip
-                cursor={{ fill: "rgba(241,241,241,0.06)" }}
-                contentStyle={{
-                  background: "#030a1e",
-                  border: "1px solid rgba(241,241,241,0.15)",
-                  borderRadius: 6,
-                  fontSize: 12,
-                  color: "#f1f1f1",
-                }}
-                formatter={(_value, _name, item) => {
-                  const bar = item?.payload as ChartRow | undefined;
-                  const total = bar?.totalNotional ?? 0;
-                  const extra =
-                    bar && bar.sessionCount > 0
-                      ? ` · ADTV ${formatVolume(bar.adtv, volumeAxis(bar.adtv))}`
-                      : "";
-                  return [formatVolume(total, axis) + extra, "Volume"];
-                }}
-                labelFormatter={(label) => String(label)}
+                cursor={{ fill: "rgba(241,241,241,0.08)" }}
+                content={<VolumeTip grain={grain} />}
               />
               <Bar dataKey="plot" radius={[2, 2, 0, 0]} maxBarSize={56}>
                 {chartData.map((d) => (
@@ -140,8 +146,8 @@ export function TradeVolumeChart({
                 <LabelList
                   dataKey="plotLabel"
                   position="top"
-                  fill="rgba(241,241,241,0.88)"
-                  fontSize={10}
+                  fill="rgba(241,241,241,0.92)"
+                  fontSize={chartData.length > 16 ? 8 : 10}
                 />
               </Bar>
             </BarChart>
@@ -153,7 +159,7 @@ export function TradeVolumeChart({
         <p className="text-[11px] text-surface-soft/40">
           {note ? `Nota: ${note}` : "Valor = volume financeiro negociado no período"}
         </p>
-        <p className="text-[11px] text-surface-soft/35">Fonte: Finacap</p>
+        <p className="text-[11px] text-surface-soft/35">Fonte: {source}</p>
       </div>
     </section>
   );
@@ -162,4 +168,31 @@ export function TradeVolumeChart({
 function yTicks(max: number): number[] {
   const step = max / 4;
   return [0, step, step * 2, step * 3, max];
+}
+
+function VolumeTip({
+  active,
+  payload,
+  label,
+  grain,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: ChartRow }>;
+  label?: string;
+  grain: VolumeGrain;
+}) {
+  if (!active || !payload?.[0]) return null;
+  const bar = payload[0].payload;
+  const axis = volumeAxis(bar.totalNotional || 1);
+  return (
+    <div className="rounded-md border border-surface-soft/20 bg-navy px-3 py-2 text-[12px] text-surface-soft shadow-lg">
+      <p className="text-surface-soft/60 mb-0.5">{label}</p>
+      <p className="tabular font-medium">{formatVolume(bar.totalNotional, axis)}</p>
+      {grain !== "day" && bar.sessionCount > 0 && (
+        <p className="text-surface-soft/55 mt-0.5 tabular">
+          ADTV {formatVolume(bar.adtv, volumeAxis(bar.adtv))}
+        </p>
+      )}
+    </div>
+  );
 }

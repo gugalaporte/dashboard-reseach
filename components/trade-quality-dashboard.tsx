@@ -21,6 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDateShort, formatNumber, formatNumberFull, formatValue } from "@/lib/format";
+import { isMauritsstadDesk } from "@/lib/trade-target-progress";
+import { volumeChartFrom } from "@/lib/trade-volume";
 import { comparisonMetrics, summaryStats, type RotationBucket } from "@/lib/trade-analytics";
 import { AppHeader } from "@/components/app-header";
 import { TradeVolumeChart } from "@/components/trade-volume-chart";
@@ -88,6 +90,8 @@ type TradesPayload = {
     totalVsTypicalValue: number | null;
   };
   latestTradeIso?: string | null;
+  b3Turnover?: Array<{ tradeDateIso: string; notional: number }>;
+  b3FromIso?: string;
 };
 
 const PERIOD_OPTIONS = [
@@ -292,6 +296,23 @@ export function TradeQualityDashboard() {
       return true;
     });
   }, [data, desk, dateFrom, dateTo]);
+
+  const chartToIso = dateTo || todayIso();
+  const chartFromIso = volumeChartFrom(chartToIso);
+  const filteredB3 = React.useMemo(() => {
+    if (!data?.b3Turnover) return [];
+    return data.b3Turnover.filter((p) =>
+      inDateRange(p.tradeDateIso, chartFromIso, chartToIso)
+    );
+  }, [data, chartFromIso, chartToIso]);
+
+  const filteredExecutions24m = React.useMemo(() => {
+    if (!data) return [];
+    return data.executions.filter((ex) => {
+      if (!isMauritsstadDesk(ex.tradingDesk)) return false;
+      return inDateRange(ex.tradeDateIso, chartFromIso, chartToIso);
+    });
+  }, [data, chartFromIso, chartToIso]);
 
   const filteredBuckets = React.useMemo(() => {
     if (!data) return [];
@@ -505,10 +526,26 @@ export function TradeQualityDashboard() {
         </div>
 
         <TradeVolumeChart
-          executions={filteredExecutions}
-          fromIso={dateFrom || data?.fromIso || ""}
-          toIso={dateTo || data?.toIso || ""}
+          executions={filteredB3}
+          fromIso={chartFromIso}
+          toIso={chartToIso}
           isLoading={loading}
+          title="Volume financeiro B3"
+          legendExtra="(últimos 24 meses)"
+          source="B3"
+          emptyText="Sem volume B3 no período"
+          grain="month"
+        />
+
+        <TradeVolumeChart
+          executions={filteredExecutions24m}
+          fromIso={chartFromIso}
+          toIso={chartToIso}
+          isLoading={loading}
+          title="Volume financeiro Mauritsstad"
+          legendExtra="(compra + venda · últimos 24 meses)"
+          source="Finacap"
+          grain="month"
         />
 
         <TradeTargetsSection

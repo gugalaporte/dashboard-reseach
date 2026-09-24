@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { loadB3Turnover } from "@/lib/b3-turnover-queries";
+import { volumeChartFrom } from "@/lib/trade-volume";
 import { getAssetSupabase } from "@/lib/supabase-asset";
 import { getDailyBars } from "@/lib/market-history";
 import {
@@ -86,8 +88,10 @@ export async function GET(req: Request) {
       : Math.min(365, Math.max(7, Number(rawDays) || 90));
 
     const toIso = isoDaysAgo(0);
-    // out/24 fica de fora: mês parcial com volume distorcido.
-    const requestedFrom = allHistory ? "2024-11-01" : isoDaysAgo(days!);
+    const chartFrom = volumeChartFrom(toIso);
+    // Tabelas usam o período; os gráficos precisam da janela (sem out/24).
+    const periodFrom = allHistory ? "2024-11-01" : isoDaysAgo(days!);
+    const requestedFrom = periodFrom < chartFrom ? periodFrom : chartFrom;
 
     const raw = await loadEquityTrades(requestedFrom);
     const latestTradeIso =
@@ -110,6 +114,13 @@ export async function GET(req: Request) {
       ...new Set(executions.map((e) => e.tradingDesk).filter((d) => d && d !== "—")),
     ].sort();
 
+    let b3Turnover: Awaited<ReturnType<typeof loadB3Turnover>> = [];
+    try {
+      b3Turnover = await loadB3Turnover(chartFrom, toIso);
+    } catch (err) {
+      console.error("[api/trades] B3.TURNOVER", err);
+    }
+
     return NextResponse.json(
       {
         fromIso,
@@ -117,6 +128,8 @@ export async function GET(req: Request) {
         tradingDesks,
         executions: executions.sort((a, b) => b.tradeDateIso.localeCompare(a.tradeDateIso)),
         rotationBuckets,
+        b3Turnover,
+        b3FromIso: chartFrom,
         summary: summaryStats(executions),
         latestTradeIso,
         priceSource: barsByRic.size > 0 ? "supabase+yahoo" : "yahoo",
