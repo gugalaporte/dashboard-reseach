@@ -1,12 +1,8 @@
+import { defaultCcyForTicker } from "./currency";
 import { extractYear, type MetricId } from "./metrics";
 import type { Cell, ResearchRow, TargetCell } from "./queries";
 
 export const LSEG_FONTE = "LSEG" as const;
-
-function defaultCcyForTicker(ticker: string): "R$" | "US$" {
-  const t = (ticker ?? "").trim().toUpperCase();
-  return /\d$/.test(t) ? "R$" : "US$";
-}
 
 /** PETR4.SA → PETR4 */
 export function ricToTicker(ric: string): string {

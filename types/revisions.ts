@@ -21,6 +21,8 @@ export interface RevisionEvent {
   rating: string | null;
   prev_target_price: number | null;
   target_price: number | null;
+  prev_target_ccy: string | null;
+  target_ccy: string | null;
   tp_change_pct: number | null;
   tp_direction: RevisionDirection;
   rating_direction: RevisionRatingDirection;

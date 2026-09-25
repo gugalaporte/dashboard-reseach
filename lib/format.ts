@@ -1,3 +1,5 @@
+import { isoCurrency, moneyPrefix } from "./currency";
+
 // Utilitarios de formatacao em pt-BR.
 // Regra: null/undefined/NaN => en-dash "–".
 
@@ -44,16 +46,15 @@ export function formatNumberFull(v: number | null | undefined): string {
 // Formatador unificado usado pelo MetricCell.
 export function formatValue(v: number, f: Format, ccy?: string | null): string {
   if (f === "money") {
-    const currency = ccy === "US$" ? "USD" : "BRL";
     return new Intl.NumberFormat(PT, {
       style: "currency",
-      currency,
+      currency: isoCurrency(ccy),
       minimumFractionDigits: 2,
     }).format(v);
   }
   if (f === "millions") {
     const n = new Intl.NumberFormat(PT, { maximumFractionDigits: 0 }).format(v);
-    const prefix = ccy === "US$" ? "US$" : "R$";
+    const prefix = moneyPrefix(ccy);
     return `${prefix} ${n} M`;
   }
   if (f === "pct") {

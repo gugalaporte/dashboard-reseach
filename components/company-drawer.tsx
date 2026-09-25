@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { sameCcy } from "@/lib/currency";
 import { defaultCcyForTicker, getHistoricoEmpresa, getPdfsEmpresa } from "@/lib/queries";
 import type { ResearchRow } from "@/lib/queries";
 import type { MetricaRow, PdfDoc } from "@/types/research";
@@ -237,7 +238,7 @@ export function CompanyDrawer({ empresa, consenso, onClose, livePrices }: Props)
                               : yClose?.currency ?? (empresa ? defaultCcyForTicker(empresa) : "R$");
                           const target = c.target;
                           const upside =
-                            price != null && target && target.ccy === ccy
+                            price != null && target && sameCcy(target.ccy, ccy)
                               ? ((target.value - price) / price) * 100
                               : null;
                           return (

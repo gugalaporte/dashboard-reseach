@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatDateLong, formatDateShort, formatNumber, formatValue, parseDisplayDate } from "@/lib/format";
+import { defaultCcyForTicker } from "@/lib/currency";
 import { FONTES, FONTE_SHORT_LABEL } from "@/lib/queries";
 import { sectorPt } from "@/lib/sector-labels";
 import { CompanySearch } from "@/components/company-search";
@@ -66,8 +67,15 @@ function pctTone(e: RevisionEvent): string {
 }
 
 function eventSummary(e: RevisionEvent): string {
-  const prevTp = e.prev_target_price != null ? formatValue(e.prev_target_price, "money", "R$") : "–";
-  const currTp = e.target_price != null ? formatValue(e.target_price, "money", "R$") : "–";
+  const fallbackCcy = defaultCcyForTicker(e.ticker);
+  const prevTp =
+    e.prev_target_price != null
+      ? formatValue(e.prev_target_price, "money", e.prev_target_ccy ?? fallbackCcy)
+      : "–";
+  const currTp =
+    e.target_price != null
+      ? formatValue(e.target_price, "money", e.target_ccy ?? fallbackCcy)
+      : "–";
   const pct = e.tp_change_pct != null ? `${e.tp_change_pct > 0 ? "+" : ""}${e.tp_change_pct.toFixed(1)}%` : "";
   if (e.event_type === "new_coverage") {
     return `Iniciou cobertura com ${e.rating ?? "sem rating"}, Target ${currTp}`;

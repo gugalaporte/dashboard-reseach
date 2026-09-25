@@ -1,8 +1,11 @@
 import { parseDisplayDate } from "./format";
+import { defaultCcyForTicker, normalizeCcy, sameCcy } from "./currency";
 import { supabase } from "./supabase";
 import type { MetricaRow, PdfDoc } from "@/types/research";
 import { canonicalMetricId, extractYear, type MetricId } from "./metrics";
 import { deriveEPSFromPriceAndPE, deriveNetIncomeFromEPS } from "./derive-metrics";
+
+export { defaultCcyForTicker } from "./currency";
 
 export { latestActivityDate } from "./activity-date";
 
@@ -261,13 +264,23 @@ function cell(r?: MetricRow): Cell | undefined {
 }
 
 function isPeriodo12m(periodo: string | null | undefined): boolean {
-  return (periodo ?? "").trim().toLowerCase() === "12m";
+  const p = (periodo ?? "").trim().toLowerCase();
+  return p === "12m" || p === "current";
 }
 
-export function defaultCcyForTicker(ticker: string): "R$" | "US$" {
-  const t = (ticker ?? "").trim().toUpperCase();
-  // Convenção do projeto: tickers sem número no final (ex.: VALE, INTR) são listados em US$.
-  return /\d$/.test(t) ? "R$" : "US$";
+function targetCcyOf(
+  rows: MetricRow[] | undefined,
+  pdfId: number | null,
+  value: number,
+  ticker: string
+): "R$" | "US$" | "MX$" | "CLP$" {
+  const match = rows?.find(
+    (r) =>
+      (pdfId == null || r.pdf_id === pdfId) &&
+      Number(r.valor) === value &&
+      normalizeCcy(r.unidade) != null
+  );
+  return normalizeCcy(match?.unidade) ?? defaultCcyForTicker(ticker);
 }
 
 // Quando nao ha metrica em dados_estruturados, cai para o stock_guide.
@@ -501,10 +514,11 @@ export function buildRows(
     // Prioridade do target:
     //   1) dados_estruturados.Target Price com periodo "12m" (evita periodos forward 2026E/2027E/etc)
     //   2) stock_guide.target_price (fallback quando nao houver 12m publicado)
+    const tpRows = byMetric["Target Price"] ?? [];
     const target: TargetCell | undefined = tp
       ? {
           value: Number(tp.valor),
-          ccy: tp.unidade ?? defaultCcyForTicker(empresa),
+          ccy: normalizeCcy(tp.unidade) ?? defaultCcyForTicker(empresa),
           date: tp.data_relatorio,
           periodo: tp.periodo,
           unidade: tp.unidade,
@@ -513,7 +527,7 @@ export function buildRows(
       : sg?.target_price != null
         ? {
             value: Number(sg.target_price),
-            ccy: defaultCcyForTicker(empresa),
+            ccy: targetCcyOf(tpRows, sg.pdf_id, Number(sg.target_price), empresa),
             date: sg.report_date,
             periodo: null,
             unidade: defaultCcyForTicker(empresa),
@@ -708,7 +722,7 @@ function applyTargetFallback(
     // Recalcula upside contra o preco da LINHA ATUAL (Safra), nao do BBI,
     // para refletir o upside implicito no preco mostrado naquela linha.
     const localUpside =
-      r.price?.value != null && srcTarget.ccy === "R$"
+      r.price?.value != null && sameCcy(srcTarget.ccy, "R$")
         ? ((srcTarget.value - r.price.value) / r.price.value) * 100
         : null;
     r.target = {

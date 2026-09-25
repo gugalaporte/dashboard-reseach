@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { sameCcy } from "@/lib/currency";
 import { formatDateShort, formatValue } from "@/lib/format";
 import { FONTE_SHORT_LABEL } from "@/lib/queries";
 
@@ -32,10 +33,11 @@ export function TargetCell({
   const effectivePriceCcy = priceCcy ?? "R$";
 
   // Upside do banco (do stock_guide) quando existir; senao calcula local.
+  const comparable = sameCcy(effectivePriceCcy, target.ccy);
   const upside =
-    target.upside != null
+    comparable && target.upside != null
       ? target.upside
-      : priceValue != null && effectivePriceCcy === target.ccy
+      : comparable && priceValue != null
         ? ((target.value - priceValue) / priceValue) * 100
         : null;
 

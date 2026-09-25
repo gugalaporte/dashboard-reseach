@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { fetchAllRows } from "@/lib/supabase-page";
+import {
+  applyRevisionCurrency,
+  buildTargetCcyLookup,
+  type TargetCcyRow,
+} from "@/lib/revision-currency";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +24,8 @@ type ApiRevision = {
   rating: string | null;
   prev_target_price: number | null;
   target_price: number | null;
+  prev_target_ccy?: string | null;
+  target_ccy?: string | null;
   tp_change_pct: number | null;
   tp_direction: "raise" | "cut" | "hold" | null;
   rating_direction: "upgrade" | "downgrade" | "lateral" | "hold" | null;
@@ -60,6 +67,26 @@ function isRelevant(r: ApiRevision): boolean {
 function sameRatingIgnoreCase(a: string | null, b: string | null): boolean {
   if (a == null || b == null) return false;
   return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+async function loadTargetCurrencies(rows: ApiRevision[]): Promise<Map<string, string>> {
+  const tickers = Array.from(new Set(rows.map((r) => r.ticker).filter(Boolean)));
+  const pdfIds = Array.from(
+    new Set(
+      rows.flatMap((r) => [r.pdf_id, r.prev_pdf_id]).filter((x): x is number => x != null)
+    )
+  );
+  if (tickers.length === 0 || pdfIds.length === 0) return new Map();
+  const metrics = await fetchAllRows<TargetCcyRow>((from, to) =>
+    supabase
+      .from("dados_estruturados")
+      .select("empresa,pdf_id,valor,unidade")
+      .eq("metrica", "Target Price")
+      .in("empresa", tickers)
+      .in("pdf_id", pdfIds)
+      .range(from, to)
+  );
+  return buildTargetCcyLookup(metrics);
 }
 
 // Remove ruido de "mudanca" de rating quando so muda a caixa.
@@ -115,7 +142,10 @@ export async function GET(req: Request) {
       return q.order("event_date", { ascending: false }).range(from, to);
     });
 
+    const ccyLookup = await loadTargetCurrencies(data);
     const rows = data
+      .map((r) => applyRevisionCurrency(r, ccyLookup))
+      .filter((r): r is NonNullable<typeof r> => r != null)
       .map(normalizeRatingNoise)
       .filter((r): r is ApiRevision => r != null)
       .filter(isRelevant)
