@@ -7,7 +7,7 @@ import { deriveEPSFromPriceAndPE, deriveNetIncomeFromEPS } from "./derive-metric
 
 export { defaultCcyForTicker } from "./currency";
 
-export { latestActivityDate } from "./activity-date";
+export { latestActivityDate, latestRowsDate } from "./activity-date";
 
 // Fontes (corretoras) presentes na base (alinhado a dados_estruturados.fonte).
 export const FONTES = [
@@ -803,13 +803,38 @@ export async function getSummaryStats(): Promise<SummaryStats> {
   for (const g of guide ?? []) empresas.add(g.ticker);
 
   const pdfSet = new Set<number>();
-  let lastDate: string | null = null;
   for (const r of metricas ?? []) {
-    if (!lastDate && r.data_relatorio) lastDate = r.data_relatorio;
     if (r.data_relatorio && r.data_relatorio >= minIso && r.pdf_id != null) {
       pdfSet.add(r.pdf_id);
     }
   }
+
+  // Max dedicado (limit 1). O lote de 1000 linhas nao pega o report mais novo.
+  const [{ data: latestDe, error: eDe }, { data: latestSg, error: eSg }] =
+    await Promise.all([
+      supabase
+        .from("dados_estruturados")
+        .select("data_relatorio")
+        .in("empresa", tickers)
+        .not("data_relatorio", "is", null)
+        .order("data_relatorio", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("stock_guide")
+        .select("report_date")
+        .in("ticker", tickers)
+        .not("report_date", "is", null)
+        .order("report_date", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+  if (eDe) throw eDe;
+  if (eSg) throw eSg;
+  const deDate = (latestDe?.data_relatorio as string | null)?.slice(0, 10) ?? null;
+  const sgDate = (latestSg?.report_date as string | null)?.slice(0, 10) ?? null;
+  const lastDate =
+    deDate && sgDate ? (sgDate > deDate ? sgDate : deDate) : sgDate ?? deDate;
 
   // 2) Contagem de linhas em dados_estruturados dentro da whitelist.
   const { count, error: e3 } = await supabase

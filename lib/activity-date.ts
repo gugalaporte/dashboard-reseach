@@ -1,5 +1,6 @@
 /** Linha com datas de células (ResearchRow / LsegViewRow). */
 export type ActivityRow = {
+  fonte?: string;
   rating?: { date: string | null };
   price?: { date: string | null };
   target?: { date: string | null };
@@ -15,6 +16,14 @@ export type ActivityRow = {
     Record<string, Record<string, { date: string | null } | undefined>>
   >;
 };
+
+function todayIso(): string {
+  const n = new Date();
+  const y = n.getFullYear();
+  const m = String(n.getMonth() + 1).padStart(2, "0");
+  const d = String(n.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 /** Data mais recente em qualquer célula, inclusive estimativas por ano. */
 export function latestActivityDate(row: ActivityRow): string | null {
@@ -43,6 +52,23 @@ export function latestActivityDate(row: ActivityRow): string | null {
   for (const d of dates) {
     const iso = d?.slice(0, 10);
     if (iso && (!max || iso > max)) max = iso;
+  }
+  return max;
+}
+
+/** Maior data entre as linhas, sem datas futuras (lixo de extração). */
+export function latestRowsDate(
+  rows: ActivityRow[],
+  opts?: { excludeFontes?: readonly string[] }
+): string | null {
+  const cap = todayIso();
+  const skip = new Set(opts?.excludeFontes ?? []);
+  let max: string | null = null;
+  for (const r of rows) {
+    if (r.fonte && skip.has(r.fonte)) continue;
+    const d = latestActivityDate(r);
+    if (!d || d > cap) continue;
+    if (!max || d > max) max = d;
   }
   return max;
 }

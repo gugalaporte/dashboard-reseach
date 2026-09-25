@@ -13,7 +13,7 @@ import {
   type RatingFilterBucket,
 } from "@/components/summary-cards";
 import { classifyRating } from "@/lib/rating";
-import { detectYears, latestActivityDate } from "@/lib/queries";
+import { detectYears, latestRowsDate } from "@/lib/queries";
 import type { LsegViewRow } from "@/lib/lseg-transform";
 import { sectorPt } from "@/lib/sector-labels";
 import { useLivePrices } from "@/lib/use-live-prices";
@@ -110,14 +110,7 @@ export function LsegDashboard() {
 
   const { prices: livePrices } = useLivePrices(uniqueTickers);
 
-  const lastUpdate = React.useMemo(() => {
-    let best: string | null = null;
-    for (const r of allRows) {
-      const d = latestActivityDate(r) ?? r.price?.date ?? null;
-      if (d && (!best || d > best)) best = d;
-    }
-    return best;
-  }, [allRows]);
+  const lastUpdate = React.useMemo(() => latestRowsDate(allRows), [allRows]);
 
   const summary: SummaryData | null = React.useMemo(() => {
     if (loading && allRows.length === 0) return null;
