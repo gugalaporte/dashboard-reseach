@@ -14,6 +14,7 @@ type Props = {
   data: FactorRow[];
   isLoading: boolean;
   onRowClick?: (row: FactorRow) => void;
+  sectorLabel?: (row: FactorRow) => string;
 };
 
 function fmtZ(v: number | null): string {
@@ -32,7 +33,7 @@ const CLASS_STYLES: Record<FactorClass, string> = {
  * Lista compacta para mobile — ticker, score, classe e fatores.
  * Toque abre o mesmo drawer da tabela desktop.
  */
-export function FactorMobileList({ data, isLoading, onRowClick }: Props) {
+export function FactorMobileList({ data, isLoading, onRowClick, sectorLabel }: Props) {
   if (isLoading) {
     return (
       <div className="space-y-2 md:hidden">
@@ -88,7 +89,7 @@ export function FactorMobileList({ data, isLoading, onRowClick }: Props) {
                     )}
                   </div>
                   <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-ink/45 truncate">
-                    {row.sector || "Sem setor"}
+                    {sectorLabel ? sectorLabel(row) : row.sector || "Sem setor"}
                     {!row.eligible && row.ineligibleReason
                       ? ` · ${row.ineligibleReason}`
                       : ""}

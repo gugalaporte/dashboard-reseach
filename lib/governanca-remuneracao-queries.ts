@@ -20,6 +20,31 @@ function yearFromIso(iso: string): number {
   return Number.isFinite(y) ? y : 2025;
 }
 
+function blankToNull(v: string | null | undefined): string | null {
+  const s = (v ?? "").trim();
+  return s ? s : null;
+}
+
+/** companies.name está vazio na LSEG; o dossiê do CEO tem o nome CVM. */
+async function loadCeoCompanyName(
+  db: ReturnType<typeof getResearchSupabase>,
+  ticker: string
+): Promise<string | null> {
+  const stem = ticker.replace(/\d+$/, "");
+  const { data, error } = await db
+    .from("ceo_analise")
+    .select("ticker,company_name")
+    .like("ticker", `${stem}%`)
+    .not("company_name", "is", null)
+    .limit(8);
+  if (error) throw error;
+  const exact = data?.find(
+    (r) => String(r.ticker ?? "").toUpperCase() === ticker && r.company_name
+  );
+  const row = exact ?? data?.find((r) => r.company_name);
+  return blankToNull(row?.company_name as string | null);
+}
+
 /** Carrega remuneração CVM 2025 cruzada com o nome LSEG da empresa. */
 export async function loadRemuneracao(
   ticker: string
@@ -52,7 +77,9 @@ export async function loadRemuneracao(
     .maybeSingle();
   if (cErr) throw cErr;
 
-  const companyName = (company?.name as string | null) ?? null;
+  const companyName =
+    blankToNull(company?.name as string | null) ??
+    (await loadCeoCompanyName(db, t));
   if (!companyName) return empty(null);
 
   const token = searchToken(companyName);

@@ -51,6 +51,20 @@ describe("searchToken", () => {
     expect(searchToken("Petroleo Brasileiro SA Petrobras")).toBe("PETROBRAS");
     expect(searchToken("Itau Unibanco Holding SA")).toBe("UNIBANCO");
     expect(searchToken("Vitru Educacao SA")).toBe("VITRU");
+    expect(searchToken("Randon S.A. Implementos e Participações")).toBe(
+      "RANDON"
+    );
+  });
+});
+
+describe("pickBestCompanyName Randon", () => {
+  it("casa RANDON com RANDONCORP", () => {
+    expect(
+      pickBestCompanyName("Randon S.A. Implementos e Participações", [
+        "RANDONCORP S.A.",
+        "WEG S.A.",
+      ])
+    ).toBe("RANDONCORP S.A.");
   });
 });
 

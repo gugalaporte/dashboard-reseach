@@ -74,6 +74,13 @@ function tokens(raw: string): string[] {
     .filter((t) => t.length >= 3 && !stop.has(t));
 }
 
+/** RANDON casa com RANDONCORP (mesmo prefixo, mínimo 5 letras). */
+function tokensOverlap(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (a.length < 5 || b.length < 5) return false;
+  return a.startsWith(b) || b.startsWith(a);
+}
+
 /** Token mais específico para o ilike inicial (evita HOLDING, BANCO…). */
 export function searchToken(lsegName: string): string | null {
   const generic = new Set([
@@ -85,6 +92,7 @@ export function searchToken(lsegName: string): string | null {
     "TECNOLOGIA",
     "EDUCACAO",
     "EDUCACIONAL",
+    "IMPLEMENTOS",
   ]);
   const tks = tokens(lsegName);
   const branded = tks.filter((t) => !generic.has(t));
@@ -108,7 +116,16 @@ export function pickBestCompanyName(
     const ct = tokens(name);
     let score = 0;
     if (n.includes(target) || target.includes(n)) score += 40;
-    const overlap = targetTok.filter((t) => ct.includes(t)).length;
+    if (
+      targetTok.some(
+        (t) => t.length >= 5 && (n.startsWith(t) || t.startsWith(n))
+      )
+    ) {
+      score += 28;
+    }
+    const overlap = targetTok.filter((t) =>
+      ct.some((c) => tokensOverlap(t, c))
+    ).length;
     score += overlap * 12;
     score -= Math.abs(ct.length - targetTok.length) * 4;
     if (score > bestScore) {

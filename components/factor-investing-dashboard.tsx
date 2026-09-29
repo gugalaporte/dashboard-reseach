@@ -37,6 +37,10 @@ import { BottomUpDrawer } from "@/components/bottom-up-drawer";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Star } from "lucide-react";
+import {
+  FINACAP_BOOKS,
+  sectorForFilter,
+} from "@/lib/finacap-book";
 
 type FactorPayload = {
   asOfDate: string | null;
@@ -89,6 +93,9 @@ export function FactorInvestingDashboard() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [setor, setSetor] = React.useState<string | undefined>();
+  const [sectorSource, setSectorSource] = React.useState<"lseg" | "finacap">(
+    "finacap"
+  );
   const [classFilter, setClassFilter] = React.useState<FactorClass | "all">("all");
   const [onlyEligible, setOnlyEligible] = React.useState(true);
   const [onlyPortfolio, setOnlyPortfolio] = React.useState(false);
@@ -141,13 +148,17 @@ export function FactorInvestingDashboard() {
     let list = data.rows;
     if (onlyEligible) list = list.filter((r) => r.eligible || r.inPortfolio);
     if (onlyPortfolio) list = list.filter((r) => r.inPortfolio);
-    if (setor) list = list.filter((r) => r.sector === setor);
+    if (setor) {
+      list = list.filter(
+        (r) => sectorForFilter(r.ticker, r.sector, sectorSource) === setor
+      );
+    }
     return scoreFactors(
       list.map((r) => r.raw),
       data.eligibility,
       weightsFromPct(data.weights)
     );
-  }, [data, onlyEligible, onlyPortfolio, setor]);
+  }, [data, onlyEligible, onlyPortfolio, setor, sectorSource]);
 
   const rows = React.useMemo(() => {
     let list = scored;
@@ -174,6 +185,16 @@ export function FactorInvestingDashboard() {
       C: eligible.filter((r) => r.factorClass === "C").length,
     };
   }, [scored]);
+
+  const sectorOptions = React.useMemo(() => {
+    if (sectorSource === "lseg") return data?.sectors ?? [];
+    const present = new Set<string>();
+    for (const r of data?.rows ?? []) {
+      const book = sectorForFilter(r.ticker, r.sector, "finacap");
+      if (book) present.add(book);
+    }
+    return FINACAP_BOOKS.filter((b) => present.has(b));
+  }, [data, sectorSource]);
 
   const appliedWeights = data?.weights ?? DEFAULT_WEIGHT_PCT;
 
@@ -209,9 +230,29 @@ export function FactorInvestingDashboard() {
 
       <div className="bg-surface-soft border-b border-line sticky top-14 md:top-16 z-[35]">
         <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-3 md:py-4 flex flex-wrap items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-1 rounded-md bg-surface p-1 w-full sm:w-auto">
+            <TogglePill
+              active={sectorSource === "lseg"}
+              onClick={() => {
+                setSectorSource("lseg");
+                setSetor(undefined);
+              }}
+              label="LSEG"
+              className="flex-1 sm:flex-none"
+            />
+            <TogglePill
+              active={sectorSource === "finacap"}
+              onClick={() => {
+                setSectorSource("finacap");
+                setSetor(undefined);
+              }}
+              label="Book Finacap"
+              className="flex-1 sm:flex-none"
+            />
+          </div>
           <div className="w-full sm:w-auto">
             <SectorFilter
-              options={data?.sectors ?? []}
+              options={sectorOptions}
               value={setor}
               onChange={setSetor}
             />
@@ -322,6 +363,9 @@ export function FactorInvestingDashboard() {
             data={rows}
             isLoading={loading}
             onRowClick={setSelected}
+            sectorLabel={(r) =>
+              sectorForFilter(r.ticker, r.sector, sectorSource) ?? "Sem setor"
+            }
           />
 
           <div className="hidden md:block overflow-x-auto border border-line bg-white">
@@ -383,7 +427,7 @@ export function FactorInvestingDashboard() {
                         )}
                       </TableCell>
                       <TableCell className="text-[11px] text-ink/55 max-w-[140px] truncate">
-                        {r.sector || "–"}
+                        {sectorForFilter(r.ticker, r.sector, sectorSource) ?? "–"}
                       </TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                         <FactorScoreCell row={r} factor="quality" />
