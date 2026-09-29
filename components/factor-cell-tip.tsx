@@ -31,6 +31,7 @@ function fmtRaw(key: string, v: number | null): string {
     if (abs >= 1e6) return `${formatNumber(v / 1e6, 1)} mi`;
     return formatNumber(v, 0);
   }
+  if (key === "revenueCagr") return `${formatNumber(v, 1)}%`;
   return formatNumber(v, 2);
 }
 

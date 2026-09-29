@@ -14,6 +14,7 @@ function base(partial: Partial<FactorInput> & Pick<FactorInput, "ticker" | "ric"
     name: partial.name ?? partial.ticker,
     asOfDate: "2026-07-01",
     roe: 15,
+    roic: 12,
     netMargin: 10,
     ebitdaMargin: 20,
     currentRatio: 1.5,
@@ -31,6 +32,7 @@ function base(partial: Partial<FactorInput> & Pick<FactorInput, "ticker" | "ric"
     marketCap: 50e9,
     dayVolume: 2_000_000,
     analystCount: 8,
+    revenueCagr: 10,
     inPortfolio: false,
     ...partial,
   };
@@ -58,8 +60,8 @@ describe("scoreFactors", () => {
   it("ranqueia elegíveis e marca inelegíveis", () => {
     const rows = scoreFactors(
       [
-        base({ ticker: "AAA3", ric: "AAA3.SA", sector: "Energy", roe: 30, peRatio: 8 }),
-        base({ ticker: "BBB3", ric: "BBB3.SA", sector: "Energy", roe: 10, peRatio: 20 }),
+        base({ ticker: "AAA3", ric: "AAA3.SA", sector: "Energy", roic: 30, peRatio: 8 }),
+        base({ ticker: "BBB3", ric: "BBB3.SA", sector: "Energy", roic: 10, peRatio: 20 }),
         base({
           ticker: "CCC3",
           ric: "CCC3.SA",
@@ -126,14 +128,13 @@ describe("scoreFactors", () => {
     expect(rows[0]!.eligible).toBe(true);
   });
 
-  it("peso maior em quality sobe empresa de ROE alto", () => {
+  it("peso maior em quality sobe empresa de ROIC alto", () => {
     const highQ = base({
       ticker: "HIGHQ",
       ric: "HQ.SA",
       sector: "Energy",
-      roe: 40,
-      ebitdaMargin: 40,
-      netDebtEbitda: 0.5,
+      roic: 40,
+      revenueCagr: 25,
       dividendYield: 1,
       dyFwd: null,
     });
@@ -141,9 +142,8 @@ describe("scoreFactors", () => {
       ticker: "HIGHC",
       ric: "HC.SA",
       sector: "Energy",
-      roe: 5,
-      ebitdaMargin: 5,
-      netDebtEbitda: 3,
+      roic: 5,
+      revenueCagr: 2,
       dividendYield: 12,
       dyFwd: null,
     });
@@ -160,10 +160,10 @@ describe("scoreFactors", () => {
     expect(qTilt.score! - cTilt.score!).toBeGreaterThan(qEqual.score! - cEqual.score!);
   });
 
-  it("inverte métricas de valuation (menor P/E → z positivo relativo)", () => {
+  it("inverte métricas de valuation (menor EV/EBITDA → z positivo relativo)", () => {
     const rows = scoreFactors([
-      base({ ticker: "CHEAP", ric: "C.SA", sector: "Energy", peRatio: 5, peFwd: null }),
-      base({ ticker: "EXPENSIVE", ric: "E.SA", sector: "Energy", peRatio: 30, peFwd: null }),
+      base({ ticker: "CHEAP", ric: "C.SA", sector: "Energy", evEbitda: 4 }),
+      base({ ticker: "EXPENSIVE", ric: "E.SA", sector: "Energy", evEbitda: 12 }),
     ]);
     const cheap = rows.find((r) => r.ticker === "CHEAP")!;
     const exp = rows.find((r) => r.ticker === "EXPENSIVE")!;
@@ -175,22 +175,19 @@ describe("scoreFactors", () => {
       ticker: "PETR4",
       ric: "PETR4.SA",
       sector: "Energy",
-      peRatio: 6,
-      peFwd: null,
+      evEbitda: 4,
     });
     const energyPeer = base({
       ticker: "PRIO3",
       ric: "PRIO3.SA",
       sector: "Energy",
-      peRatio: 8,
-      peFwd: null,
+      evEbitda: 6,
     });
     const retailExpensive = base({
       ticker: "LREN3",
       ric: "LREN3.SA",
       sector: "Retail",
-      peRatio: 30,
-      peFwd: null,
+      evEbitda: 14,
     });
     const all = scoreFactors([energyCheap, energyPeer, retailExpensive]);
     const onlyEnergy = scoreFactors([energyCheap, energyPeer]);
@@ -211,33 +208,24 @@ describe("scoreFactors", () => {
     expect(low.breakdown.some((b) => b.key === "upsidePct")).toBe(false);
   });
 
-  it("ignora P/E, P/B e EV/EBITDA ≤ 0 no Value", () => {
+  it("ignora EV/EBITDA ≤ 0 no Value das não-financeiras", () => {
     const cheap = base({
       ticker: "CHEAP",
       ric: "C.SA",
       sector: "Energy",
-      peFwd: 8,
-      peRatio: 8,
-      pbRatio: 1.5,
-      evEbitda: 6,
+      evEbitda: 4,
     });
     const expensive = base({
       ticker: "EXPENSIVE",
       ric: "E.SA",
       sector: "Energy",
-      peFwd: 25,
-      peRatio: 25,
-      pbRatio: 1.5,
-      evEbitda: 6,
+      evEbitda: 12,
     });
     const loss = base({
       ticker: "LOSS",
       ric: "L.SA",
       sector: "Energy",
-      peFwd: -1.01,
-      peRatio: -4,
-      pbRatio: -0.09,
-      evEbitda: 6,
+      evEbitda: -2,
     });
 
     const without = scoreFactors([cheap, expensive]);
@@ -247,10 +235,152 @@ describe("scoreFactors", () => {
     const lossRow = withLoss.find((r) => r.ticker === "LOSS")!;
 
     expect(cheap1.value).toBeCloseTo(cheap0.value!, 8);
-    expect(lossRow.breakdown.find((b) => b.key === "peFwd")?.z).toBeNull();
-    expect(lossRow.breakdown.find((b) => b.key === "pbRatio")?.z).toBeNull();
-    expect(lossRow.breakdown.find((b) => b.key === "evEbitda")?.z).not.toBeNull();
-    expect(cheap1.value!).toBeGreaterThan(lossRow.value!);
+    expect(lossRow.breakdown.find((b) => b.key === "evEbitda")?.z).toBeNull();
+    expect(lossRow.breakdown.some((b) => b.key === "peFwd")).toBe(false);
+    expect(cheap1.value!).toBeGreaterThan(lossRow.value ?? -Infinity);
+  });
+
+  it("banco usa só P/E fwd; demais usam só EV/EBITDA", () => {
+    const bankCheap = base({
+      ticker: "ITUB4",
+      ric: "ITUB4.SA",
+      sector: "Banks",
+      peFwd: 6,
+      evEbitda: 40,
+    });
+    const bankExp = base({
+      ticker: "SANB11",
+      ric: "SANB11.SA",
+      sector: "Banks",
+      peFwd: 12,
+      evEbitda: 4,
+    });
+    const oilCheap = base({
+      ticker: "PETR4",
+      ric: "PETR4.SA",
+      sector: "Energy",
+      peFwd: 40,
+      evEbitda: 3,
+    });
+    const oilExp = base({
+      ticker: "PRIO3",
+      ric: "PRIO3.SA",
+      sector: "Energy",
+      peFwd: 5,
+      evEbitda: 10,
+    });
+    const rows = scoreFactors([bankCheap, bankExp, oilCheap, oilExp]);
+    const itub = rows.find((r) => r.ticker === "ITUB4")!;
+    const sanb = rows.find((r) => r.ticker === "SANB11")!;
+    const petr = rows.find((r) => r.ticker === "PETR4")!;
+    const prio = rows.find((r) => r.ticker === "PRIO3")!;
+
+    expect(itub.value!).toBeGreaterThan(sanb.value!);
+    expect(petr.value!).toBeGreaterThan(prio.value!);
+    expect(itub.breakdown.filter((b) => b.factor === "value").map((b) => b.key)).toEqual([
+      "peFwd",
+    ]);
+    expect(petr.breakdown.filter((b) => b.factor === "value").map((b) => b.key)).toEqual([
+      "evEbitda",
+    ]);
+  });
+
+  it("não-financeira usa só ROIC no Quality; banco usa só ROE", () => {
+    const bankHigh = base({
+      ticker: "ITUB4",
+      ric: "ITUB4.SA",
+      sector: "Banks",
+      roe: 22,
+      roic: 2,
+      revenueCagr: 8,
+    });
+    const bankLow = base({
+      ticker: "SANB11",
+      ric: "SANB11.SA",
+      sector: "Banks",
+      roe: 8,
+      roic: 40,
+      revenueCagr: 8,
+    });
+    const oilHigh = base({
+      ticker: "PETR4",
+      ric: "PETR4.SA",
+      sector: "Energy",
+      roe: 5,
+      roic: 30,
+      revenueCagr: 8,
+    });
+    const oilLow = base({
+      ticker: "PRIO3",
+      ric: "PRIO3.SA",
+      sector: "Energy",
+      roe: 40,
+      roic: 6,
+      revenueCagr: 8,
+    });
+    const rows = scoreFactors([bankHigh, bankLow, oilHigh, oilLow]);
+    const itub = rows.find((r) => r.ticker === "ITUB4")!;
+    const sanb = rows.find((r) => r.ticker === "SANB11")!;
+    const petr = rows.find((r) => r.ticker === "PETR4")!;
+    const prio = rows.find((r) => r.ticker === "PRIO3")!;
+
+    expect(itub.quality!).toBeGreaterThan(sanb.quality!);
+    expect(petr.quality!).toBeGreaterThan(prio.quality!);
+    expect(itub.breakdown.filter((b) => b.factor === "quality").map((b) => b.key)).toEqual([
+      "roe",
+      "revenueCagr",
+    ]);
+    expect(petr.breakdown.filter((b) => b.factor === "quality").map((b) => b.key)).toEqual([
+      "roic",
+      "revenueCagr",
+    ]);
+  });
+
+  it("evolução da receita maior sobe o Quality quando o retorno é igual", () => {
+    const grow = base({
+      ticker: "GROW3",
+      ric: "GROW3.SA",
+      sector: "Energy",
+      roic: 12,
+      revenueCagr: 30,
+    });
+    const slow = base({
+      ticker: "SLOW3",
+      ric: "SLOW3.SA",
+      sector: "Energy",
+      roic: 12,
+      revenueCagr: 2,
+    });
+    const rows = scoreFactors([grow, slow]);
+    expect(rows.find((r) => r.ticker === "GROW3")!.quality!).toBeGreaterThan(
+      rows.find((r) => r.ticker === "SLOW3")!.quality!
+    );
+  });
+
+  it("momentum usa só retorno 3M", () => {
+    const high = base({
+      ticker: "HOT3",
+      ric: "HOT3.SA",
+      sector: "Energy",
+      ret3m: 20,
+      ret6m: -40,
+      epsRev4wPct: -50,
+    });
+    const low = base({
+      ticker: "COLD3",
+      ric: "COLD3.SA",
+      sector: "Energy",
+      ret3m: -5,
+      ret6m: 40,
+      epsRev4wPct: 50,
+    });
+    const rows = scoreFactors([high, low]);
+    const hot = rows.find((r) => r.ticker === "HOT3")!;
+    const cold = rows.find((r) => r.ticker === "COLD3")!;
+    expect(hot.momentum!).toBeGreaterThan(cold.momentum!);
+    expect(hot.breakdown.filter((b) => b.factor === "momentum").map((b) => b.key)).toEqual([
+      "ret3m",
+    ]);
   });
 });
 
@@ -298,13 +428,20 @@ describe("buildFactorInputs", () => {
         pe_fwd: 5,
         dy_fwd: 9,
         eps_rev_4w_pct: 1.5,
-      }]
+      }],
+      [
+        { ric: "VALE3.SA", as_of_date: "2026-07-01", period_type: "ANNUAL", period_year: 2023, period_label: "2023", revenue: 100, ebitda: 1, net_income: 1 },
+        { ric: "VALE3.SA", as_of_date: "2026-07-01", period_type: "ANNUAL", period_year: 2024, period_label: "2024", revenue: 120, ebitda: 1, net_income: 1 },
+        { ric: "VALE3.SA", as_of_date: "2026-07-01", period_type: "ANNUAL", period_year: 2025, period_label: "2025", revenue: 144, ebitda: 1, net_income: 1 },
+      ]
     );
     expect(inputs).toHaveLength(1);
     expect(inputs[0]!.ticker).toBe("VALE3");
     expect(inputs[0]!.peFwd).toBe(5);
     expect(inputs[0]!.epsRev4wPct).toBe(1.5);
     expect(inputs[0]!.analystCount).toBe(12);
+    expect(inputs[0]!.roic).toBe(10);
+    expect(inputs[0]!.revenueCagr).toBeCloseTo(20, 5);
   });
 
   it("usa day_volume do snapshot anterior se o mais recente vier vazio", () => {
@@ -343,5 +480,6 @@ describe("buildFactorInputs", () => {
     expect(inputs).toHaveLength(1);
     expect(inputs[0]!.asOfDate).toBe("2026-09-18");
     expect(inputs[0]!.dayVolume).toBe(23_808_400);
+    expect(inputs[0]!.revenueCagr).toBeNull();
   });
 });

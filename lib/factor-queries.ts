@@ -6,6 +6,7 @@ import type {
   LsegCompanyRow,
   LsegDailySnapshotRow,
   LsegForwardEstimateRow,
+  LsegHistoricalSeriesRow,
 } from "./lseg-transform";
 import {
   DEFAULT_ELIGIBILITY,
@@ -19,7 +20,7 @@ import {
 import { buildFactorInputs } from "./factor-build";
 
 const SNAPSHOT_BASE =
-  "ric,as_of_date,roe,net_margin,ebitda_margin,current_ratio,net_debt_ebitda,pe_ratio,pb_ratio,ev_ebitda,upside_pct,ret_3m,ret_6m,dividend_yield,market_cap,day_volume,num_buys,num_holds,num_sells";
+  "ric,as_of_date,roe,roic,net_margin,ebitda_margin,current_ratio,net_debt_ebitda,pe_ratio,pb_ratio,ev_ebitda,upside_pct,ret_3m,ret_6m,dividend_yield,market_cap,day_volume,num_buys,num_holds,num_sells";
 
 const FORWARD_BASE = "ric,as_of_date,fiscal_year,pe_fwd,dy_fwd";
 
@@ -75,7 +76,7 @@ export async function loadFactorRanking(
   }
 
   const db = getResearchSupabase();
-  const [companies, snapshots, forward] = await Promise.all([
+  const [companies, snapshots, forward, historical] = await Promise.all([
     fetchAllRows<LsegCompanyRow>((from, to) =>
       db
         .from("companies")
@@ -84,9 +85,17 @@ export async function loadFactorRanking(
     ),
     loadSnapshots(db),
     loadForward(db),
+    fetchAllRows<LsegHistoricalSeriesRow>((from, to) =>
+      db
+        .from("historical_series")
+        .select("ric,as_of_date,period_type,period_year,revenue")
+        .eq("period_type", "ANNUAL")
+        .not("revenue", "is", null)
+        .range(from, to)
+    ),
   ]);
 
-  const inputs = buildFactorInputs(companies, snapshots, forward);
+  const inputs = buildFactorInputs(companies, snapshots, forward, historical);
   const rows = scoreFactors(inputs, eligibility, weightsFromPct(weightPct));
 
   let asOfDate: string | null = null;

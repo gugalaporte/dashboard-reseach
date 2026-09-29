@@ -1,3 +1,4 @@
+import { displayTicker } from "./finacap-book";
 import { defaultCcyForTicker } from "./currency";
 import { extractYear, type MetricId } from "./metrics";
 import type { Cell, ResearchRow, TargetCell } from "./queries";
@@ -805,8 +806,9 @@ export function buildLsegRows(
 
   for (const ric of allRics) {
     const company = companyByRic.get(ric);
-    const ticker =
-      company?.ticker?.trim().toUpperCase() || ricToTicker(ric);
+    const ticker = displayTicker(
+      company?.ticker?.trim().toUpperCase() || ricToTicker(ric)
+    );
     if (!ticker) continue;
     if (allowed && !allowed.has(ticker)) continue;
 

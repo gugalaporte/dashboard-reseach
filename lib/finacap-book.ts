@@ -1,5 +1,7 @@
 /** Book Finacap: agrupamento interno de setores (não é o GICS/LSEG). */
 
+import { bovespaSubsector } from "./bovespa-subsector";
+
 export const FINACAP_BOOKS = [
   "Commodities",
   "Consumo",
@@ -13,6 +15,7 @@ export type FinacapBook = (typeof FINACAP_BOOKS)[number];
 const BOOK_BY_TICKER: Record<string, FinacapBook> = {
   AESB3: "Utilities",
   ALOS3: "Consumo",
+  AZUL3: "Consumo",
   AZUL4: "Consumo",
   BRBI11: "Financials",
   CMIG4: "Utilities",
@@ -127,18 +130,31 @@ const BOOK_BY_TICKER: Record<string, FinacapBook> = {
   CSMG3: "Utilities",
 };
 
-export function finacapBook(ticker: string | null | undefined): FinacapBook | null {
+/** Azul: screening e carteira usam AZUL3; LSEG ainda entrega AZUL4. */
+const DISPLAY_TICKER: Record<string, string> = {
+  AZUL4: "AZUL3",
+};
+
+export function displayTicker(ticker: string | null | undefined): string {
   const t = (ticker ?? "").trim().toUpperCase();
-  if (!t) return null;
-  return BOOK_BY_TICKER[t] ?? null;
+  return DISPLAY_TICKER[t] ?? t;
 }
+
+export function finacapBook(ticker: string | null | undefined): FinacapBook | null {
+  const t = displayTicker(ticker);
+  if (!t) return null;
+  return BOOK_BY_TICKER[t] ?? BOOK_BY_TICKER[(ticker ?? "").trim().toUpperCase()] ?? null;
+}
+
+export type SectorSource = "lseg" | "finacap" | "bovespa";
 
 export function sectorForFilter(
   ticker: string,
   lsegSector: string | null | undefined,
-  source: "lseg" | "finacap"
+  source: SectorSource
 ): string | null {
   if (source === "finacap") return finacapBook(ticker);
+  if (source === "bovespa") return bovespaSubsector(ticker);
   const s = (lsegSector ?? "").trim();
   return s || null;
 }

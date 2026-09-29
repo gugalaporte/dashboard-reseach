@@ -3,7 +3,7 @@
 const IR_SITES: Record<string, string> = {
   ALOS3: "https://ri.allos.com.br/",
   AXIA3: "https://ri.axia.com.br/",
-  AZUL4: "https://ri.voeazul.com.br/",
+  AZUL3: "https://ri.voeazul.com.br/",
   BPAC11: "https://ri.btgpactual.com/",
   BRBI11: "https://ri.brpartners.com.br/",
   DXCO3: "https://ri.dex.co/",
@@ -33,5 +33,5 @@ const IR_SITES: Record<string, string> = {
 
 export function irSiteForTicker(ticker: string): string | null {
   const t = ticker.trim().toUpperCase();
-  return IR_SITES[t] ?? null;
+  return IR_SITES[t] ?? IR_SITES[t === "AZUL4" ? "AZUL3" : t] ?? null;
 }

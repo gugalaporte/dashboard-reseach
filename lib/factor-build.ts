@@ -1,5 +1,7 @@
-import { latestSnapshots, type LsegCompanyRow, type LsegDailySnapshotRow, type LsegForwardEstimateRow } from "./lseg-transform";
+import { latestSnapshots, type LsegCompanyRow, type LsegDailySnapshotRow, type LsegForwardEstimateRow, type LsegHistoricalSeriesRow } from "./lseg-transform";
 import type { FactorInput } from "./factor-scoring";
+import { lastCompletedYear, revenueCagrByRic } from "./revenue-cagr";
+import { displayTicker } from "./finacap-book";
 
 function num(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -69,20 +71,30 @@ function lastKnownByRic(
 export function buildFactorInputs(
   companies: LsegCompanyRow[],
   snapshots: LsegDailySnapshotRow[],
-  forward: LsegForwardEstimateRow[]
+  forward: LsegForwardEstimateRow[],
+  historical: LsegHistoricalSeriesRow[] = []
 ): FactorInput[] {
   const snaps = latestSnapshots(snapshots);
   const lastVolume = lastKnownByRic(snapshots, (r) => num(r.day_volume));
   const fwdMap = latestForwardByRic(forward);
   const byRic = new Map(companies.map((c) => [c.ric, c]));
 
+  let maxAsOf: string | null = null;
+  for (const snap of snaps) {
+    if (snap.as_of_date && (!maxAsOf || snap.as_of_date > maxAsOf)) {
+      maxAsOf = snap.as_of_date;
+    }
+  }
+  const cagrByRic = revenueCagrByRic(historical, lastCompletedYear(maxAsOf));
+
   const inputs: FactorInput[] = [];
   for (const snap of snaps) {
     const company = byRic.get(snap.ric);
-    const ticker =
+    const ticker = displayTicker(
       company?.ticker?.trim().toUpperCase() ||
-      snap.ric.split(".")[0]?.toUpperCase() ||
-      snap.ric;
+        snap.ric.split(".")[0]?.toUpperCase() ||
+        snap.ric
+    );
     const fwd = fwdMap.get(snap.ric);
 
     inputs.push({
@@ -92,6 +104,7 @@ export function buildFactorInputs(
       sector: company?.sector ?? null,
       asOfDate: snap.as_of_date ?? null,
       roe: num(snap.roe),
+      roic: num(snap.roic),
       netMargin: num(snap.net_margin),
       ebitdaMargin: num(snap.ebitda_margin),
       currentRatio: num(snap.current_ratio),
@@ -109,6 +122,7 @@ export function buildFactorInputs(
       marketCap: num(snap.market_cap),
       dayVolume: num(snap.day_volume) ?? lastVolume.get(snap.ric) ?? null,
       analystCount: analystCount(snap),
+      revenueCagr: cagrByRic.get(snap.ric) ?? null,
       inPortfolio: Boolean(company?.in_portfolio),
     });
   }

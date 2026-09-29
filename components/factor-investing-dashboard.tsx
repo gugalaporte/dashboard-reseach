@@ -36,11 +36,14 @@ import { FactorMobileList } from "@/components/factor-mobile-list";
 import { BottomUpDrawer } from "@/components/bottom-up-drawer";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { downloadFactorPdf } from "@/lib/factor-pdf";
 import { Star } from "lucide-react";
 import {
   FINACAP_BOOKS,
   sectorForFilter,
+  type SectorSource,
 } from "@/lib/finacap-book";
+import { BOVESPA_SUBSECTORS } from "@/lib/bovespa-subsector";
 
 type FactorPayload = {
   asOfDate: string | null;
@@ -93,9 +96,7 @@ export function FactorInvestingDashboard() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [setor, setSetor] = React.useState<string | undefined>();
-  const [sectorSource, setSectorSource] = React.useState<"lseg" | "finacap">(
-    "finacap"
-  );
+  const [sectorSource, setSectorSource] = React.useState<SectorSource>("finacap");
   const [classFilter, setClassFilter] = React.useState<FactorClass | "all">("all");
   const [onlyEligible, setOnlyEligible] = React.useState(true);
   const [onlyPortfolio, setOnlyPortfolio] = React.useState(false);
@@ -105,6 +106,7 @@ export function FactorInvestingDashboard() {
   const [sortKey, setSortKey] = React.useState<SortKey>("score");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
   const [selected, setSelected] = React.useState<FactorRow | null>(null);
+  const [savingPdf, setSavingPdf] = React.useState(false);
 
   const fetchData = React.useCallback(async () => {
     setLoading(true);
@@ -190,8 +192,11 @@ export function FactorInvestingDashboard() {
     if (sectorSource === "lseg") return data?.sectors ?? [];
     const present = new Set<string>();
     for (const r of data?.rows ?? []) {
-      const book = sectorForFilter(r.ticker, r.sector, "finacap");
-      if (book) present.add(book);
+      const label = sectorForFilter(r.ticker, r.sector, sectorSource);
+      if (label) present.add(label);
+    }
+    if (sectorSource === "bovespa") {
+      return BOVESPA_SUBSECTORS.filter((s) => present.has(s));
     }
     return FINACAP_BOOKS.filter((b) => present.has(b));
   }, [data, sectorSource]);
@@ -220,6 +225,25 @@ export function FactorInvestingDashboard() {
     setWeightInputs(defaultWeightInputs());
   }
 
+  async function savePdf() {
+    if (rows.length === 0 || savingPdf) return;
+    setSavingPdf(true);
+    try {
+      await downloadFactorPdf({
+        rows,
+        asOfDate: data?.asOfDate ?? null,
+        weights: appliedWeights,
+        sectorLabel: (r) =>
+          sectorForFilter(r.ticker, r.sector, sectorSource) ?? "–",
+        includeReason: !onlyEligible,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao salvar PDF");
+    } finally {
+      setSavingPdf(false);
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <AppHeader
@@ -238,6 +262,15 @@ export function FactorInvestingDashboard() {
                 setSetor(undefined);
               }}
               label="LSEG"
+              className="flex-1 sm:flex-none"
+            />
+            <TogglePill
+              active={sectorSource === "bovespa"}
+              onClick={() => {
+                setSectorSource("bovespa");
+                setSetor(undefined);
+              }}
+              label="Bovespa"
               className="flex-1 sm:flex-none"
             />
             <TogglePill
@@ -345,18 +378,30 @@ export function FactorInvestingDashboard() {
         )}
 
         <section>
-          <div className="mb-3">
-            <h2 className="font-display text-lg text-ink tracking-tight">
-              Screening multifatorial
-              <span className="ml-2 font-sans text-sm text-ink/45 tabular font-normal tracking-normal">
-                {formatNumber(rows.length)} {rows.length === 1 ? "empresa" : "empresas"}
-              </span>
-            </h2>
-            <p className="text-xs text-ink/45 mt-0.5 leading-relaxed">
-              Quality {appliedWeights.quality}% · Value {appliedWeights.value}% · Carry{" "}
-              {appliedWeights.carry}% · Momentum {appliedWeights.momentum}% — z-score
-              no universo da tela · ND/EBITDA ignore bancos/financeiras
-            </p>
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="font-display text-lg text-ink tracking-tight">
+                Screening multifatorial
+                <span className="ml-2 font-sans text-sm text-ink/45 tabular font-normal tracking-normal">
+                  {formatNumber(rows.length)} {rows.length === 1 ? "empresa" : "empresas"}
+                </span>
+              </h2>
+              <p className="text-xs text-ink/45 mt-0.5 leading-relaxed">
+                Quality {appliedWeights.quality}% · Value {appliedWeights.value}% · Carry{" "}
+                {appliedWeights.carry}% · Momentum {appliedWeights.momentum}% — z-score
+                no universo da tela · ND/EBITDA ignore bancos/financeiras
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-[11px] uppercase tracking-[0.08em] shrink-0"
+              disabled={loading || rows.length === 0 || savingPdf}
+              onClick={() => void savePdf()}
+            >
+              {savingPdf ? "Salvando…" : "Salvar PDF"}
+            </Button>
           </div>
 
           <FactorMobileList

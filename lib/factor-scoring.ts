@@ -1,5 +1,7 @@
 /** Scoring multifatorial (z-score no universo passado) — read-only, puro. */
 
+import { finacapBook } from "./finacap-book";
+
 export type FactorClass = "A" | "B" | "C";
 
 export type FactorEligibility = {
@@ -81,6 +83,7 @@ export type FactorInput = {
   sector: string | null;
   asOfDate: string | null;
   roe: number | null;
+  roic: number | null;
   netMargin: number | null;
   ebitdaMargin: number | null;
   currentRatio: number | null;
@@ -98,6 +101,8 @@ export type FactorInput = {
   marketCap: number | null;
   dayVolume: number | null;
   analystCount: number | null;
+  /** Crescimento composto da receita em 2 anos (3 exercícios anuais), em %. */
+  revenueCagr: number | null;
   /** Flag companies.in_portfolio (carteira Finacap). */
   inPortfolio: boolean;
 };
@@ -124,11 +129,11 @@ export const FACTOR_LABELS: Record<FactorId, string> = {
 /** Descrição genérica da composição de cada fator (para tooltip). */
 export const FACTOR_FORMULA: Record<FactorId, string> = {
   quality:
-    "Média dos z-scores no universo da tela: ROE, margem EBITDA, dívida líquida/EBITDA (inv., menor é melhor).",
+    "Bancos e financeiras: z-score de ROE, só entre financeiras na tela. Demais: z-score de ROIC, só entre não-financeiras. Mais z-score da evolução da receita (crescimento composto em 2 anos, 3 exercícios anuais fechados). Quality = média dessas 2 métricas.",
   value:
-    "Média dos z-scores no universo da tela: P/E fwd ou P/E (inv., menor é melhor), P/B (inv.), EV/EBITDA (inv.). Múltiplo ≤ 0 é ignorado.",
+    "Bancos e financeiras: z-score de P/E fwd (inv., menor é melhor), só entre financeiras na tela. Demais: z-score de EV/EBITDA (inv.), só entre não-financeiras. Múltiplo ≤ 0 é ignorado.",
   momentum:
-    "Média dos z-scores no universo da tela: revisão EPS 4 semanas %, retorno 3M, retorno 6M.",
+    "Z-score no universo da tela: retorno 3M.",
   carry:
     "Z-score no universo da tela: DY fwd ou dividend yield.",
   liquidity:
@@ -212,6 +217,15 @@ export function isLeverageExemptSector(sector: string | null | undefined): boole
   return /bank|banco|financ|insurance|seguro|invest/.test(s);
 }
 
+/** Value: P/E fwd só em banco/financeira; EV/EBITDA no restante. */
+export function isFinancialForValue(row: {
+  ticker: string;
+  sector: string | null | undefined;
+}): boolean {
+  if (finacapBook(row.ticker) === "Financials") return true;
+  return isLeverageExemptSector(row.sector);
+}
+
 type MetricDef = {
   key: keyof FactorInput;
   label: string;
@@ -254,51 +268,74 @@ function metricZ(
   return inverted ? -z : z;
 }
 
-/** Value: pe_fwd invertido se existir e for > 0, senão pe_ratio. */
-function valuePeZ(row: FactorInput, pePeers: number[], peFwdPeers: number[]): {
-  z: number | null;
-  key: string;
-  label: string;
-  raw: number | null;
-  inverted: boolean;
-} {
-  if (usableMetric("peFwd", row.peFwd)) {
+/** Value: P/E fwd (financeiras) ou EV/EBITDA (demais), invertido. */
+function valueMetric(
+  row: FactorInput,
+  peFwdPeers: number[],
+  evPeers: number[]
+): MetricBreakdown {
+  if (isFinancialForValue(row)) {
+    const z = metricZ(row, "peFwd", peFwdPeers, true);
     return {
-      z: metricZ(row, "peFwd", peFwdPeers, true),
       key: "peFwd",
       label: "P/E fwd",
       raw: row.peFwd,
+      z,
       inverted: true,
+      factor: "value",
     };
   }
-  if (usableMetric("peRatio", row.peRatio)) {
-    return {
-      z: metricZ(row, "peRatio", pePeers, true),
-      key: "peRatio",
-      label: "P/E",
-      raw: row.peRatio,
-      inverted: true,
-    };
-  }
-  if (row.peFwd != null) {
-    return {
-      z: null,
-      key: "peFwd",
-      label: "P/E fwd",
-      raw: row.peFwd,
-      inverted: true,
-    };
-  }
+  const z = metricZ(row, "evEbitda", evPeers, true);
   return {
-    z: null,
-    key: "peRatio",
-    label: "P/E",
-    raw: row.peRatio,
+    key: "evEbitda",
+    label: "EV/EBITDA",
+    raw: row.evEbitda,
+    z,
     inverted: true,
+    factor: "value",
   };
 }
 
-/** Carry: dy_fwd se existir, senão dividend_yield. */
+/** Quality: ROE (financeiras) ou ROIC (demais). */
+function qualityReturnMetric(
+  row: FactorInput,
+  roePeers: number[],
+  roicPeers: number[]
+): MetricBreakdown {
+  if (isFinancialForValue(row)) {
+    return {
+      key: "roe",
+      label: "ROE",
+      raw: row.roe,
+      z: metricZ(row, "roe", roePeers, false),
+      inverted: false,
+      factor: "quality",
+    };
+  }
+  return {
+    key: "roic",
+    label: "ROIC",
+    raw: row.roic,
+    z: metricZ(row, "roic", roicPeers, false),
+    inverted: false,
+    factor: "quality",
+  };
+}
+
+function qualityGrowthMetric(
+  row: FactorInput,
+  cagrPeers: number[]
+): MetricBreakdown {
+  return {
+    key: "revenueCagr",
+    label: "Evolução da receita",
+    raw: row.revenueCagr,
+    z: metricZ(row, "revenueCagr", cagrPeers, false),
+    inverted: false,
+    factor: "quality",
+  };
+}
+
 function carryYieldZ(row: FactorInput, dyPeers: number[], dyFwdPeers: number[]): {
   z: number | null;
   key: string;
@@ -324,21 +361,8 @@ function carryYieldZ(row: FactorInput, dyPeers: number[], dyFwdPeers: number[]):
   };
 }
 
-const QUALITY_METRICS: MetricDef[] = [
-  { key: "roe", label: "ROE" },
-  { key: "ebitdaMargin", label: "Margem EBITDA" },
-  { key: "netDebtEbitda", label: "Dívida líquida/EBITDA", inverted: true },
-];
-
-const VALUE_EXTRA: MetricDef[] = [
-  { key: "pbRatio", label: "P/B", inverted: true },
-  { key: "evEbitda", label: "EV/EBITDA", inverted: true },
-];
-
 const MOMENTUM_METRICS: MetricDef[] = [
-  { key: "epsRev4wPct", label: "Rev. EPS 4s %" },
   { key: "ret3m", label: "Retorno 3M" },
-  { key: "ret6m", label: "Retorno 6M" },
 ];
 
 const LIQUIDITY_METRICS: MetricDef[] = [
@@ -370,18 +394,16 @@ export function scoreFactors(
   weights: FactorWeights = FACTOR_WEIGHTS
 ): FactorRow[] {
   const eligible = inputs.filter((r) => isEligible(r, cfg).ok);
+  const financials = eligible.filter(isFinancialForValue);
+  const others = eligible.filter((r) => !isFinancialForValue(r));
 
   const peerMaps: Record<string, number[]> = {
-    roe: collectPeers(eligible, "roe"),
-    ebitdaMargin: collectPeers(eligible, "ebitdaMargin"),
-    netDebtEbitda: collectPeers(eligible, "netDebtEbitda"),
-    peRatio: collectPeers(eligible, "peRatio"),
-    peFwd: collectPeers(eligible, "peFwd"),
-    pbRatio: collectPeers(eligible, "pbRatio"),
-    evEbitda: collectPeers(eligible, "evEbitda"),
-    epsRev4wPct: collectPeers(eligible, "epsRev4wPct"),
+    roe: collectPeers(financials, "roe"),
+    roic: collectPeers(others, "roic"),
+    revenueCagr: collectPeers(eligible, "revenueCagr"),
+    peFwd: collectPeers(financials, "peFwd"),
+    evEbitda: collectPeers(others, "evEbitda"),
     ret3m: collectPeers(eligible, "ret3m"),
-    ret6m: collectPeers(eligible, "ret6m"),
     dividendYield: collectPeers(eligible, "dividendYield"),
     dyFwd: collectPeers(eligible, "dyFwd"),
     marketCap: collectPeers(eligible, "marketCap"),
@@ -414,42 +436,14 @@ export function scoreFactors(
     }
 
     const breakdown: MetricBreakdown[] = [];
-    const qualityZs: Array<number | null> = [];
-    for (const m of QUALITY_METRICS) {
-      const z = metricZ(row, m.key, peerMaps[m.key]!, !!m.inverted);
-      qualityZs.push(z);
-      breakdown.push({
-        key: m.key,
-        label: m.label,
-        raw: typeof row[m.key] === "number" ? (row[m.key] as number) : null,
-        z,
-        inverted: !!m.inverted,
-        factor: "quality",
-      });
-    }
+    const returnPart = qualityReturnMetric(row, peerMaps.roe!, peerMaps.roic!);
+    const growthPart = qualityGrowthMetric(row, peerMaps.revenueCagr!);
+    breakdown.push(returnPart, growthPart);
+    const qualityZs: Array<number | null> = [returnPart.z, growthPart.z];
 
-    const pePart = valuePeZ(row, peerMaps.peRatio!, peerMaps.peFwd!);
-    breakdown.push({
-      key: pePart.key,
-      label: pePart.label,
-      raw: pePart.raw,
-      z: pePart.z,
-      inverted: pePart.inverted,
-      factor: "value",
-    });
-    const valueZs: Array<number | null> = [pePart.z];
-    for (const m of VALUE_EXTRA) {
-      const z = metricZ(row, m.key, peerMaps[m.key]!, !!m.inverted);
-      valueZs.push(z);
-      breakdown.push({
-        key: m.key,
-        label: m.label,
-        raw: typeof row[m.key] === "number" ? (row[m.key] as number) : null,
-        z,
-        inverted: !!m.inverted,
-        factor: "value",
-      });
-    }
+    const valuePart = valueMetric(row, peerMaps.peFwd!, peerMaps.evEbitda!);
+    breakdown.push(valuePart);
+    const valueZs: Array<number | null> = [valuePart.z];
 
     const momentumZs: Array<number | null> = [];
     for (const m of MOMENTUM_METRICS) {
