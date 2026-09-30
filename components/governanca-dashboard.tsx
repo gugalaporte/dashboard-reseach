@@ -7,6 +7,7 @@ import { CompanyLogo } from "@/components/company-logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { sectorPt } from "@/lib/sector-labels";
 import { GovernancaCalendario } from "@/components/governanca-calendario";
+import { GovernancaEventosTimeline } from "@/components/governanca-eventos-timeline";
 import type { LsegViewRow } from "@/lib/lseg-transform";
 
 function GovernanceCard({ row }: { row: LsegViewRow }) {
@@ -84,6 +85,10 @@ export function GovernancaDashboard() {
             {error}
           </p>
         )}
+
+        <div className="mb-6">
+          <GovernancaEventosTimeline />
+        </div>
 
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
