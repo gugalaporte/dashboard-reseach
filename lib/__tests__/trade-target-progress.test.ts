@@ -30,6 +30,8 @@ function target(partial: Partial<TradeTarget> = {}): TradeTarget {
     dueDate: "2026-09-30",
     createdAt: "2026-09-01T00:00:00.000Z",
     updatedAt: "2026-09-01T00:00:00.000Z",
+    filledQty: null,
+    filledValue: null,
     remaining: null,
     avgPrice: null,
     currentPrice: null,
@@ -44,6 +46,8 @@ describe("targetProgress", () => {
       trade({ qty: 3000, notional: 3000 * 30 }),
       trade({ qty: 2000, notional: 2000 * 32, tradeDateIso: "2026-09-20" }),
     ]);
+    expect(p.filledQty).toBe(5000);
+    expect(p.filledValue).toBe(154_000);
     expect(p.remaining).toBe(5000);
     expect(p.avgPrice).toBe(30.8);
   });
@@ -52,6 +56,8 @@ describe("targetProgress", () => {
     const p = targetProgress(target({ amountType: "value", amount: 2_000_000 }), [
       trade({ qty: 1000, notional: 31_000 }),
     ]);
+    expect(p.filledQty).toBe(1000);
+    expect(p.filledValue).toBe(31_000);
     expect(p.remaining).toBe(1_969_000);
     expect(p.avgPrice).toBe(31);
   });
@@ -64,6 +70,8 @@ describe("targetProgress", () => {
       trade({ tradeDateIso: "2026-08-31", qty: 4000, notional: 120_000 }),
       trade({ tradeDateIso: "2026-10-01", qty: 4000, notional: 120_000 }),
     ]);
+    expect(p.filledQty).toBe(0);
+    expect(p.filledValue).toBe(0);
     expect(p.remaining).toBe(10000);
     expect(p.avgPrice).toBe(null);
   });
@@ -72,6 +80,8 @@ describe("targetProgress", () => {
     const p = targetProgress(target({ startDate: null, dueDate: null }), [
       trade({ qty: 1000, notional: 30_000 }),
     ]);
+    expect(p.filledQty).toBe(null);
+    expect(p.filledValue).toBe(null);
     expect(p.remaining).toBe(null);
     expect(p.avgPrice).toBe(null);
   });
@@ -80,6 +90,8 @@ describe("targetProgress", () => {
 describe("attachTargetProgress", () => {
   it("preenche remaining e avgPrice em cada meta", () => {
     const [row] = attachTargetProgress([target()], [trade({ qty: 1000, notional: 30_000 })]);
+    expect(row?.filledQty).toBe(1000);
+    expect(row?.filledValue).toBe(30_000);
     expect(row?.remaining).toBe(9000);
     expect(row?.avgPrice).toBe(30);
   });

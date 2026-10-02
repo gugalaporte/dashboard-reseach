@@ -13,7 +13,11 @@ export type TradeTarget = {
   dueDate: string | null;
   createdAt: string;
   updatedAt: string;
-  /** Meta menos o executado no intervalo (qty ou R$), só Mauritsstad. */
+  /** Ações já executadas no intervalo, só Mauritsstad. */
+  filledQty: number | null;
+  /** Financeiro já executado no intervalo (R$), só Mauritsstad. */
+  filledValue: number | null;
+  /** Meta menos o financeiro executado no intervalo, só Mauritsstad. */
   remaining: number | null;
   /** VWAP das execuções do mesmo lado no intervalo. */
   avgPrice: number | null;
@@ -102,8 +106,7 @@ export function parseTargetInput(body: unknown): TradeTargetInput | string {
   if (!ticker) return "ticker inválido";
   const side = parseSide(raw.side);
   if (!side) return "side deve ser buy ou sell";
-  const amountType = parseAmountType(raw.amountType);
-  if (!amountType) return "amountType deve ser qty ou value";
+  const amountType = parseAmountType(raw.amountType) ?? "value";
   const amount = parseAmount(raw.amount);
   if (amount == null) return "amount deve ser um número maior que zero";
   const startDate = parseDate(raw.startDate);
@@ -120,12 +123,14 @@ export function rowToTarget(row: TradeTargetRow): TradeTarget {
     id: String(row.id),
     ticker: String(row.ticker ?? "").trim().toUpperCase(),
     side: parseSide(row.side) ?? "buy",
-    amountType: parseAmountType(row.amount_type) ?? "qty",
+    amountType: parseAmountType(row.amount_type) ?? "value",
     amount,
     startDate: parseDate(row.start_date) ?? null,
     dueDate: parseDate(row.due_date) ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    filledQty: null,
+    filledValue: null,
     remaining: null,
     avgPrice: null,
     currentPrice: null,

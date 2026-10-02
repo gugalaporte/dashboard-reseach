@@ -10,6 +10,7 @@ import {
   defaultPipelineStage,
   emptyPipelineCounts,
   inPipelineStage,
+  sortPipelineByDate,
   type PipelineNote,
 } from "@/lib/pipeline";
 import { PIPELINE_STEPS, type PipelineStatus } from "@/lib/bottom-up-types";
@@ -42,12 +43,13 @@ export function PipelineDashboard() {
     };
   }, []);
 
-  const counts = React.useMemo(() => countByPipeline(notes), [notes]);
+  const ordered = React.useMemo(() => sortPipelineByDate(notes), [notes]);
+  const counts = React.useMemo(() => countByPipeline(ordered), [ordered]);
   const active = stage ?? defaultPipelineStage(counts);
-  const visible = notes.filter((n) => inPipelineStage(n.status, active));
+  const visible = ordered.filter((n) => inPipelineStage(n.status, active));
   const stepLabel =
     PIPELINE_STEPS.find((s) => s.id === active)?.label ?? active;
-  const lastUpdate = notes[0]?.updatedAt ?? null;
+  const lastUpdate = ordered[0]?.updatedAt ?? null;
   const tickers = React.useMemo(
     () => notes.map((n) => n.ticker),
     [notes]

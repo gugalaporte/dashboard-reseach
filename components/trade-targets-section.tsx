@@ -22,23 +22,20 @@ import {
 } from "@/components/ui/table";
 import { TickerSearch } from "@/components/ticker-search";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDateShort, formatNumber, formatValue } from "@/lib/format";
-import { parseAmount, parseDate, type TradeAmountType, type TradeSide, type TradeTarget } from "@/lib/trade-targets";
+import { formatDateShort, formatValue } from "@/lib/format";
+import { parseAmount, parseDate, type TradeSide, type TradeTarget } from "@/lib/trade-targets";
 import { cn } from "@/lib/utils";
 
 type Props = { extraTickers?: string[] };
 
-function formatAmount(type: TradeAmountType, n: number | null | undefined): string {
+function formatMoney(n: number | null | undefined): string {
   if (n == null) return "–";
-  return type === "value"
-    ? formatValue(n, "money", "R$")
-    : formatNumber(n, n % 1 === 0 ? 0 : 2);
+  return formatValue(n, "money", "R$");
 }
 
 const EMPTY = {
   ticker: "",
   side: "" as "" | TradeSide,
-  amountType: "qty" as TradeAmountType,
   amount: "",
   startDate: "",
   dueDate: "",
@@ -107,7 +104,7 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
         body: JSON.stringify({
           ticker: draft.ticker,
           side: draft.side,
-          amountType: draft.amountType,
+          amountType: "value",
           amount: draft.amount,
           startDate: draft.startDate,
           dueDate: draft.dueDate,
@@ -174,29 +171,12 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
           </Select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] uppercase tracking-wide text-ink/50">Tipo</label>
-          <Select
-            value={draft.amountType}
-            onValueChange={(v) => setDraft((p) => ({ ...p, amountType: v as TradeAmountType }))}
-          >
-            <SelectTrigger className="w-[140px] h-8 text-xs bg-surface border-line">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="qty" className="text-xs">Quantidade</SelectItem>
-              <SelectItem value="value" className="text-xs">Valor (R$)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] uppercase tracking-wide text-ink/50">
-            {draft.amountType === "value" ? "Valor" : "Quantidade"}
-          </label>
+          <label className="text-[10px] uppercase tracking-wide text-ink/50">Valor</label>
           <Input
             inputMode="decimal"
             value={draft.amount}
             onChange={(e) => setDraft((p) => ({ ...p, amount: e.target.value }))}
-            placeholder={draft.amountType === "value" ? "1.500.000" : "10.000"}
+            placeholder="1.500.000"
             className="w-[140px] h-8 text-xs bg-surface border-line tabular"
           />
         </div>
@@ -235,8 +215,8 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
               {[
                 "Papel",
                 "Lado",
-                "Tipo",
                 "Meta",
+                "Realizado",
                 "Restante para a meta",
                 "Preço médio",
                 "Preço atual",
@@ -283,11 +263,11 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
                       {t.side === "buy" ? "Compra" : "Venda"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-center text-xs text-ink/60">
-                    {t.amountType === "qty" ? "Quantidade" : "Valor"}
+                  <TableCell className="text-center tabular text-sm font-medium text-ink">
+                    {formatMoney(t.amount)}
                   </TableCell>
                   <TableCell className="text-center tabular text-sm font-medium text-ink">
-                    {formatAmount(t.amountType, t.amount)}
+                    {formatMoney(t.filledValue)}
                   </TableCell>
                   <TableCell
                     className={cn(
@@ -295,7 +275,7 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
                       t.remaining != null && t.remaining <= 0 ? "text-brand" : "text-ink"
                     )}
                   >
-                    {formatAmount(t.amountType, t.remaining)}
+                    {formatMoney(t.remaining)}
                   </TableCell>
                   <TableCell className="text-center tabular text-sm text-ink">
                     {t.avgPrice != null ? formatValue(t.avgPrice, "money", "R$") : "–"}

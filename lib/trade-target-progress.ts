@@ -26,9 +26,9 @@ export function targetProgress(
     "ticker" | "side" | "amountType" | "amount" | "startDate" | "dueDate"
   >,
   trades: TargetFillTrade[]
-): { remaining: number | null; avgPrice: number | null } {
+): { filledQty: number | null; filledValue: number | null; remaining: number | null; avgPrice: number | null } {
   if (!target.startDate || !target.dueDate) {
-    return { remaining: null, avgPrice: null };
+    return { filledQty: null, filledValue: null, remaining: null, avgPrice: null };
   }
 
   let qty = 0;
@@ -46,6 +46,8 @@ export function targetProgress(
 
   const filled = target.amountType === "qty" ? qty : notional;
   return {
+    filledQty: qty,
+    filledValue: notional,
     remaining: target.amount - filled,
     avgPrice: qty > 0 ? notional / qty : null,
   };

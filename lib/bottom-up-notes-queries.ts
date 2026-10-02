@@ -8,7 +8,7 @@ import {
   rowToNotes,
   type NotesPatch,
 } from "./bottom-up-notes";
-import type { PipelineNote } from "./pipeline";
+import { sortPipelineByDate, type PipelineNote } from "./pipeline";
 import type { BottomUpNotes } from "./bottom-up-types";
 
 const SELECT =
@@ -44,7 +44,7 @@ export async function loadPipelineNotes(): Promise<PipelineNote[]> {
   const { data, error } = await db
     .from("bottom_up_notes")
     .select(SELECT)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false, nullsFirst: false });
   if (error) throwQueryError(error);
   const notes = (data ?? []).map(rowToNotes);
   if (notes.length === 0) return [];
@@ -68,10 +68,12 @@ export async function loadPipelineNotes(): Promise<PipelineNote[]> {
     });
   }
 
-  return notes.map((n) => {
-    const meta = byTicker.get(n.ticker);
-    return { ...n, name: meta?.name ?? null, sector: meta?.sector ?? null };
-  });
+  return sortPipelineByDate(
+    notes.map((n) => {
+      const meta = byTicker.get(n.ticker);
+      return { ...n, name: meta?.name ?? null, sector: meta?.sector ?? null };
+    })
+  );
 }
 
 export async function upsertBottomUpNotes(

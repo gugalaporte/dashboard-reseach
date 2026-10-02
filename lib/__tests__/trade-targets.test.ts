@@ -58,6 +58,25 @@ describe("parseTargetInput", () => {
     });
   });
 
+  it("assume valor financeiro se o tipo vier vazio", () => {
+    expect(
+      parseTargetInput({
+        ticker: "VALE3",
+        side: "buy",
+        amount: 1500000,
+        startDate: "2026-09-21",
+        dueDate: "2026-10-15",
+      })
+    ).toEqual({
+      ticker: "VALE3",
+      side: "buy",
+      amountType: "value",
+      amount: 1500000,
+      startDate: "2026-09-21",
+      dueDate: "2026-10-15",
+    });
+  });
+
   it("rejeita fazer até antes da data inicial", () => {
     expect(
       parseTargetInput({

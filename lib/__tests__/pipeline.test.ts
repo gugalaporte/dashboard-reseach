@@ -6,6 +6,7 @@ import {
   finacapUpside,
   inPipelineStage,
   parsePipelineStage,
+  sortPipelineByDate,
 } from "../pipeline";
 
 describe("countByPipeline", () => {
@@ -57,6 +58,25 @@ describe("defaultPipelineStage", () => {
 describe("parsePipelineStage", () => {
   it("aceita etapa válida", () => {
     expect(parsePipelineStage("thesis_ready")).toBe("thesis_ready");
+  });
+});
+
+describe("sortPipelineByDate", () => {
+  it("ordena da data mais recente para a mais antiga", () => {
+    const ordered = sortPipelineByDate([
+      { ticker: "VALE3", updatedAt: "2026-01-01T00:00:00.000Z" },
+      { ticker: "PETR4", updatedAt: "2026-09-30T12:00:00.000Z" },
+      { ticker: "ITUB4", updatedAt: "2026-06-15T08:00:00.000Z" },
+    ]);
+    expect(ordered.map((n) => n.ticker)).toEqual(["PETR4", "ITUB4", "VALE3"]);
+  });
+
+  it("coloca empresa sem data no fim", () => {
+    const ordered = sortPipelineByDate([
+      { ticker: "BBAS3", updatedAt: null },
+      { ticker: "WEGE3", updatedAt: "2026-03-01T00:00:00.000Z" },
+    ]);
+    expect(ordered.map((n) => n.ticker)).toEqual(["WEGE3", "BBAS3"]);
   });
 });
 

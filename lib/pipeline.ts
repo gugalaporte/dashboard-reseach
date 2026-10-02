@@ -58,6 +58,20 @@ export function parsePipelineStage(v: unknown): PipelineStatus {
   return "watchlist";
 }
 
+/** Mais recente primeiro; sem data vai para o fim. */
+export function sortPipelineByDate<T extends { ticker: string; updatedAt: string | null }>(
+  notes: T[]
+): T[] {
+  return [...notes].sort((a, b) => {
+    const ad = a.updatedAt ?? "";
+    const bd = b.updatedAt ?? "";
+    if (!ad && !bd) return a.ticker.localeCompare(b.ticker);
+    if (!ad) return 1;
+    if (!bd) return -1;
+    return bd.localeCompare(ad);
+  });
+}
+
 /** Upside % = (TP Finacap − último fechamento) / fechamento. */
 export function finacapUpside(
   close: number | null | undefined,
