@@ -20,7 +20,7 @@ import {
 import { buildFactorInputs } from "./factor-build";
 
 const SNAPSHOT_BASE =
-  "ric,as_of_date,roe,roic,net_margin,ebitda_margin,current_ratio,net_debt_ebitda,pe_ratio,pb_ratio,ev_ebitda,upside_pct,ret_3m,ret_6m,dividend_yield,market_cap,day_volume,num_buys,num_holds,num_sells";
+  "ric,as_of_date,roe,roic,roic_calc,net_margin,ebitda_margin,current_ratio,net_debt_ebitda,pe_ratio,pb_ratio,ev_ebitda,upside_pct,ret_3m,ret_6m,dividend_yield,market_cap,day_volume,num_buys,num_holds,num_sells";
 
 const FORWARD_BASE = "ric,as_of_date,fiscal_year,pe_fwd,dy_fwd";
 

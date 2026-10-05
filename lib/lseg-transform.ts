@@ -51,6 +51,8 @@ export type LsegDailySnapshotRow = {
   market_cap_currency?: string | null;
   beta?: number | null;
   roic: number | null;
+  /** Preenchido quando o ROIC do LSEG vem vazio. */
+  roic_calc?: number | null;
   roe: number | null;
   // Novos campos LSEG
   price_52w_high?: number | null;
@@ -415,7 +417,7 @@ function buildOneLsegRow(args: {
       byMetricYear,
       "roic",
       ySnap,
-      makeCell(snap.roic, asOf, { periodo: "Atual", unidade: "%" })
+      makeCell(snap.roic ?? snap.roic_calc ?? null, asOf, { periodo: "Atual", unidade: "%" })
     );
     putMetricYearIfEmpty(
       byMetricYear,
@@ -760,7 +762,7 @@ function buildOneLsegRow(args: {
     pe: makeCell(snap?.pe_ratio, asOf, { unidade: "x" }),
     ev_ebitda: makeCell(snap?.ev_ebitda, asOf, { unidade: "x" }),
     dy: makeCell(snap?.dividend_yield, asOf, { unidade: "%" }),
-    roic: makeCell(snap?.roic, asOf, { unidade: "%" }),
+    roic: makeCell(snap?.roic ?? snap?.roic_calc ?? null, asOf, { unidade: "%" }),
     revenue: makeCell(toMillions(snap?.revenue), asOf, { unidade: "R$ M" }),
     ebitda: makeCell(toMillions(snap?.ebitda), asOf, { unidade: "R$ M" }),
     net_income: makeCell(toMillions(snap?.net_income), asOf, { unidade: "R$ M" }),

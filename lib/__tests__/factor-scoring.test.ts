@@ -363,16 +363,15 @@ describe("scoreFactors", () => {
     expect(petr.quality!).toBeGreaterThan(prio.quality!);
     expect(itub.breakdown.filter((b) => b.factor === "quality").map((b) => b.key)).toEqual([
       "roe",
-      "revenueCagr",
     ]);
     expect(petr.breakdown.filter((b) => b.factor === "quality").map((b) => b.key)).toEqual([
       "roic",
-      "revenueCagr",
     ]);
-    expect(petr.quality).toBeCloseTo((30 + 8) / 2, 5);
+    expect(itub.quality).toBe(22);
+    expect(petr.quality).toBe(30);
   });
 
-  it("evolução da receita maior sobe o Quality quando o retorno é igual", () => {
+  it("evolução da receita não entra no Quality", () => {
     const grow = base({
       ticker: "GROW3",
       ric: "GROW3.SA",
@@ -388,9 +387,13 @@ describe("scoreFactors", () => {
       revenueCagr: 2,
     });
     const rows = scoreFactors([grow, slow]);
-    expect(rows.find((r) => r.ticker === "GROW3")!.quality!).toBeGreaterThan(
-      rows.find((r) => r.ticker === "SLOW3")!.quality!
-    );
+    const growQ = rows.find((r) => r.ticker === "GROW3")!.quality;
+    const slowQ = rows.find((r) => r.ticker === "SLOW3")!.quality;
+    expect(growQ).toBe(12);
+    expect(slowQ).toBe(12);
+    expect(
+      rows.find((r) => r.ticker === "GROW3")!.breakdown.some((b) => b.key === "revenueCagr")
+    ).toBe(false);
   });
 
   it("momentum usa só retorno 3M", () => {
@@ -478,6 +481,58 @@ describe("buildFactorInputs", () => {
     expect(inputs[0]!.analystCount).toBe(12);
     expect(inputs[0]!.roic).toBe(10);
     expect(inputs[0]!.revenueCagr).toBeCloseTo(20, 5);
+  });
+
+  it("usa roic_calc quando o ROIC do LSEG está vazio", () => {
+    const inputs = buildFactorInputs(
+      [{ ticker: "AZUL3", ric: "AZUL4.SA", sector: "Transportation", name: "Azul", gics_industry: null, updated_at: null }],
+      [{
+        ric: "AZUL4.SA",
+        as_of_date: "2026-10-02",
+        last_price: 5,
+        price_target: null,
+        rating_label: null,
+        upside_pct: null,
+        pe_ratio: null,
+        ev_ebitda: null,
+        dividend_yield: null,
+        revenue: 1,
+        ebitda: 1,
+        net_income: 1,
+        roic: null,
+        roic_calc: 52.8264,
+        roe: null,
+        analyst_count: 4,
+      }],
+      []
+    );
+    expect(inputs[0]!.roic).toBeCloseTo(52.8264, 4);
+  });
+
+  it("não troca ROIC do LSEG por roic_calc", () => {
+    const inputs = buildFactorInputs(
+      [{ ticker: "VALE3", ric: "VALE3.SA", sector: "Materials", name: "Vale", gics_industry: null, updated_at: null }],
+      [{
+        ric: "VALE3.SA",
+        as_of_date: "2026-07-01",
+        last_price: 70,
+        price_target: 80,
+        rating_label: "Buy",
+        upside_pct: 14,
+        pe_ratio: 6,
+        ev_ebitda: 4,
+        dividend_yield: 8,
+        revenue: 1,
+        ebitda: 1,
+        net_income: 1,
+        roic: 10,
+        roic_calc: 99,
+        roe: 20,
+        analyst_count: 12,
+      }],
+      []
+    );
+    expect(inputs[0]!.roic).toBe(10);
   });
 
   it("usa day_volume do snapshot anterior se o mais recente vier vazio", () => {

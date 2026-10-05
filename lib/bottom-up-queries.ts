@@ -28,6 +28,7 @@ const SNAP_SELECT = [
   "price_close",
   "roe",
   "roic",
+  "roic_calc",
   "ebitda_margin",
   "net_margin",
   "net_debt_ebitda",
@@ -87,7 +88,7 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
     const point: SeriesPoint = {
       date,
       roe: num((row as { roe?: unknown }).roe),
-      roic: num((row as { roic?: unknown }).roic),
+      roic: num((row as { roic?: unknown }).roic) ?? num((row as { roic_calc?: unknown }).roic_calc),
       ebitdaMargin: num((row as { ebitda_margin?: unknown }).ebitda_margin),
       netMargin: num((row as { net_margin?: unknown }).net_margin),
       netDebtEbitda: num((row as { net_debt_ebitda?: unknown }).net_debt_ebitda),

@@ -129,7 +129,7 @@ export const FACTOR_LABELS: Record<FactorId, string> = {
 /** Descrição genérica da composição de cada fator (para tooltip). */
 export const FACTOR_FORMULA: Record<FactorId, string> = {
   quality:
-    "Bancos e financeiras: ROE. Demais: ROIC. Mais a evolução da receita (crescimento composto em 2 anos, 3 exercícios anuais fechados). Quality = média dessas 2 métricas. Ranking 1º = maior valor no universo da tela.",
+    "Bancos e financeiras: ROE. Demais: ROIC. Ranking 1º = maior valor no universo da tela.",
   value:
     "Bancos e financeiras: P/E fwd (menor é melhor), só entre financeiras na tela. Demais: EV/EBITDA (menor é melhor), só entre não-financeiras. Múltiplo ≤ 0 é ignorado. Ranking 1º = mais barato no grupo.",
   momentum:
@@ -354,15 +354,11 @@ function qualityReturnMetric(row: FactorInput): MetricBreakdown {
   };
 }
 
-function qualityGrowthMetric(row: FactorInput): MetricBreakdown {
-  return {
-    key: "revenueCagr",
-    label: "Evolução da receita",
-    raw: row.revenueCagr,
-    z: null,
-    inverted: false,
-    factor: "quality",
-  };
+function qualityNominal(row: FactorInput): number | null {
+  if (isFinancialForValue(row)) {
+    return usableMetric("roe", row.roe) ? row.roe : null;
+  }
+  return usableMetric("roic", row.roic) ? row.roic : null;
 }
 
 function carryYield(row: FactorInput): {
@@ -451,21 +447,15 @@ export function scoreFactors(
     }
 
     const returnPart = qualityReturnMetric(row);
-    const growthPart = qualityGrowthMetric(row);
     const valuePart = valueMetric(row);
     const carryPart = carryYield(row);
-    const quality = avgNullable([
-      usableMetric(returnPart.key as keyof FactorInput, returnPart.raw)
-        ? returnPart.raw
-        : null,
-      usableMetric("revenueCagr", growthPart.raw) ? growthPart.raw : null,
-    ]);
+    const quality = qualityNominal(row);
     const value = valueNominal(row);
     const momentum =
       typeof row.ret3m === "number" && Number.isFinite(row.ret3m) ? row.ret3m : null;
     const carry = carryPart.raw;
 
-    const breakdown: MetricBreakdown[] = [returnPart, growthPart, valuePart];
+    const breakdown: MetricBreakdown[] = [returnPart, valuePart];
     for (const m of MOMENTUM_METRICS) {
       breakdown.push({
         key: m.key,

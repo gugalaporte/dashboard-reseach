@@ -104,7 +104,7 @@ export function buildFactorInputs(
       sector: company?.sector ?? null,
       asOfDate: snap.as_of_date ?? null,
       roe: num(snap.roe),
-      roic: num(snap.roic),
+      roic: num(snap.roic) ?? num(snap.roic_calc),
       netMargin: num(snap.net_margin),
       ebitdaMargin: num(snap.ebitda_margin),
       currentRatio: num(snap.current_ratio),
