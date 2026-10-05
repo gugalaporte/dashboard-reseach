@@ -1,4 +1,4 @@
-/** Scoring multifatorial (z-score no universo passado) — read-only, puro. */
+/** Scoring multifatorial (valor nominal + ranking no universo da tela). */
 
 import { finacapBook } from "./finacap-book";
 
@@ -129,13 +129,13 @@ export const FACTOR_LABELS: Record<FactorId, string> = {
 /** Descrição genérica da composição de cada fator (para tooltip). */
 export const FACTOR_FORMULA: Record<FactorId, string> = {
   quality:
-    "Bancos e financeiras: z-score de ROE, só entre financeiras na tela. Demais: z-score de ROIC, só entre não-financeiras. Mais z-score da evolução da receita (crescimento composto em 2 anos, 3 exercícios anuais fechados). Quality = média dessas 2 métricas.",
+    "Bancos e financeiras: ROE. Demais: ROIC. Mais a evolução da receita (crescimento composto em 2 anos, 3 exercícios anuais fechados). Quality = média dessas 2 métricas. Ranking 1º = maior valor no universo da tela.",
   value:
-    "Bancos e financeiras: z-score de P/E fwd (inv., menor é melhor), só entre financeiras na tela. Demais: z-score de EV/EBITDA (inv.), só entre não-financeiras. Múltiplo ≤ 0 é ignorado.",
+    "Bancos e financeiras: P/E fwd (menor é melhor), só entre financeiras na tela. Demais: EV/EBITDA (menor é melhor), só entre não-financeiras. Múltiplo ≤ 0 é ignorado. Ranking 1º = mais barato no grupo.",
   momentum:
-    "Z-score no universo da tela: retorno 3M.",
+    "Retorno 3M. Ranking 1º = maior retorno no universo da tela.",
   carry:
-    "Z-score no universo da tela: DY fwd ou dividend yield.",
+    "DY fwd ou dividend yield. Ranking 1º = maior yield no universo da tela.",
   liquidity:
     "Média dos z-scores no universo da tela: market cap, volume diário.",
 };
@@ -147,9 +147,13 @@ export type FactorRow = {
   sector: string | null;
   asOfDate: string | null;
   quality: number | null;
+  qualityRank: number | null;
   value: number | null;
+  valueRank: number | null;
   momentum: number | null;
+  momentumRank: number | null;
   carry: number | null;
+  carryRank: number | null;
   liquidity: number | null;
   score: number | null;
   percentile: number | null;
@@ -268,46 +272,74 @@ function metricZ(
   return inverted ? -z : z;
 }
 
-/** Value: P/E fwd (financeiras) ou EV/EBITDA (demais), invertido. */
-function valueMetric(
-  row: FactorInput,
-  peFwdPeers: number[],
-  evPeers: number[]
-): MetricBreakdown {
+/** Rank 1 = melhor. Empate compartilha a posição; a próxima pula (1, 2, 2, 4). */
+export function assignRanks(
+  items: Array<{ ticker: string; value: number | null }>,
+  inverted: boolean
+): Map<string, number> {
+  const present = items.filter(
+    (x): x is { ticker: string; value: number } =>
+      x.value != null && Number.isFinite(x.value)
+  );
+  present.sort((a, b) => (inverted ? a.value - b.value : b.value - a.value));
+  const out = new Map<string, number>();
+  let lastVal: number | undefined;
+  let lastRank = 0;
+  for (let i = 0; i < present.length; i++) {
+    const cur = present[i]!;
+    if (lastVal === undefined || cur.value !== lastVal) {
+      lastRank = i + 1;
+      lastVal = cur.value;
+    }
+    out.set(cur.ticker, lastRank);
+  }
+  return out;
+}
+
+/** 1 = melhor do grupo, 0 = pior. Usado só no score composto. */
+function rankScore(rank: number | null, count: number): number | null {
+  if (rank == null || count <= 0) return null;
+  if (count === 1) return 1;
+  return 1 - (rank - 1) / (count - 1);
+}
+
+/** Value: P/E fwd (financeiras) ou EV/EBITDA (demais). */
+function valueMetric(row: FactorInput): MetricBreakdown {
   if (isFinancialForValue(row)) {
-    const z = metricZ(row, "peFwd", peFwdPeers, true);
     return {
       key: "peFwd",
       label: "P/E fwd",
       raw: row.peFwd,
-      z,
+      z: null,
       inverted: true,
       factor: "value",
     };
   }
-  const z = metricZ(row, "evEbitda", evPeers, true);
   return {
     key: "evEbitda",
     label: "EV/EBITDA",
     raw: row.evEbitda,
-    z,
+    z: null,
     inverted: true,
     factor: "value",
   };
 }
 
+function valueNominal(row: FactorInput): number | null {
+  if (isFinancialForValue(row)) {
+    return usableMetric("peFwd", row.peFwd) ? row.peFwd : null;
+  }
+  return usableMetric("evEbitda", row.evEbitda) ? row.evEbitda : null;
+}
+
 /** Quality: ROE (financeiras) ou ROIC (demais). */
-function qualityReturnMetric(
-  row: FactorInput,
-  roePeers: number[],
-  roicPeers: number[]
-): MetricBreakdown {
+function qualityReturnMetric(row: FactorInput): MetricBreakdown {
   if (isFinancialForValue(row)) {
     return {
       key: "roe",
       label: "ROE",
       raw: row.roe,
-      z: metricZ(row, "roe", roePeers, false),
+      z: null,
       inverted: false,
       factor: "quality",
     };
@@ -316,48 +348,38 @@ function qualityReturnMetric(
     key: "roic",
     label: "ROIC",
     raw: row.roic,
-    z: metricZ(row, "roic", roicPeers, false),
+    z: null,
     inverted: false,
     factor: "quality",
   };
 }
 
-function qualityGrowthMetric(
-  row: FactorInput,
-  cagrPeers: number[]
-): MetricBreakdown {
+function qualityGrowthMetric(row: FactorInput): MetricBreakdown {
   return {
     key: "revenueCagr",
     label: "Evolução da receita",
     raw: row.revenueCagr,
-    z: metricZ(row, "revenueCagr", cagrPeers, false),
+    z: null,
     inverted: false,
     factor: "quality",
   };
 }
 
-function carryYieldZ(row: FactorInput, dyPeers: number[], dyFwdPeers: number[]): {
-  z: number | null;
+function carryYield(row: FactorInput): {
   key: string;
   label: string;
   raw: number | null;
-  inverted: boolean;
 } {
-  if (row.dyFwd != null) {
-    return {
-      z: metricZ(row, "dyFwd", dyFwdPeers, false),
-      key: "dyFwd",
-      label: "DY fwd",
-      raw: row.dyFwd,
-      inverted: false,
-    };
+  if (row.dyFwd != null && Number.isFinite(row.dyFwd)) {
+    return { key: "dyFwd", label: "DY fwd", raw: row.dyFwd };
   }
   return {
-    z: metricZ(row, "dividendYield", dyPeers, false),
     key: "dividendYield",
     label: "Dividend yield",
-    raw: row.dividendYield,
-    inverted: false,
+    raw:
+      row.dividendYield != null && Number.isFinite(row.dividendYield)
+        ? row.dividendYield
+        : null,
   };
 }
 
@@ -385,8 +407,8 @@ export function classifyByPercentile(p: number): FactorClass {
 }
 
 /**
- * Calcula z-scores no universo recebido (o que a tela está mostrando).
- * Só empresas elegíveis entram na normalização e no ranking de classe.
+ * Valor nominal + ranking no universo da tela.
+ * Só empresas elegíveis entram no ranking e na classe.
  */
 export function scoreFactors(
   inputs: FactorInput[],
@@ -394,18 +416,7 @@ export function scoreFactors(
   weights: FactorWeights = FACTOR_WEIGHTS
 ): FactorRow[] {
   const eligible = inputs.filter((r) => isEligible(r, cfg).ok);
-  const financials = eligible.filter(isFinancialForValue);
-  const others = eligible.filter((r) => !isFinancialForValue(r));
-
-  const peerMaps: Record<string, number[]> = {
-    roe: collectPeers(financials, "roe"),
-    roic: collectPeers(others, "roic"),
-    revenueCagr: collectPeers(eligible, "revenueCagr"),
-    peFwd: collectPeers(financials, "peFwd"),
-    evEbitda: collectPeers(others, "evEbitda"),
-    ret3m: collectPeers(eligible, "ret3m"),
-    dividendYield: collectPeers(eligible, "dividendYield"),
-    dyFwd: collectPeers(eligible, "dyFwd"),
+  const liqPeers: Record<string, number[]> = {
     marketCap: collectPeers(eligible, "marketCap"),
     dayVolume: collectPeers(eligible, "dayVolume"),
   };
@@ -420,9 +431,13 @@ export function scoreFactors(
         sector: row.sector,
         asOfDate: row.asOfDate,
         quality: null,
+        qualityRank: null,
         value: null,
+        valueRank: null,
         momentum: null,
+        momentumRank: null,
         carry: null,
+        carryRank: null,
         liquidity: null,
         score: null,
         percentile: null,
@@ -435,43 +450,44 @@ export function scoreFactors(
       };
     }
 
-    const breakdown: MetricBreakdown[] = [];
-    const returnPart = qualityReturnMetric(row, peerMaps.roe!, peerMaps.roic!);
-    const growthPart = qualityGrowthMetric(row, peerMaps.revenueCagr!);
-    breakdown.push(returnPart, growthPart);
-    const qualityZs: Array<number | null> = [returnPart.z, growthPart.z];
+    const returnPart = qualityReturnMetric(row);
+    const growthPart = qualityGrowthMetric(row);
+    const valuePart = valueMetric(row);
+    const carryPart = carryYield(row);
+    const quality = avgNullable([
+      usableMetric(returnPart.key as keyof FactorInput, returnPart.raw)
+        ? returnPart.raw
+        : null,
+      usableMetric("revenueCagr", growthPart.raw) ? growthPart.raw : null,
+    ]);
+    const value = valueNominal(row);
+    const momentum =
+      typeof row.ret3m === "number" && Number.isFinite(row.ret3m) ? row.ret3m : null;
+    const carry = carryPart.raw;
 
-    const valuePart = valueMetric(row, peerMaps.peFwd!, peerMaps.evEbitda!);
-    breakdown.push(valuePart);
-    const valueZs: Array<number | null> = [valuePart.z];
-
-    const momentumZs: Array<number | null> = [];
+    const breakdown: MetricBreakdown[] = [returnPart, growthPart, valuePart];
     for (const m of MOMENTUM_METRICS) {
-      const z = metricZ(row, m.key, peerMaps[m.key]!, false);
-      momentumZs.push(z);
       breakdown.push({
         key: m.key,
         label: m.label,
         raw: typeof row[m.key] === "number" ? (row[m.key] as number) : null,
-        z,
+        z: null,
         inverted: false,
         factor: "momentum",
       });
     }
-
-    const carryPart = carryYieldZ(row, peerMaps.dividendYield!, peerMaps.dyFwd!);
     breakdown.push({
       key: carryPart.key,
       label: carryPart.label,
       raw: carryPart.raw,
-      z: carryPart.z,
+      z: null,
       inverted: false,
       factor: "carry",
     });
 
     const liquidityZs: Array<number | null> = [];
     for (const m of LIQUIDITY_METRICS) {
-      const z = metricZ(row, m.key, peerMaps[m.key]!, false);
+      const z = metricZ(row, m.key, liqPeers[m.key]!, false);
       liquidityZs.push(z);
       breakdown.push({
         key: m.key,
@@ -483,26 +499,6 @@ export function scoreFactors(
       });
     }
 
-    const quality = avgNullable(qualityZs);
-    const value = avgNullable(valueZs);
-    const momentum = avgNullable(momentumZs);
-    const carry = avgNullable([carryPart.z]);
-    const liquidity = avgNullable(liquidityZs);
-
-    const parts: Array<{ w: number; v: number | null }> = [
-      { w: weights.quality, v: quality },
-      { w: weights.value, v: value },
-      { w: weights.momentum, v: momentum },
-      { w: weights.carry, v: carry },
-      { w: weights.liquidity, v: liquidity },
-    ];
-    const present = parts.filter((p) => p.v != null && p.w > 0);
-    let score: number | null = null;
-    if (present.length > 0) {
-      const wSum = present.reduce((a, p) => a + p.w, 0);
-      score = present.reduce((a, p) => a + (p.v! * p.w) / wSum, 0);
-    }
-
     return {
       ticker: row.ticker,
       ric: row.ric,
@@ -510,11 +506,15 @@ export function scoreFactors(
       sector: row.sector,
       asOfDate: row.asOfDate,
       quality,
+      qualityRank: null,
       value,
+      valueRank: null,
       momentum,
+      momentumRank: null,
       carry,
-      liquidity,
-      score,
+      carryRank: null,
+      liquidity: avgNullable(liquidityZs),
+      score: null,
       percentile: null,
       factorClass: null,
       eligible: true,
@@ -523,6 +523,56 @@ export function scoreFactors(
       raw: row,
     };
   });
+
+  const ok = scored.filter((r) => r.eligible);
+  const qualityRanks = assignRanks(
+    ok.map((r) => ({ ticker: r.ticker, value: r.quality })),
+    false
+  );
+  const momentumRanks = assignRanks(
+    ok.map((r) => ({ ticker: r.ticker, value: r.momentum })),
+    false
+  );
+  const carryRanks = assignRanks(
+    ok.map((r) => ({ ticker: r.ticker, value: r.carry })),
+    false
+  );
+  const finRanks = assignRanks(
+    ok.filter((r) => isFinancialForValue(r.raw)).map((r) => ({ ticker: r.ticker, value: r.value })),
+    true
+  );
+  const othRanks = assignRanks(
+    ok.filter((r) => !isFinancialForValue(r.raw)).map((r) => ({ ticker: r.ticker, value: r.value })),
+    true
+  );
+
+  const qCount = qualityRanks.size;
+  const mCount = momentumRanks.size;
+  const cCount = carryRanks.size;
+  const finCount = finRanks.size;
+  const othCount = othRanks.size;
+
+  for (const row of scored) {
+    if (!row.eligible) continue;
+    row.qualityRank = qualityRanks.get(row.ticker) ?? null;
+    row.momentumRank = momentumRanks.get(row.ticker) ?? null;
+    row.carryRank = carryRanks.get(row.ticker) ?? null;
+    const fin = isFinancialForValue(row.raw);
+    row.valueRank = (fin ? finRanks : othRanks).get(row.ticker) ?? null;
+    const valueCount = fin ? finCount : othCount;
+
+    const parts: Array<{ w: number; v: number | null }> = [
+      { w: weights.quality, v: rankScore(row.qualityRank, qCount) },
+      { w: weights.value, v: rankScore(row.valueRank, valueCount) },
+      { w: weights.momentum, v: rankScore(row.momentumRank, mCount) },
+      { w: weights.carry, v: rankScore(row.carryRank, cCount) },
+    ];
+    const present = parts.filter((p) => p.v != null && p.w > 0);
+    if (present.length > 0) {
+      const wSum = present.reduce((a, p) => a + p.w, 0);
+      row.score = present.reduce((a, p) => a + (p.v! * p.w) / wSum, 0) * 100;
+    }
+  }
 
   const eligibleScores = scored
     .filter((r) => r.eligible && r.score != null)

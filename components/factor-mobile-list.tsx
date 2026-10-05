@@ -3,11 +3,11 @@
 import { Star } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { formatNumber } from "@/lib/format";
 import {
   type FactorClass,
   type FactorRow,
 } from "@/lib/factor-scoring";
+import { formatFactorNominal, formatRank, factorRankOf, formatScore } from "@/lib/factor-display";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -17,10 +17,27 @@ type Props = {
   sectorLabel?: (row: FactorRow) => string;
 };
 
-function fmtZ(v: number | null): string {
-  if (v == null) return "–";
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${formatNumber(v, 2)}`;
+function FactorChip({
+  label,
+  row,
+  factor,
+}: {
+  label: string;
+  row: FactorRow;
+  factor: "quality" | "value" | "momentum" | "carry";
+}) {
+  const rank = factorRankOf(row, factor);
+  return (
+    <div className="rounded-md border border-line/70 bg-white px-1 py-1.5">
+      <div className="text-[9px] uppercase tracking-wide text-ink/40">{label}</div>
+      <div className="tabular text-[12px] font-medium text-ink mt-0.5 inline-flex items-baseline justify-center gap-0.5">
+        <span>{formatFactorNominal(row, factor)}</span>
+        {rank != null && (
+          <span className="text-[9px] text-ink/40 font-medium">{formatRank(rank)}</span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 const CLASS_STYLES: Record<FactorClass, string> = {
@@ -100,32 +117,16 @@ export function FactorMobileList({ data, isLoading, onRowClick, sectorLabel }: P
                     Score
                   </div>
                   <div className="font-mono tabular text-base font-semibold text-ink mt-0.5">
-                    {fmtZ(row.score)}
+                    {formatScore(row.score)}
                   </div>
                 </div>
               </div>
 
               <div className="mt-3 grid grid-cols-4 gap-1.5 text-center">
-                {(
-                  [
-                    ["Q", row.quality],
-                    ["V", row.value],
-                    ["M", row.momentum],
-                    ["C", row.carry],
-                  ] as const
-                ).map(([label, v]) => (
-                  <div
-                    key={label}
-                    className="rounded-md border border-line/70 bg-white px-1 py-1.5"
-                  >
-                    <div className="text-[9px] uppercase tracking-wide text-ink/40">
-                      {label}
-                    </div>
-                    <div className="tabular text-[12px] font-medium text-ink mt-0.5">
-                      {fmtZ(v)}
-                    </div>
-                  </div>
-                ))}
+                <FactorChip label="Q" row={row} factor="quality" />
+                <FactorChip label="V" row={row} factor="value" />
+                <FactorChip label="M" row={row} factor="momentum" />
+                <FactorChip label="C" row={row} factor="carry" />
               </div>
             </button>
           </li>

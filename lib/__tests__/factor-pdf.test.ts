@@ -8,10 +8,14 @@ function row(partial: Partial<FactorRow> & Pick<FactorRow, "ticker">): FactorRow
     name: partial.ticker,
     sector: "Energy",
     asOfDate: "2026-09-25",
-    quality: 0.5,
-    value: -0.2,
-    momentum: 1.1,
-    carry: 0,
+    quality: 12.4,
+    qualityRank: 3,
+    value: 6.2,
+    valueRank: 2,
+    momentum: 5.1,
+    momentumRank: 8,
+    carry: 4,
+    carryRank: 1,
     liquidity: null,
     score: 0.4,
     percentile: 80,
@@ -53,6 +57,8 @@ describe("factorPdfTable", () => {
       "Classe",
     ]);
     expect(table.body[0]![0]).toBe("PETR4 *");
+    expect(table.body[0]![2]).toContain("12,4%");
+    expect(table.body[0]![2]).toContain("3º");
     expect(table.body[1]![2]).toBe("–");
     expect(table.subtitle).toContain("30%");
   });

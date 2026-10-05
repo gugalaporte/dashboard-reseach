@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assignRanks,
   classifyByPercentile,
   percentileRank,
   scoreFactors,
@@ -44,6 +45,36 @@ describe("zScore", () => {
   });
   it("retorna null se valor ausente", () => {
     expect(zScore(null, [1, 2, 3])).toBeNull();
+  });
+});
+
+describe("assignRanks", () => {
+  it("1º é o melhor; empate compartilha a posição", () => {
+    const ranks = assignRanks(
+      [
+        { ticker: "A", value: 10 },
+        { ticker: "B", value: 30 },
+        { ticker: "C", value: 30 },
+        { ticker: "D", value: null },
+      ],
+      false
+    );
+    expect(ranks.get("B")).toBe(1);
+    expect(ranks.get("C")).toBe(1);
+    expect(ranks.get("A")).toBe(3);
+    expect(ranks.has("D")).toBe(false);
+  });
+
+  it("value invertido: menor número fica 1º", () => {
+    const ranks = assignRanks(
+      [
+        { ticker: "CHEAP", value: 4 },
+        { ticker: "EXP", value: 12 },
+      ],
+      true
+    );
+    expect(ranks.get("CHEAP")).toBe(1);
+    expect(ranks.get("EXP")).toBe(2);
   });
 });
 
@@ -160,14 +191,16 @@ describe("scoreFactors", () => {
     expect(qTilt.score! - cTilt.score!).toBeGreaterThan(qEqual.score! - cEqual.score!);
   });
 
-  it("inverte métricas de valuation (menor EV/EBITDA → z positivo relativo)", () => {
+  it("inverte ranking de valuation (menor EV/EBITDA → melhor posição)", () => {
     const rows = scoreFactors([
       base({ ticker: "CHEAP", ric: "C.SA", sector: "Energy", evEbitda: 4 }),
       base({ ticker: "EXPENSIVE", ric: "E.SA", sector: "Energy", evEbitda: 12 }),
     ]);
     const cheap = rows.find((r) => r.ticker === "CHEAP")!;
     const exp = rows.find((r) => r.ticker === "EXPENSIVE")!;
-    expect(cheap.value!).toBeGreaterThan(exp.value!);
+    expect(cheap.value).toBe(4);
+    expect(exp.value).toBe(12);
+    expect(cheap.valueRank!).toBeLessThan(exp.valueRank!);
   });
 
   it("compara o universo inteiro, não só o setor", () => {
@@ -193,8 +226,10 @@ describe("scoreFactors", () => {
     const onlyEnergy = scoreFactors([energyCheap, energyPeer]);
     const petrAll = all.find((r) => r.ticker === "PETR4")!;
     const petrEnergy = onlyEnergy.find((r) => r.ticker === "PETR4")!;
-    expect(petrAll.value).not.toBeCloseTo(petrEnergy.value!, 8);
-    expect(all.find((r) => r.ticker === "LREN3")!.value!).toBeLessThan(petrAll.value!);
+    expect(petrAll.value).toBeCloseTo(petrEnergy.value!, 8);
+    expect(all.find((r) => r.ticker === "LREN3")!.valueRank!).toBeGreaterThan(
+      petrAll.valueRank!
+    );
   });
 
   it("não usa upside no fator Value", () => {
@@ -275,8 +310,8 @@ describe("scoreFactors", () => {
     const petr = rows.find((r) => r.ticker === "PETR4")!;
     const prio = rows.find((r) => r.ticker === "PRIO3")!;
 
-    expect(itub.value!).toBeGreaterThan(sanb.value!);
-    expect(petr.value!).toBeGreaterThan(prio.value!);
+    expect(itub.valueRank!).toBeLessThan(sanb.valueRank!);
+    expect(petr.valueRank!).toBeLessThan(prio.valueRank!);
     expect(itub.breakdown.filter((b) => b.factor === "value").map((b) => b.key)).toEqual([
       "peFwd",
     ]);
@@ -334,6 +369,7 @@ describe("scoreFactors", () => {
       "roic",
       "revenueCagr",
     ]);
+    expect(petr.quality).toBeCloseTo((30 + 8) / 2, 5);
   });
 
   it("evolução da receita maior sobe o Quality quando o retorno é igual", () => {

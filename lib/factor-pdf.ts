@@ -1,5 +1,6 @@
-import { formatDateShort, formatNumber } from "./format";
+import { formatDateShort } from "./format";
 import type { FactorRow, FactorWeightPct } from "./factor-scoring";
+import { formatFactorCell, formatScore } from "./factor-display";
 
 export type FactorPdfOpts = {
   rows: FactorRow[];
@@ -8,12 +9,6 @@ export type FactorPdfOpts = {
   sectorLabel: (row: FactorRow) => string;
   includeReason: boolean;
 };
-
-function fmtZ(v: number | null): string {
-  if (v == null) return "–";
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${formatNumber(v, 2)}`;
-}
 
 export function factorPdfFilename(asOfDate: string | null): string {
   const day = (asOfDate ?? new Date().toISOString()).slice(0, 10);
@@ -42,11 +37,11 @@ export function factorPdfTable(opts: FactorPdfOpts): {
     const row = [
       r.inPortfolio ? `${r.ticker} *` : r.ticker,
       opts.sectorLabel(r) || "–",
-      fmtZ(r.quality),
-      fmtZ(r.value),
-      fmtZ(r.momentum),
-      fmtZ(r.carry),
-      fmtZ(r.score),
+      formatFactorCell(r, "quality"),
+      formatFactorCell(r, "value"),
+      formatFactorCell(r, "momentum"),
+      formatFactorCell(r, "carry"),
+      formatScore(r.score),
       r.factorClass ?? "–",
     ];
     if (opts.includeReason) {

@@ -14,26 +14,15 @@ import {
   type FactorWeightPct,
   type MetricBreakdown,
 } from "@/lib/factor-scoring";
+import {
+  factorRankOf,
+  formatFactorNominal,
+  formatMetricRaw,
+  formatRank,
+  formatScore,
+} from "@/lib/factor-display";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-
-function fmtZ(v: number | null): string {
-  if (v == null) return "–";
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${formatNumber(v, 2)}`;
-}
-
-function fmtRaw(key: string, v: number | null): string {
-  if (v == null) return "–";
-  if (key === "marketCap" || key === "dayVolume") {
-    const abs = Math.abs(v);
-    if (abs >= 1e9) return `${formatNumber(v / 1e9, 2)} bi`;
-    if (abs >= 1e6) return `${formatNumber(v / 1e6, 1)} mi`;
-    return formatNumber(v, 0);
-  }
-  if (key === "revenueCagr") return `${formatNumber(v, 1)}%`;
-  return formatNumber(v, 2);
-}
 
 export function metricsForFactor(
   row: FactorRow,
@@ -95,15 +84,11 @@ function HoverTip({
 
 function FactorTipBody({ row, factor }: { row: FactorRow; factor: FactorId }) {
   const metrics = metricsForFactor(row, factor);
-  const score = row[factor];
-  const sector = row.sector?.trim() || "Sem setor";
+  const rank = factorRankOf(row, factor);
 
   return (
     <div className="space-y-2">
       <p className="text-surface-soft/70 text-[10px] leading-snug">{FACTOR_FORMULA[factor]}</p>
-      <p className="font-medium text-surface-soft">
-        Média dos z-scores (universo na tela{sector !== "Sem setor" ? ` · ${sector}` : ""})
-      </p>
       {metrics.length === 0 ? (
         <p className="text-surface-soft/50">sem dados para este fator</p>
       ) : (
@@ -112,24 +97,15 @@ function FactorTipBody({ row, factor }: { row: FactorRow; factor: FactorId }) {
             <li key={m.key} className="flex justify-between gap-3">
               <span className="text-surface-soft/75 truncate">
                 {m.label}
-                {m.inverted ? " (inv.)" : ""}
+                {m.inverted ? " (menor é melhor)" : ""}
               </span>
               <span className="shrink-0 text-surface-soft/90">
-                {m.raw == null && m.z == null ? (
+                {m.raw == null ? (
                   <span className="text-surface-soft/45">sem dado</span>
+                ) : m.factor === "value" && m.raw <= 0 ? (
+                  <span className="text-surface-soft/45">ignorado (≤0)</span>
                 ) : (
-                  <>
-                    {fmtRaw(m.key, m.raw)} → z{" "}
-                    {m.z == null ? (
-                      <span className="text-surface-soft/45">
-                        {m.factor === "value" && m.raw != null && m.raw <= 0
-                          ? "ignorado (≤0)"
-                          : "sem dado"}
-                      </span>
-                    ) : (
-                      fmtZ(m.z)
-                    )}
-                  </>
+                  formatMetricRaw(m.key, m.raw)
                 )}
               </span>
             </li>
@@ -137,7 +113,8 @@ function FactorTipBody({ row, factor }: { row: FactorRow; factor: FactorId }) {
         </ul>
       )}
       <p className="pt-1 border-t border-surface-soft/15 font-semibold tabular">
-        {FACTOR_LABELS[factor]} = {fmtZ(score)}
+        {FACTOR_LABELS[factor]} = {formatFactorNominal(row, factor)}
+        {rank != null ? ` · ${formatRank(rank)}` : ""}
       </p>
     </div>
   );
@@ -166,9 +143,9 @@ function ScoreTipBody({
   return (
     <div className="space-y-2">
       <p className="text-surface-soft/70 text-[10px] leading-snug">
-        Score composto = Quality×{pct(w.quality)} + Value×{pct(w.value)} +
-        Carry×{pct(w.carry)} + Momentum×{pct(w.momentum)} (renormaliza se faltar
-        fator ou se a soma ≠ 100%).
+        Score composto pelos rankings (1º = 100) de Quality×{pct(w.quality)} +
+        Value×{pct(w.value)} + Carry×{pct(w.carry)} + Momentum×{pct(w.momentum)}
+        (renormaliza se faltar fator ou se a soma ≠ 100%).
       </p>
       <ul className="space-y-0.5 font-mono tabular text-[10px]">
         {parts.map((p) => (
@@ -180,7 +157,12 @@ function ScoreTipBody({
               {p.v == null ? (
                 <span className="text-surface-soft/45">sem dado</span>
               ) : (
-                fmtZ(p.v)
+                <>
+                  {formatFactorNominal(row, p.id)}
+                  {factorRankOf(row, p.id) != null
+                    ? ` ${formatRank(factorRankOf(row, p.id))}`
+                    : ""}
+                </>
               )}
             </span>
           </li>
@@ -197,7 +179,7 @@ function ScoreTipBody({
         </p>
       )}
       <p className="pt-1 border-t border-surface-soft/15 font-semibold tabular">
-        = {fmtZ(row.score)}
+        = {formatScore(row.score)}
       </p>
     </div>
   );
@@ -219,7 +201,7 @@ function PercentileTipBody({
         (respeitando os filtros ativos).
       </p>
       <p className="font-mono tabular text-[10px]">
-        Score {fmtZ(row.score)} · percentil{" "}
+        Score {formatScore(row.score)} · percentil{" "}
         {percentile != null ? formatNumber(percentile, 0) : "–"}
       </p>
       <p className="text-surface-soft/55 text-[10px]">
@@ -238,7 +220,14 @@ export function FactorScoreCell({
 }) {
   return (
     <HoverTip content={<FactorTipBody row={row} factor={factor} />}>
-      <span className="tabular text-sm">{fmtZ(row[factor])}</span>
+      <span className="inline-flex items-baseline justify-center gap-1">
+        <span className="tabular text-sm">{formatFactorNominal(row, factor)}</span>
+        {factorRankOf(row, factor) != null && (
+          <span className="text-[9px] tabular text-ink/40 font-medium">
+            {formatRank(factorRankOf(row, factor))}
+          </span>
+        )}
+      </span>
     </HoverTip>
   );
 }
@@ -252,7 +241,7 @@ export function CompositeScoreCell({
 }) {
   return (
     <HoverTip content={<ScoreTipBody row={row} weights={weights} />}>
-      <span className="tabular text-sm font-semibold text-ink">{fmtZ(row.score)}</span>
+      <span className="tabular text-sm font-semibold text-ink">{formatScore(row.score)}</span>
     </HoverTip>
   );
 }
@@ -308,7 +297,7 @@ function ClassTipBody({ row }: { row: FactorRow }) {
         </li>
       </ul>
       <p className="pt-1 border-t border-surface-soft/15 font-semibold tabular">
-        Score {fmtZ(row.score)} · percentil{" "}
+        Score {formatScore(row.score)} · percentil{" "}
         {p != null ? formatNumber(p, 0) : "–"} → Classe {row.factorClass ?? "–"}
       </p>
     </div>

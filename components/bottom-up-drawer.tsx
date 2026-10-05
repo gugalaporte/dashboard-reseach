@@ -9,32 +9,20 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatNumber } from "@/lib/format";
 import { sectorPt } from "@/lib/sector-labels";
 import type { FactorRow } from "@/lib/factor-scoring";
+import {
+  factorRankOf,
+  formatFactorNominal,
+  formatMetricRaw,
+  formatRank,
+  formatScore,
+} from "@/lib/factor-display";
 import type { BottomUpPayload } from "@/lib/bottom-up-types";
 import { BottomUpCharts } from "@/components/bottom-up-charts";
 import { BottomUpValuation } from "@/components/bottom-up-valuation";
 import { BottomUpIntrinsic } from "@/components/bottom-up-intrinsic";
 import { BottomUpQualitative } from "@/components/bottom-up-qualitative";
-import { cn } from "@/lib/utils";
-
-function fmtZ(v: number | null): string {
-  if (v == null) return "–";
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${formatNumber(v, 2)}`;
-}
-
-function fmtRaw(key: string, v: number | null): string {
-  if (v == null) return "–";
-  if (key === "marketCap" || key === "dayVolume") {
-    const abs = Math.abs(v);
-    if (abs >= 1e9) return `${formatNumber(v / 1e9, 2)} bi`;
-    if (abs >= 1e6) return `${formatNumber(v / 1e6, 1)} mi`;
-    return formatNumber(v, 0);
-  }
-  return formatNumber(v, 2);
-}
 
 type Props = {
   row: FactorRow | null;
@@ -101,31 +89,39 @@ export function BottomUpDrawer({ row, onClose }: Props) {
                 value={row.sector ? sectorPt(row.sector) : "–"}
               />
               <Meta label="Classe" value={row.factorClass ?? "–"} />
-              <Meta label="Score" value={fmtZ(row.score)} />
+              <Meta label="Score" value={formatScore(row.score)} />
             </div>
 
             <div className="grid grid-cols-5 gap-1.5 sm:gap-2 text-center mb-5">
               {(
                 [
-                  ["Quality", row.quality],
-                  ["Value", row.value],
-                  ["Mom.", row.momentum],
-                  ["Carry", row.carry],
-                  ["Liq.", row.liquidity],
+                  ["Quality", "quality"],
+                  ["Value", "value"],
+                  ["Mom.", "momentum"],
+                  ["Carry", "carry"],
+                  ["Liq.", "liquidity"],
                 ] as const
-              ).map(([label, v]) => (
-                <div
-                  key={label}
-                  className="border border-line bg-white px-1.5 sm:px-2 py-2.5"
-                >
-                  <div className="text-[9px] uppercase tracking-wide text-ink/40 truncate">
-                    {label}
+              ).map(([label, factor]) => {
+                const rank = factorRankOf(row, factor);
+                return (
+                  <div
+                    key={label}
+                    className="border border-line bg-white px-1.5 sm:px-2 py-2.5"
+                  >
+                    <div className="text-[9px] uppercase tracking-wide text-ink/40 truncate">
+                      {label}
+                    </div>
+                    <div className="tabular text-xs sm:text-sm font-semibold mt-1 inline-flex items-baseline justify-center gap-0.5">
+                      <span>{formatFactorNominal(row, factor)}</span>
+                      {rank != null && (
+                        <span className="text-[9px] text-ink/40 font-medium">
+                          {formatRank(rank)}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="tabular text-xs sm:text-sm font-semibold mt-1">
-                    {fmtZ(v)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <Tabs defaultValue="snapshot">
@@ -202,16 +198,15 @@ function SnapshotTab({ row }: { row: FactorRow }) {
         </p>
       ) : (
         <div className="border border-line bg-white overflow-hidden">
-          <div className="grid grid-cols-[minmax(0,1fr)_5rem_3.75rem] sm:grid-cols-[minmax(0,1fr)_6.5rem_4.25rem] gap-x-2 sm:gap-x-4 px-3 sm:px-4 py-2.5 border-b border-line bg-surface text-[9px] uppercase tracking-[0.14em] text-ink/45">
+          <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-x-2 sm:gap-x-4 px-3 sm:px-4 py-2.5 border-b border-line bg-surface text-[9px] uppercase tracking-[0.14em] text-ink/45">
             <span>Métrica</span>
             <span className="text-right">Valor</span>
-            <span className="text-right">Z-score</span>
           </div>
           <ul>
             {row.breakdown.map((m) => (
               <li
                 key={m.key}
-                className="grid grid-cols-[minmax(0,1fr)_5rem_3.75rem] sm:grid-cols-[minmax(0,1fr)_6.5rem_4.25rem] gap-x-2 sm:gap-x-4 items-center px-3 sm:px-4 py-2.5 border-b border-line/60 last:border-b-0 text-sm"
+                className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-x-2 sm:gap-x-4 items-center px-3 sm:px-4 py-2.5 border-b border-line/60 last:border-b-0 text-sm"
               >
                 <span
                   className="text-ink/70 truncate min-w-0"
@@ -219,18 +214,13 @@ function SnapshotTab({ row }: { row: FactorRow }) {
                 >
                   {m.label}
                   {m.inverted ? (
-                    <span className="text-[10px] text-ink/35 ml-1">(inv.)</span>
+                    <span className="text-[10px] text-ink/35 ml-1">(menor é melhor)</span>
                   ) : null}
                 </span>
-                <span className="tabular text-ink/55 text-xs text-right whitespace-nowrap">
-                  {fmtRaw(m.key, m.raw)}
-                </span>
-                <span
-                  className={cn(
-                    "tabular font-medium text-right whitespace-nowrap text-xs sm:text-sm"
-                  )}
-                >
-                  {fmtZ(m.z)}
+                <span className="tabular text-ink font-medium text-xs text-right whitespace-nowrap">
+                  {m.factor === "value" && m.raw != null && m.raw <= 0
+                    ? "ignorado"
+                    : formatMetricRaw(m.key, m.raw)}
                 </span>
               </li>
             ))}

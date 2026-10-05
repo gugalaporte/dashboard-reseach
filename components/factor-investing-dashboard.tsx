@@ -167,8 +167,18 @@ export function FactorInvestingDashboard() {
     if (classFilter !== "all") list = list.filter((r) => r.factorClass === classFilter);
 
     const dir = sortDir === "asc" ? 1 : -1;
+    const RANK_KEYS = new Set(["quality", "value", "momentum", "carry"]);
     return [...list].sort((a, b) => {
       if (sortKey === "ticker") return dir * a.ticker.localeCompare(b.ticker);
+      if (RANK_KEYS.has(sortKey)) {
+        const av = a[`${sortKey}Rank` as "qualityRank"];
+        const bv = b[`${sortKey}Rank` as "qualityRank"];
+        if (av == null && bv == null) return a.ticker.localeCompare(b.ticker);
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        // desc = melhor primeiro = menor rank
+        return (sortDir === "desc" ? 1 : -1) * (Number(av) - Number(bv));
+      }
       const av = a[sortKey];
       const bv = b[sortKey];
       if (av == null && bv == null) return a.ticker.localeCompare(b.ticker);
@@ -388,8 +398,8 @@ export function FactorInvestingDashboard() {
               </h2>
               <p className="text-xs text-ink/45 mt-0.5 leading-relaxed">
                 Quality {appliedWeights.quality}% · Value {appliedWeights.value}% · Carry{" "}
-                {appliedWeights.carry}% · Momentum {appliedWeights.momentum}% — z-score
-                no universo da tela · ND/EBITDA ignore bancos/financeiras
+                {appliedWeights.carry}% · Momentum {appliedWeights.momentum}% — valor
+                nominal e ranking no universo da tela · ND/EBITDA ignore bancos/financeiras
               </p>
             </div>
             <Button
