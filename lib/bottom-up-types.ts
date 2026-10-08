@@ -29,8 +29,11 @@ export type BottomUpNotes = {
 
 export type SeriesPoint = {
   date: string;
+  /** Rótulo do eixo (1T23, 2024). Se vazio, usa o ano da data. */
+  label?: string;
   roe: number | null;
   roic: number | null;
+  ebitda?: number | null;
   ebitdaMargin: number | null;
   netMargin: number | null;
   netDebtEbitda: number | null;
@@ -80,6 +83,8 @@ export type BottomUpPayload = {
   sector: string | null;
   series: SeriesPoint[];
   annual: AnnualPoint[];
+  /** Margens e alavancagem: trimestre se a base tiver, senão ano. */
+  fiscal: SeriesPoint[];
   bands: MultipleBand[];
   intrinsic: IntrinsicEstimate;
   peerCount: number;

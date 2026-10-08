@@ -33,7 +33,8 @@ import {
   FactorScoreCell,
 } from "@/components/factor-cell-tip";
 import { FactorMobileList } from "@/components/factor-mobile-list";
-import { BottomUpDrawer } from "@/components/bottom-up-drawer";
+import { useRouter } from "next/navigation";
+import { empresaHref } from "@/lib/empresa";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { downloadFactorPdf } from "@/lib/factor-pdf";
@@ -105,8 +106,9 @@ export function FactorInvestingDashboard() {
   const [weightInputs, setWeightInputs] = React.useState(defaultWeightInputs);
   const [sortKey, setSortKey] = React.useState<SortKey>("score");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
-  const [selected, setSelected] = React.useState<FactorRow | null>(null);
   const [savingPdf, setSavingPdf] = React.useState(false);
+  const router = useRouter();
+  const openEmpresa = (row: FactorRow) => router.push(empresaHref(row.ticker));
 
   const fetchData = React.useCallback(async () => {
     setLoading(true);
@@ -417,7 +419,7 @@ export function FactorInvestingDashboard() {
           <FactorMobileList
             data={rows}
             isLoading={loading}
-            onRowClick={setSelected}
+            onRowClick={openEmpresa}
             sectorLabel={(r) =>
               sectorForFilter(r.ticker, r.sector, sectorSource) ?? "Sem setor"
             }
@@ -471,7 +473,7 @@ export function FactorInvestingDashboard() {
                         i % 2 === 0 ? "bg-surface-soft" : "bg-white",
                         "hover:bg-brand/5"
                       )}
-                      onClick={() => setSelected(r)}
+                      onClick={() => openEmpresa(r)}
                     >
                       <TableCell className="font-medium text-ink tabular text-sm">
                         {r.ticker}
@@ -522,7 +524,6 @@ export function FactorInvestingDashboard() {
         </section>
       </main>
 
-      <BottomUpDrawer row={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

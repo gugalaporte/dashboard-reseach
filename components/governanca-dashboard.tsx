@@ -10,11 +10,12 @@ import { pickPortfolioCompanies } from "@/lib/governanca-portfolio";
 import { GovernancaCalendario } from "@/components/governanca-calendario";
 import { GovernancaEventosTimeline } from "@/components/governanca-eventos-timeline";
 import type { LsegViewRow } from "@/lib/lseg-transform";
+import { empresaHref } from "@/lib/empresa";
 
 function GovernanceCard({ row }: { row: LsegViewRow }) {
   return (
     <Link
-      href={`/governanca/${row.empresa}`}
+      href={empresaHref(row.empresa)}
       className="text-left border border-line bg-white p-4 hover:border-brand/40 hover:shadow-sm transition group block"
     >
       <div className="flex items-center gap-3">

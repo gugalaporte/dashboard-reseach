@@ -10,7 +10,8 @@ export type Tab =
   | "pipeline"
   | "mercado"
   | "governanca"
-  | "trades";
+  | "trades"
+  | "empresa";
 
 export const NAV_ITEMS: { id: Tab; href: string; label: string }[] = [
   { id: "research", href: "/", label: "Research" },

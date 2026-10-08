@@ -13,6 +13,7 @@ import {
   ComposedChart,
 } from "recharts";
 import type { AnnualPoint, SeriesPoint } from "@/lib/bottom-up-types";
+import { pickEvolutionSeries, seriesFromAnnual } from "@/lib/bottom-up-series";
 import { formatNumber } from "@/lib/format";
 
 const BRAND = "#1b61b6";
@@ -20,10 +21,6 @@ const SOFT = "#4492cc";
 const AMBER = "#b8860b";
 const ROSE = "#c0392b";
 const EMERALD = "#059669";
-
-function yearLabel(iso: string): string {
-  return iso.slice(0, 4);
-}
 
 function ChartCard({
   title,
@@ -57,139 +54,106 @@ const tipStyle = {
   border: "1px solid #e5e7eb",
 };
 
-function hasAny(points: SeriesPoint[], keys: (keyof SeriesPoint)[]): boolean {
-  return points.some((p) => keys.some((k) => p[k] != null));
-}
-
-type Props = {
-  series: SeriesPoint[];
-  annual: AnnualPoint[];
-};
-
-/** Gráficos de qualidade e FCF anual. */
-export function BottomUpCharts({ series, annual }: Props) {
-  const qualityData = series.map((p) => ({
-    label: yearLabel(p.date),
-    date: p.date,
+function toChart(points: SeriesPoint[]) {
+  return points.map((p) => ({
+    label: p.label ?? p.date.slice(0, 4),
     roe: p.roe,
     roic: p.roic,
     ebitdaMargin: p.ebitdaMargin,
     netMargin: p.netMargin,
     netDebtEbitda: p.netDebtEbitda,
   }));
+}
 
-  const annualData = annual.map((a) => ({
-    label: String(a.year),
-    fcf: a.freeCashFlow != null ? a.freeCashFlow / 1e6 : null,
-    ebitda: a.ebitda != null ? a.ebitda / 1e6 : null,
-  }));
+function isQuarterly(points: SeriesPoint[]): boolean {
+  return points.some((p) => /[1-4]T\d{2}/.test(p.label ?? ""));
+}
 
-  if (series.length === 0 && annual.length === 0) {
+type Props = {
+  series: SeriesPoint[];
+  annual: AnnualPoint[];
+  fiscal?: SeriesPoint[];
+};
+
+/** Gráficos de evolução. Trimestre quando a base tiver; senão ano. */
+export function BottomUpCharts({ series, annual, fiscal }: Props) {
+  const hist = fiscal ?? seriesFromAnnual(annual);
+  const roe = pickEvolutionSeries(series, hist, ["roe", "roic"]);
+  const margins = pickEvolutionSeries(series, hist, ["ebitdaMargin", "netMargin"]);
+  const nd = pickEvolutionSeries(series, hist, ["netDebtEbitda"]);
+  const useQBars = isQuarterly(hist);
+  const annualOk = annual.filter((a) => a.freeCashFlow != null || a.ebitda != null);
+  const barData = useQBars
+    ? hist.map((p) => ({
+        label: p.label ?? p.date.slice(0, 4),
+        fcf: p.freeCashFlow != null ? p.freeCashFlow / 1e6 : null,
+        ebitda: p.ebitda != null ? p.ebitda / 1e6 : null,
+      }))
+    : annualOk.map((a) => ({
+        label: String(a.year),
+        fcf: a.freeCashFlow != null ? a.freeCashFlow / 1e6 : null,
+        ebitda: a.ebitda != null ? a.ebitda / 1e6 : null,
+      }));
+  const barOk = barData.filter((d) => d.fcf != null || d.ebitda != null).length >= 2;
+
+  const empty =
+    roe.length === 0 &&
+    margins.length === 0 &&
+    nd.length === 0 &&
+    !barOk;
+
+  if (empty) {
     return (
       <p className="text-sm text-ink/40 py-6 text-center">
-        Sem série histórica disponível para este papel.
+        Sem evolução (são necessários pelo menos dois períodos).
       </p>
     );
   }
 
   return (
     <div className="space-y-3">
-      {hasAny(series, ["roe", "roic"]) && (
-        <ChartCard title="ROE / ROIC" hint="% ao longo do tempo">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={qualityData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} width={36} />
-              <Tooltip
-                contentStyle={tipStyle}
-                formatter={(v: number) => formatNumber(v, 1)}
-              />
-              <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Line
-                type="monotone"
-                dataKey="roe"
-                name="ROE"
-                stroke={BRAND}
-                dot={false}
-                connectNulls
-              />
-              <Line
-                type="monotone"
-                dataKey="roic"
-                name="ROIC"
-                stroke={AMBER}
-                dot={false}
-                connectNulls
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
+      {roe.length > 0 && (
+        <QualityChart
+          title="ROE / ROIC"
+          hint={`% ${isQuarterly(roe) ? "trimestral" : "anual"}`}
+          data={toChart(roe)}
+          lines={[
+            { key: "roe", name: "ROE", color: BRAND },
+            { key: "roic", name: "ROIC", color: AMBER },
+          ]}
+          digits={1}
+        />
       )}
-
-      {hasAny(series, ["ebitdaMargin", "netMargin"]) && (
-        <ChartCard title="Margens" hint="EBITDA e líquida (%)">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={qualityData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} width={36} />
-              <Tooltip
-                contentStyle={tipStyle}
-                formatter={(v: number) => formatNumber(v, 1)}
-              />
-              <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Line
-                type="monotone"
-                dataKey="ebitdaMargin"
-                name="Margem EBITDA"
-                stroke={EMERALD}
-                dot={false}
-                connectNulls
-              />
-              <Line
-                type="monotone"
-                dataKey="netMargin"
-                name="Margem líquida"
-                stroke={SOFT}
-                dot={false}
-                connectNulls
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
+      {margins.length > 0 && (
+        <QualityChart
+          title="Margens"
+          hint={`EBITDA e líquida (% ${isQuarterly(margins) ? "trimestral" : "anual"})`}
+          data={toChart(margins)}
+          lines={[
+            { key: "ebitdaMargin", name: "Margem EBITDA", color: EMERALD },
+            { key: "netMargin", name: "Margem líquida", color: SOFT },
+          ]}
+          digits={1}
+        />
       )}
-
-      {hasAny(series, ["netDebtEbitda"]) && (
-        <ChartCard title="ND / EBITDA" hint="Menor = melhor">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={qualityData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} width={36} />
-              <Tooltip
-                contentStyle={tipStyle}
-                formatter={(v: number) => formatNumber(v, 2)}
-              />
-              <Line
-                type="monotone"
-                dataKey="netDebtEbitda"
-                name="ND/EBITDA"
-                stroke={ROSE}
-                dot={false}
-                connectNulls
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
+      {nd.length > 0 && (
+        <QualityChart
+          title="Dívida / EBITDA"
+          hint={`${isQuarterly(nd) ? "trimestral" : "anual"} · menor = melhor`}
+          data={toChart(nd)}
+          lines={[{ key: "netDebtEbitda", name: "Dív./EBITDA", color: ROSE }]}
+          digits={2}
+        />
       )}
-
-      {annualData.some((d) => d.fcf != null || d.ebitda != null) && (
-        <ChartCard title="FCF e EBITDA anuais" hint="R$ milhões">
+      {barOk && (
+        <ChartCard
+          title={useQBars ? "FCF e EBITDA" : "FCF e EBITDA anuais"}
+          hint="R$ milhões"
+        >
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={annualData}>
+            <ComposedChart data={barData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+              <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" minTickGap={12} />
               <YAxis tick={{ fontSize: 10 }} width={40} />
               <Tooltip
                 contentStyle={tipStyle}
@@ -203,7 +167,7 @@ export function BottomUpCharts({ series, annual }: Props) {
                 name="FCF"
                 stroke={BRAND}
                 strokeWidth={2}
-                dot={{ r: 2 }}
+                dot={{ r: 3 }}
                 connectNulls
               />
             </ComposedChart>
@@ -211,5 +175,48 @@ export function BottomUpCharts({ series, annual }: Props) {
         </ChartCard>
       )}
     </div>
+  );
+}
+
+function QualityChart({
+  title,
+  hint,
+  data,
+  lines,
+  digits,
+}: {
+  title: string;
+  hint: string;
+  data: ReturnType<typeof toChart>;
+  lines: Array<{ key: string; name: string; color: string }>;
+  digits: number;
+}) {
+  return (
+    <ChartCard title={title} hint={hint}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" minTickGap={12} />
+          <YAxis tick={{ fontSize: 10 }} width={36} />
+          <Tooltip
+            contentStyle={tipStyle}
+            formatter={(v: number) => formatNumber(v, digits)}
+          />
+          <Legend wrapperStyle={{ fontSize: 10 }} />
+          {lines.map((l) => (
+            <Line
+              key={l.key}
+              type="monotone"
+              dataKey={l.key}
+              name={l.name}
+              stroke={l.color}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              connectNulls
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </ChartCard>
   );
 }

@@ -13,6 +13,7 @@ import {
   WEEKDAYS,
   type ResultadoEvent,
 } from "@/lib/governanca-calendario";
+import { empresaHref } from "@/lib/empresa";
 
 type Props = {
   events: ResultadoEvent[];
@@ -165,7 +166,7 @@ function DayEvents({
           </div>
           {inPortfolio.has(e.ticker) ? (
             <Link
-              href={`/governanca/${e.ticker}`}
+              href={empresaHref(e.ticker)}
               className="text-[10px] uppercase tracking-[0.12em] text-brand shrink-0"
             >
               Ver →

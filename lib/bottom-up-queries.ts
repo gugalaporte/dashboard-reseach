@@ -7,11 +7,8 @@ import {
   estimateIntrinsic,
   finite,
 } from "./bottom-up-value";
-import type {
-  AnnualPoint,
-  BottomUpPayload,
-  SeriesPoint,
-} from "./bottom-up-types";
+import { buildAnnualPoints, buildFiscalSeries } from "./bottom-up-series";
+import type { BottomUpPayload, SeriesPoint } from "./bottom-up-types";
 
 function num(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -62,7 +59,7 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
     db
       .from("historical_series")
       .select(
-        "period_year,period_label,revenue,ebitda,net_income,free_cash_flow,total_debt"
+        "period_year,period_label,period_type,as_of_date,revenue,ebitda,net_income,free_cash_flow,total_debt"
       )
       .eq("ric", ric)
       .order("period_year", { ascending: true }),
@@ -101,22 +98,9 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
   }
   const series = [...byMonth.values()];
 
-  const annual: AnnualPoint[] = [];
-  for (const row of histRes.data ?? []) {
-    const year = num((row as { period_year?: unknown }).period_year);
-    if (year == null) continue;
-    annual.push({
-      year,
-      label:
-        String((row as { period_label?: string }).period_label ?? year) ||
-        String(year),
-      revenue: num((row as { revenue?: unknown }).revenue),
-      ebitda: num((row as { ebitda?: unknown }).ebitda),
-      netIncome: num((row as { net_income?: unknown }).net_income),
-      freeCashFlow: num((row as { free_cash_flow?: unknown }).free_cash_flow),
-      totalDebt: num((row as { total_debt?: unknown }).total_debt),
-    });
-  }
+  const histRows = histRes.data ?? [];
+  const annual = buildAnnualPoints(histRows);
+  const fiscal = buildFiscalSeries(histRows);
 
   // Pares do mesmo setor (snapshot mais recente de cada RIC)
   let peerPes: number[] = [];
@@ -196,6 +180,7 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
     sector,
     series,
     annual,
+    fiscal,
     bands,
     intrinsic,
     peerCount,

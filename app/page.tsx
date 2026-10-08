@@ -8,8 +8,9 @@ import { DateFilter } from "@/components/date-filter";
 import { MetricsSelector } from "@/components/metrics-selector";
 import { YearSelector } from "@/components/year-selector";
 import { ResearchTable } from "@/components/research-table";
-import { CompanyDrawer } from "@/components/company-drawer";
 import { ChangeFeed } from "@/components/change-feed";
+import { useRouter } from "next/navigation";
+import { empresaHref } from "@/lib/empresa";
 import {
   SummaryCards,
   type SummaryData,
@@ -71,9 +72,7 @@ export default function DashboardPage() {
   const [stats, setStats] = React.useState<SummaryStats | null>(null);
   const [loadingTable, setLoadingTable] = React.useState(true);
 
-  const [selectedEmpresa, setSelectedEmpresa] = React.useState<string | null>(
-    null
-  );
+  const router = useRouter();
 
   // Metricas selecionadas pelo usuario (1..3). Default: P/E, EV/EBITDA, DY.
   const [selectedMetrics, setSelectedMetrics] =
@@ -125,15 +124,6 @@ export default function DashboardPage() {
     }
     return Array.from(set).sort((a, b) => sectorPt(a).localeCompare(sectorPt(b)));
   }, [allRows]);
-
-  // Consenso do drawer: todas as rows da empresa selecionada.
-  const consensoDrawer = React.useMemo(
-    () =>
-      selectedEmpresa
-        ? allRows.filter((r) => r.empresa === selectedEmpresa)
-        : [],
-    [allRows, selectedEmpresa]
-  );
 
   // Tickers unicos visiveis no dashboard. Usamos allRows (nao as filtradas)
   // para o mapa persistir mesmo quando o usuario filtra por fonte/periodo.
@@ -284,7 +274,7 @@ export default function DashboardPage() {
         <ResearchTable
           data={rows}
           isLoading={loadingTable}
-          onRowClick={(r) => setSelectedEmpresa(r.empresa)}
+          onRowClick={(r) => router.push(empresaHref(r.empresa))}
           livePrices={livePrices}
           selectedMetrics={selectedMetrics}
           years={years}
@@ -296,12 +286,6 @@ export default function DashboardPage() {
         />
       </main>
 
-      <CompanyDrawer
-        empresa={selectedEmpresa}
-        consenso={consensoDrawer}
-        onClose={() => setSelectedEmpresa(null)}
-        livePrices={livePrices}
-      />
     </div>
   );
 }

@@ -25,8 +25,11 @@ import {
 } from "@/lib/metrics";
 import { visibleYears } from "@/lib/year-filter";
 import { LsegSeriesPanel } from "@/components/lseg-series-panel";
+import { useRouter } from "next/navigation";
+import { empresaHref } from "@/lib/empresa";
 
 export function LsegDashboard() {
+  const router = useRouter();
   const [allRows, setAllRows] = React.useState<LsegViewRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -242,6 +245,7 @@ export function LsegDashboard() {
           selectedMetrics={selectedMetrics}
           years={years}
           portfolioTickers={portfolioTickers}
+          onRowClick={(r) => router.push(empresaHref(r.empresa))}
         />
 
         <div id="serie-temporal" className="pt-4 border-t border-line">

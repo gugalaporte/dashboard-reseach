@@ -7,6 +7,8 @@ import type { LivePrice } from "@/lib/use-live-prices";
 import { formatDateShort, formatValue } from "@/lib/format";
 import { sectorPt } from "@/lib/sector-labels";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { empresaHref } from "@/lib/empresa";
 
 const RATING_CLASS: Record<NotesRating, string> = {
   buy: "bg-emerald-700 text-white",
@@ -72,7 +74,10 @@ export function PipelineCompanyCard({ note, close }: Props) {
   return (
     <article className="border border-line bg-white p-4 md:p-5 space-y-4">
       <header className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+        <Link
+          href={empresaHref(note.ticker)}
+          className="flex items-center gap-3 min-w-0 hover:opacity-90"
+        >
           <CompanyLogo ticker={note.ticker} />
           <div className="min-w-0">
             <div className="font-medium text-ink text-sm truncate">
@@ -83,7 +88,7 @@ export function PipelineCompanyCard({ note, close }: Props) {
               {note.sector ? ` · ${sectorPt(note.sector)}` : ""}
             </div>
           </div>
-        </div>
+        </Link>
         {note.rating ? (
           <span
             className={cn(

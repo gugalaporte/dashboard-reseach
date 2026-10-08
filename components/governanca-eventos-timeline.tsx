@@ -11,6 +11,7 @@ import {
   mondayIso,
   type GovernancaEvento,
 } from "@/lib/governanca-eventos";
+import { empresaHref } from "@/lib/empresa";
 
 type Props = { ticker?: string };
 
@@ -46,7 +47,7 @@ function EventCard({
         {day && <span className="tabular">{formatDateShort(day)}</span>}
         {!hideTicker && (
           <Link
-            href={`/governanca/${e.ticker}`}
+            href={empresaHref(e.ticker)}
             className="font-medium text-ink hover:text-brand"
           >
             {e.ticker}

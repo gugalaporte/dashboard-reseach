@@ -146,6 +146,7 @@ export function BottomUpDrawer({ row, onClose }: Props) {
                   <BottomUpCharts
                     series={payload?.series ?? []}
                     annual={payload?.annual ?? []}
+                    fiscal={payload?.fiscal ?? []}
                   />
                 )}
               </TabsContent>

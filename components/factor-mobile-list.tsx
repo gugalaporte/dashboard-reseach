@@ -48,7 +48,7 @@ const CLASS_STYLES: Record<FactorClass, string> = {
 
 /**
  * Lista compacta para mobile — ticker, score, classe e fatores.
- * Toque abre o mesmo drawer da tabela desktop.
+ * Toque abre a página consolidada da empresa.
  */
 export function FactorMobileList({ data, isLoading, onRowClick, sectorLabel }: Props) {
   if (isLoading) {

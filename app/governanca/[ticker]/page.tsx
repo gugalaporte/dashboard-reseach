@@ -1,8 +1,9 @@
-import { GovernancaEmpresa } from "@/components/governanca-empresa";
+import { redirect } from "next/navigation";
+import { empresaHref } from "@/lib/empresa";
 
 export const metadata = {
-  title: "Governança — Finacap",
-  description: "Detalhes de governança da empresa",
+  title: "Empresa — Finacap",
+  description: "Página consolidada da empresa",
 };
 
 export default function GovernancaTickerPage({
@@ -10,5 +11,5 @@ export default function GovernancaTickerPage({
 }: {
   params: { ticker: string };
 }) {
-  return <GovernancaEmpresa ticker={params.ticker.toUpperCase()} />;
+  redirect(`${empresaHref(params.ticker)}?tab=governanca`);
 }
