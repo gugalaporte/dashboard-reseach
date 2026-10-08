@@ -6,6 +6,7 @@ import { AppHeader } from "@/components/app-header";
 import { CompanyLogo } from "@/components/company-logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { sectorPt } from "@/lib/sector-labels";
+import { pickPortfolioCompanies } from "@/lib/governanca-portfolio";
 import { GovernancaCalendario } from "@/components/governanca-calendario";
 import { GovernancaEventosTimeline } from "@/components/governanca-eventos-timeline";
 import type { LsegViewRow } from "@/lib/lseg-transform";
@@ -68,10 +69,7 @@ export function GovernancaDashboard() {
   }, []);
 
   const portfolio = React.useMemo(
-    () =>
-      rows
-        .filter((r) => r.inPortfolio)
-        .sort((a, b) => a.empresa.localeCompare(b.empresa)),
+    () => pickPortfolioCompanies(rows.filter((r) => r.inPortfolio)),
     [rows]
   );
 
