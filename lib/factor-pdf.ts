@@ -26,8 +26,8 @@ export function factorPdfTable(opts: FactorPdfOpts): {
     "Setor",
     "Quality",
     "Value",
-    "Momentum",
     "Carry",
+    "Momentum",
     "Score",
     "Classe",
   ];
@@ -39,8 +39,8 @@ export function factorPdfTable(opts: FactorPdfOpts): {
       opts.sectorLabel(r) || "–",
       formatFactorCell(r, "quality"),
       formatFactorCell(r, "value"),
-      formatFactorCell(r, "momentum"),
       formatFactorCell(r, "carry"),
+      formatFactorCell(r, "momentum"),
       formatScore(r.score),
       r.factorClass ?? "–",
     ];

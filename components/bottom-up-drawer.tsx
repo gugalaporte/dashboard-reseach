@@ -97,8 +97,8 @@ export function BottomUpDrawer({ row, onClose }: Props) {
                 [
                   ["Quality", "quality"],
                   ["Value", "value"],
-                  ["Mom.", "momentum"],
                   ["Carry", "carry"],
+                  ["Mom.", "momentum"],
                   ["Liq.", "liquidity"],
                 ] as const
               ).map(([label, factor]) => {

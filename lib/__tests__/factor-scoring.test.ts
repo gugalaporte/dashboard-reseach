@@ -31,7 +31,7 @@ function base(partial: Partial<FactorInput> & Pick<FactorInput, "ticker" | "ric"
     dividendYield: 4,
     dyFwd: null,
     marketCap: 50e9,
-    dayVolume: 2_000_000,
+    dayVolume: 4_000_000,
     analystCount: 8,
     revenueCagr: 10,
     inPortfolio: false,
@@ -157,6 +157,42 @@ describe("scoreFactors", () => {
       { minDayVolume: 20_000, maxNetDebtEbitda: 8 }
     );
     expect(rows[0]!.eligible).toBe(true);
+  });
+
+  it("score é a média ponderada das posições", () => {
+    const rows = scoreFactors([
+      base({
+        ticker: "AQ",
+        ric: "AQ.SA",
+        sector: "Energy",
+        roic: 40,
+        evEbitda: 10,
+        ret3m: 20,
+        dividendYield: 1,
+        dyFwd: null,
+      }),
+      base({
+        ticker: "AV",
+        ric: "AV.SA",
+        sector: "Energy",
+        roic: 10,
+        evEbitda: 4,
+        ret3m: 0,
+        dividendYield: 8,
+        dyFwd: null,
+      }),
+    ]);
+    const aq = rows.find((r) => r.ticker === "AQ")!;
+    const av = rows.find((r) => r.ticker === "AV")!;
+    expect(aq.qualityRank).toBe(1);
+    expect(aq.valueRank).toBe(2);
+    expect(aq.momentumRank).toBe(1);
+    expect(aq.carryRank).toBe(2);
+    // 1º de 2 vira 2 pontos: 2×30% + 1×30% + 2×10% + 1×30% = 1,4
+    expect(aq.score).toBeCloseTo(1.4, 5);
+    // 2º vira 1 ponto: 1×30% + 2×30% + 1×10% + 2×30% = 1,6
+    expect(av.score).toBeCloseTo(1.6, 5);
+    expect(rows[0]!.ticker).toBe("AV");
   });
 
   it("peso maior em quality sobe empresa de ROIC alto", () => {

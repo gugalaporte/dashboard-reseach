@@ -10,7 +10,7 @@ export type FactorEligibility = {
 };
 
 export const DEFAULT_ELIGIBILITY: FactorEligibility = {
-  minDayVolume: 1_000_000,
+  minDayVolume: 3_000_000,
   maxNetDebtEbitda: 8,
 };
 
@@ -154,6 +154,13 @@ export type FactorRow = {
   momentumRank: number | null;
   carry: number | null;
   carryRank: number | null;
+  /** Tamanho do ranking de cada fator. 1º vira este número de pontos. */
+  rankPool: {
+    quality: number;
+    value: number;
+    momentum: number;
+    carry: number;
+  } | null;
   liquidity: number | null;
   score: number | null;
   percentile: number | null;
@@ -296,11 +303,24 @@ export function assignRanks(
   return out;
 }
 
-/** 1 = melhor do grupo, 0 = pior. Usado só no score composto. */
-function rankScore(rank: number | null, count: number): number | null {
+/** 1º vira a última posição do grupo, para o maior número valer mais. */
+export function pointsFromRank(rank: number | null, count: number): number | null {
   if (rank == null || count <= 0) return null;
-  if (count === 1) return 1;
-  return 1 - (rank - 1) / (count - 1);
+  return count - rank + 1;
+}
+
+/**
+ * Média ponderada dos pontos. 1º vale mais que o último: maior score é melhor.
+ * Fator sem ranking sai da conta e o peso dos demais é renormalizado.
+ */
+function weightedRankScore(
+  parts: Array<{ w: number; points: number | null }>
+): number | null {
+  const present = parts.filter((p) => p.points != null && p.w > 0);
+  if (present.length === 0) return null;
+  const wSum = present.reduce((a, p) => a + p.w, 0);
+  if (wSum <= 0) return null;
+  return present.reduce((a, p) => a + p.points! * p.w, 0) / wSum;
 }
 
 /** Value: P/E fwd (financeiras) ou EV/EBITDA (demais). */
@@ -434,6 +454,7 @@ export function scoreFactors(
         momentumRank: null,
         carry: null,
         carryRank: null,
+        rankPool: null,
         liquidity: null,
         score: null,
         percentile: null,
@@ -503,6 +524,7 @@ export function scoreFactors(
       momentumRank: null,
       carry,
       carryRank: null,
+      rankPool: null,
       liquidity: avgNullable(liquidityZs),
       score: null,
       percentile: null,
@@ -536,12 +558,6 @@ export function scoreFactors(
     true
   );
 
-  const qCount = qualityRanks.size;
-  const mCount = momentumRanks.size;
-  const cCount = carryRanks.size;
-  const finCount = finRanks.size;
-  const othCount = othRanks.size;
-
   for (const row of scored) {
     if (!row.eligible) continue;
     row.qualityRank = qualityRanks.get(row.ticker) ?? null;
@@ -549,19 +565,20 @@ export function scoreFactors(
     row.carryRank = carryRanks.get(row.ticker) ?? null;
     const fin = isFinancialForValue(row.raw);
     row.valueRank = (fin ? finRanks : othRanks).get(row.ticker) ?? null;
-    const valueCount = fin ? finCount : othCount;
+    const pool = {
+      quality: qualityRanks.size,
+      value: (fin ? finRanks : othRanks).size,
+      momentum: momentumRanks.size,
+      carry: carryRanks.size,
+    };
+    row.rankPool = pool;
 
-    const parts: Array<{ w: number; v: number | null }> = [
-      { w: weights.quality, v: rankScore(row.qualityRank, qCount) },
-      { w: weights.value, v: rankScore(row.valueRank, valueCount) },
-      { w: weights.momentum, v: rankScore(row.momentumRank, mCount) },
-      { w: weights.carry, v: rankScore(row.carryRank, cCount) },
-    ];
-    const present = parts.filter((p) => p.v != null && p.w > 0);
-    if (present.length > 0) {
-      const wSum = present.reduce((a, p) => a + p.w, 0);
-      row.score = present.reduce((a, p) => a + (p.v! * p.w) / wSum, 0) * 100;
-    }
+    row.score = weightedRankScore([
+      { w: weights.quality, points: pointsFromRank(row.qualityRank, pool.quality) },
+      { w: weights.value, points: pointsFromRank(row.valueRank, pool.value) },
+      { w: weights.momentum, points: pointsFromRank(row.momentumRank, pool.momentum) },
+      { w: weights.carry, points: pointsFromRank(row.carryRank, pool.carry) },
+    ]);
   }
 
   const eligibleScores = scored

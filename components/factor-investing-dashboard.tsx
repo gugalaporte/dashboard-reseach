@@ -97,7 +97,7 @@ export function FactorInvestingDashboard() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [setor, setSetor] = React.useState<string | undefined>();
-  const [sectorSource, setSectorSource] = React.useState<SectorSource>("finacap");
+  const [sectorSource, setSectorSource] = React.useState<SectorSource>("bovespa");
   const [classFilter, setClassFilter] = React.useState<FactorClass | "all">("all");
   const [onlyEligible, setOnlyEligible] = React.useState(true);
   const [onlyPortfolio, setOnlyPortfolio] = React.useState(false);
@@ -178,7 +178,7 @@ export function FactorInvestingDashboard() {
         if (av == null && bv == null) return a.ticker.localeCompare(b.ticker);
         if (av == null) return 1;
         if (bv == null) return -1;
-        // desc = melhor primeiro = menor rank
+        // desc = melhor primeiro = menor posição
         return (sortDir === "desc" ? 1 : -1) * (Number(av) - Number(bv));
       }
       const av = a[sortKey];
@@ -400,8 +400,9 @@ export function FactorInvestingDashboard() {
               </h2>
               <p className="text-xs text-ink/45 mt-0.5 leading-relaxed">
                 Quality {appliedWeights.quality}% · Value {appliedWeights.value}% · Carry{" "}
-                {appliedWeights.carry}% · Momentum {appliedWeights.momentum}% — valor
-                nominal e ranking no universo da tela · ND/EBITDA ignore bancos/financeiras
+                {appliedWeights.carry}% · Momentum {appliedWeights.momentum}% — score =
+                soma ponderada dos pontos (1º vira a última posição, maior é melhor) ·
+                ND/EBITDA ignore bancos/financeiras
               </p>
             </div>
             <Button
@@ -435,8 +436,8 @@ export function FactorInvestingDashboard() {
                   </TableHead>
                   <SortHead label="Quality" active={sortKey === "quality"} dir={sortDir} onClick={() => toggleSort("quality")} />
                   <SortHead label="Value" active={sortKey === "value"} dir={sortDir} onClick={() => toggleSort("value")} />
-                  <SortHead label="Momentum" active={sortKey === "momentum"} dir={sortDir} onClick={() => toggleSort("momentum")} />
                   <SortHead label="Carry" active={sortKey === "carry"} dir={sortDir} onClick={() => toggleSort("carry")} />
+                  <SortHead label="Momentum" active={sortKey === "momentum"} dir={sortDir} onClick={() => toggleSort("momentum")} />
                   <SortHead label="Score" active={sortKey === "score"} dir={sortDir} onClick={() => toggleSort("score")} />
                   <TableHead className="text-[9px] uppercase tracking-[0.14em] text-surface-soft/80 font-medium h-9 text-center">
                     Classe
@@ -493,10 +494,10 @@ export function FactorInvestingDashboard() {
                         <FactorScoreCell row={r} factor="value" />
                       </TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                        <FactorScoreCell row={r} factor="momentum" />
+                        <FactorScoreCell row={r} factor="carry" />
                       </TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                        <FactorScoreCell row={r} factor="carry" />
+                        <FactorScoreCell row={r} factor="momentum" />
                       </TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                         <CompositeScoreCell row={r} weights={appliedWeights} />

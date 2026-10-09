@@ -52,8 +52,8 @@ export function EmpresaScreening({ ticker, row }: Props) {
               [
                 ["Quality", "quality"],
                 ["Value", "value"],
-                ["Momentum", "momentum"],
                 ["Carry", "carry"],
+                ["Momentum", "momentum"],
                 ["Score", "score"],
               ] as const
             ).map(([label, key]) => (

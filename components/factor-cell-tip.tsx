@@ -7,6 +7,7 @@ import {
   FACTOR_FORMULA,
   FACTOR_LABELS,
   DEFAULT_WEIGHT_PCT,
+  pointsFromRank,
   weightsFromPct,
   type FactorClass,
   type FactorId,
@@ -130,51 +131,56 @@ function ScoreTipBody({
   const w = weightsFromPct(weights);
   const parts = (
     [
-      { id: "quality" as const, w: w.quality, v: row.quality },
-      { id: "value" as const, w: w.value, v: row.value },
-      { id: "momentum" as const, w: w.momentum, v: row.momentum },
-      { id: "carry" as const, w: w.carry, v: row.carry },
-    ] satisfies { id: FactorId; w: number; v: number | null }[]
+      { id: "quality" as const, w: w.quality },
+      { id: "value" as const, w: w.value },
+      { id: "momentum" as const, w: w.momentum },
+      { id: "carry" as const, w: w.carry },
+    ] satisfies { id: FactorId; w: number }[]
   ).filter((p) => p.w > 0);
-  const present = parts.filter((p) => p.v != null);
+  const present = parts.filter(
+    (p) => pointsFromRank(factorRankOf(row, p.id), row.rankPool?.[p.id] ?? 0) != null
+  );
   const wSum = present.reduce((a, p) => a + p.w, 0);
   const pct = (x: number) => `${formatNumber(x * 100, 0)}%`;
 
   return (
     <div className="space-y-2">
       <p className="text-surface-soft/70 text-[10px] leading-snug">
-        Score composto pelos rankings (1º = 100) de Quality×{pct(w.quality)} +
-        Value×{pct(w.value)} + Carry×{pct(w.carry)} + Momentum×{pct(w.momentum)}
-        (renormaliza se faltar fator ou se a soma ≠ 100%).
+        1º vira a última posição do grupo, então vale mais pontos. Maior score é
+        melhor. Quality×{pct(w.quality)} + Value×{pct(w.value)} + Carry×
+        {pct(w.carry)} + Momentum×{pct(w.momentum)}. Se faltar um fator, o peso
+        dos demais é renormalizado.
       </p>
       <ul className="space-y-0.5 font-mono tabular text-[10px]">
-        {parts.map((p) => (
-          <li key={p.id} className="flex justify-between gap-3">
-            <span className="text-surface-soft/75">
-              {FACTOR_LABELS[p.id]}×{pct(p.w)}
-            </span>
-            <span>
-              {p.v == null ? (
-                <span className="text-surface-soft/45">sem dado</span>
-              ) : (
-                <>
-                  {formatFactorNominal(row, p.id)}
-                  {factorRankOf(row, p.id) != null
-                    ? ` ${formatRank(factorRankOf(row, p.id))}`
-                    : ""}
-                </>
-              )}
-            </span>
-          </li>
-        ))}
+        {parts.map((p) => {
+          const rank = factorRankOf(row, p.id);
+          const points = pointsFromRank(rank, row.rankPool?.[p.id] ?? 0);
+          return (
+            <li key={p.id} className="flex justify-between gap-3">
+              <span className="text-surface-soft/75">
+                {FACTOR_LABELS[p.id]}×{pct(p.w)}
+              </span>
+              <span>
+                {points == null ? (
+                  <span className="text-surface-soft/45">sem dado</span>
+                ) : (
+                  `${formatRank(rank)} → ${formatNumber(points, 0)} × ${pct(p.w)}`
+                )}
+              </span>
+            </li>
+          );
+        })}
       </ul>
       {present.length > 0 && wSum > 0 && (
         <p className="text-[10px] text-surface-soft/55 leading-snug">
           {present
-            .map(
-              (p) =>
-                `${FACTOR_LABELS[p.id]}×${pct(p.w / wSum)}`
-            )
+            .map((p) => {
+              const points = pointsFromRank(
+                factorRankOf(row, p.id),
+                row.rankPool?.[p.id] ?? 0
+              );
+              return `${formatNumber(points ?? 0, 0)} × ${pct(p.w / wSum)}`;
+            })
             .join(" + ")}
         </p>
       )}

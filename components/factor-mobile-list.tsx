@@ -125,8 +125,8 @@ export function FactorMobileList({ data, isLoading, onRowClick, sectorLabel }: P
               <div className="mt-3 grid grid-cols-4 gap-1.5 text-center">
                 <FactorChip label="Q" row={row} factor="quality" />
                 <FactorChip label="V" row={row} factor="value" />
-                <FactorChip label="M" row={row} factor="momentum" />
                 <FactorChip label="C" row={row} factor="carry" />
+                <FactorChip label="M" row={row} factor="momentum" />
               </div>
             </button>
           </li>

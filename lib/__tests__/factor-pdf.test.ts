@@ -16,6 +16,7 @@ function row(partial: Partial<FactorRow> & Pick<FactorRow, "ticker">): FactorRow
     momentumRank: 8,
     carry: 4,
     carryRank: 1,
+    rankPool: null,
     liquidity: null,
     score: 0.4,
     percentile: 80,
@@ -51,8 +52,8 @@ describe("factorPdfTable", () => {
       "Setor",
       "Quality",
       "Value",
-      "Momentum",
       "Carry",
+      "Momentum",
       "Score",
       "Classe",
     ]);
