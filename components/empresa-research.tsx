@@ -27,10 +27,11 @@ export function EmpresaResearch({ tickers, primary, consenso, livePrices }: Prop
 
   React.useEffect(() => {
     let cancelled = false;
+    const ids = tickersKey ? tickersKey.split("|") : [];
     setLoading(true);
     Promise.all([
-      Promise.all(tickers.map((t) => getHistoricoEmpresa(t))),
-      Promise.all(tickers.map((t) => getPdfsEmpresa(t))),
+      Promise.all(ids.map((t) => getHistoricoEmpresa(t))),
+      Promise.all(ids.map((t) => getPdfsEmpresa(t))),
     ])
       .then(([hists, pdfLists]) => {
         if (cancelled) return;

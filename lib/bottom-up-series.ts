@@ -109,7 +109,15 @@ export function buildAnnualPoints(rows: AnnualRaw[]): AnnualPoint[] {
   }
   return [...byYear.values()]
     .sort((a, b) => a.year - b.year)
-    .map(({ annual: _a, ...p }) => p);
+    .map((p) => ({
+      year: p.year,
+      label: p.label,
+      revenue: p.revenue,
+      ebitda: p.ebitda,
+      netIncome: p.netIncome,
+      freeCashFlow: p.freeCashFlow,
+      totalDebt: p.totalDebt,
+    }));
 }
 
 export function seriesFromAnnual(annual: AnnualPoint[]): SeriesPoint[] {
@@ -148,7 +156,20 @@ function buildQuarterSeries(rows: AnnualRaw[]): SeriesPoint[] {
   }
   return [...byKey.values()]
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map(({ asOf: _a, ...p }) => p);
+    .map((p) => ({
+      date: p.date,
+      label: p.label,
+      roe: p.roe,
+      roic: p.roic,
+      ebitda: p.ebitda,
+      ebitdaMargin: p.ebitdaMargin,
+      netMargin: p.netMargin,
+      netDebtEbitda: p.netDebtEbitda,
+      freeCashFlow: p.freeCashFlow,
+      peRatio: p.peRatio,
+      evEbitda: p.evEbitda,
+      price: p.price,
+    }));
 }
 
 /** Trimestre quando houver; anos sem trimestre entram como ponto anual. */
