@@ -15,6 +15,7 @@ import { GovernancaCeoCard } from "@/components/governanca-ceo-card";
 import { GovernancaOwnershipCard } from "@/components/governanca-ownership";
 import { GovernancaCompanySummary } from "@/components/governanca-company-summary";
 import { GovernancaBoardCard } from "@/components/governanca-board-card";
+import { GovernancaOfficersCard } from "@/components/governanca-officers-card";
 import { GovernancaEventosTimeline } from "@/components/governanca-eventos-timeline";
 
 type Props = { ticker: string };
@@ -130,6 +131,7 @@ export function GovernancaEmpresa({ ticker }: Props) {
                   </div>
                 </button>
                 <GovernancaBoardCard ticker={row.empresa} />
+                <GovernancaOfficersCard ticker={row.empresa} />
                 <GovernancaOwnershipCard ticker={row.empresa} />
               </div>
             </div>
