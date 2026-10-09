@@ -53,11 +53,18 @@ export function relatedTickers(ticker: string): string[] {
 
 export function sortWeekEvents(events: GovernancaEvento[]): GovernancaEvento[] {
   return [...events].sort((a, b) => {
+    const ad = a.dataEvento ?? "";
+    const bd = b.dataEvento ?? "";
+    if (ad !== bd) {
+      if (!ad) return 1;
+      if (!bd) return -1;
+      return bd.localeCompare(ad);
+    }
     if (a.destaque !== b.destaque) return a.destaque ? -1 : 1;
     const ao = a.destaqueOrdem ?? 999;
     const bo = b.destaqueOrdem ?? 999;
     if (ao !== bo) return ao - bo;
-    return (b.dataEvento ?? "").localeCompare(a.dataEvento ?? "");
+    return a.id - b.id;
   });
 }
 

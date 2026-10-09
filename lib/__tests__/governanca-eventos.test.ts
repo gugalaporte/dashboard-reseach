@@ -42,12 +42,12 @@ describe("relatedTickers", () => {
 });
 
 describe("sortWeekEvents", () => {
-  it("coloca destaques na frente, na ordem informada", () => {
+  it("ordena da data mais recente para a mais antiga", () => {
     const list = sortWeekEvents([
-      ev({ id: 3, destaque: false, titulo: "comum" }),
-      ev({ id: 1, destaque: true, destaqueOrdem: 2, titulo: "segundo" }),
-      ev({ id: 2, destaque: true, destaqueOrdem: 1, titulo: "primeiro" }),
+      ev({ id: 1, dataEvento: "2026-10-07", titulo: "AXIA", destaque: true, destaqueOrdem: 1 }),
+      ev({ id: 2, dataEvento: "2026-10-08", titulo: "DXCO", destaque: false }),
+      ev({ id: 3, dataEvento: "2026-10-07", titulo: "SLCE", destaque: false }),
     ]);
-    expect(list.map((e) => e.titulo)).toEqual(["primeiro", "segundo", "comum"]);
+    expect(list.map((e) => e.titulo)).toEqual(["DXCO", "AXIA", "SLCE"]);
   });
 });
