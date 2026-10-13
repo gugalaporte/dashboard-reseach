@@ -60,16 +60,38 @@ type IntrinsicInput = {
   pe: number | null;
   evEbitda: number | null;
   ebitda: number | null;
+  /** EV do LSEG. O EBITDA da fórmula sai daqui, não da coluna ebitda. */
+  enterpriseValue: number | null;
   netDebt: number | null;
   marketCap: number | null;
+  marketCapCurrency?: string | null;
   histAvgEvEbitda: number | null;
   peerMedianEvEbitda: number | null;
   histAvgPe: number | null;
 };
 
 /**
- * Preço justo: múltiplo-alvo (média histórica ou mediana setorial) × EBITDA,
- * menos dívida líquida, dividido pelas ações implícitas (mkt cap / preço).
+ * EV na mesma base do múltiplo. Prefere o enterprise value do LSEG.
+ * Sem ele, usa market cap + dívida líquida.
+ */
+function evOnMultipleBasis(input: IntrinsicInput): {
+  ev: number;
+  netDebt: number;
+} | null {
+  const mkt = input.marketCap;
+  if (mkt == null || mkt <= 0) return null;
+  if (input.enterpriseValue != null && input.enterpriseValue > 0) {
+    return { ev: input.enterpriseValue, netDebt: input.enterpriseValue - mkt };
+  }
+  if (input.netDebt == null) return null;
+  const ev = mkt + input.netDebt;
+  if (ev <= 0) return null;
+  return { ev, netDebt: input.netDebt };
+}
+
+/**
+ * Preço justo: múltiplo-alvo × EBITDA implícito no múltiplo atual.
+ * EBITDA = EV ÷ EV/EBITDA atual. Equity = EV justo − dívida dessa mesma base.
  * Fallback: preço × (P/E médio histórico / P/E atual).
  */
 export function estimateIntrinsic(input: IntrinsicInput): IntrinsicEstimate {
@@ -84,25 +106,39 @@ export function estimateIntrinsic(input: IntrinsicInput): IntrinsicEstimate {
     histAvgPe,
     evEbitda,
   } = input;
+  const basis = evOnMultipleBasis(input);
+  const impliedEbitda =
+    basis != null && evEbitda != null && evEbitda > 0 ? basis.ev / evEbitda : null;
 
-  // Método principal: EV/EBITDA alvo
+  // Método principal: EV/EBITDA alvo, na mesma base do múltiplo
   if (
     targetEv != null &&
-    ebitda != null &&
-    ebitda > 0 &&
+    impliedEbitda != null &&
+    impliedEbitda > 0 &&
+    basis != null &&
     price != null &&
     price > 0 &&
     marketCap != null &&
     marketCap > 0
   ) {
-    const fairEv = targetEv * ebitda;
-    const equity = fairEv - (netDebt ?? 0);
-    const shares = marketCap / price;
-    const fairPrice = shares > 0 ? equity / shares : null;
+    const fairEv = targetEv * impliedEbitda;
+    const equity = fairEv - basis.netDebt;
+    // market cap ÷ preço não é o número de ações quando o cap mistura classes.
+    const fairPrice = (price * equity) / marketCap;
     const upsidePct =
       fairPrice != null && price > 0
         ? ((fairPrice - price) / price) * 100
         : null;
+    const alvo =
+      input.histAvgEvEbitda != null
+        ? "média histórica do EV/EBITDA"
+        : "mediana do EV/EBITDA do setor";
+    const usaEv =
+      input.enterpriseValue != null && input.enterpriseValue > 0;
+    const evFonte = usaEv
+      ? "enterprise value ÷ EV/EBITDA atual"
+      : "(market cap + dívida líquida) ÷ EV/EBITDA atual";
+    const divida = usaEv ? "enterprise value − market cap" : "dívida líquida";
 
     return {
       method: "Múltiplo-alvo EV/EBITDA",
@@ -111,11 +147,14 @@ export function estimateIntrinsic(input: IntrinsicInput): IntrinsicEstimate {
       upsidePct,
       targetMultiple: targetEv,
       currentMultiple: evEbitda,
-      ebitda,
-      netDebt,
+      ebitda: impliedEbitda,
+      netDebt: basis.netDebt,
       marketCap,
+      marketCapCurrency: input.marketCapCurrency ?? null,
       notes:
-        "EV justo = múltiplo-alvo × EBITDA atual; equity = EV − dívida líquida; preço = equity / ações implícitas.",
+        `EBITDA implícito = ${evFonte}, para o múltiplo e o EBITDA ficarem na mesma base. ` +
+        `EV justo = ${alvo} × esse EBITDA. Equity = EV justo − (${divida}). ` +
+        "Preço = preço × equity ÷ market cap.",
     };
   }
 
@@ -132,6 +171,7 @@ export function estimateIntrinsic(input: IntrinsicInput): IntrinsicEstimate {
       ebitda,
       netDebt,
       marketCap,
+      marketCapCurrency: input.marketCapCurrency ?? null,
       notes: "Preço justo ≈ preço atual × (P/E médio histórico / P/E atual).",
     };
   }
@@ -146,6 +186,7 @@ export function estimateIntrinsic(input: IntrinsicInput): IntrinsicEstimate {
     ebitda,
     netDebt,
     marketCap,
+    marketCapCurrency: input.marketCapCurrency ?? null,
     notes: "Faltam EBITDA, preço ou histórico de múltiplos para estimar.",
   };
 }

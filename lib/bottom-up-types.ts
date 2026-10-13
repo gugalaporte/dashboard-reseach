@@ -73,6 +73,8 @@ export type IntrinsicEstimate = {
   ebitda: number | null;
   netDebt: number | null;
   marketCap: number | null;
+  /** Moeda de market cap e enterprise value na mesma linha do snapshot. */
+  marketCapCurrency: string | null;
   notes: string;
 };
 
@@ -88,4 +90,6 @@ export type BottomUpPayload = {
   bands: MultipleBand[];
   intrinsic: IntrinsicEstimate;
   peerCount: number;
+  /** Tickers do mesmo setor LSEG que entram na mediana. */
+  peers: string[];
 };

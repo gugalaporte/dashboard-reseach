@@ -84,16 +84,28 @@ function Stat({
   );
 }
 
-type Props = { bands: MultipleBand[]; peerCount: number };
+type Props = { bands: MultipleBand[]; peers: string[] };
+
+function joinPeers(peers: string[]): string {
+  if (peers.length === 0) return "";
+  if (peers.length === 1) return peers[0]!;
+  if (peers.length === 2) return `${peers[0]} e ${peers[1]}`;
+  return `${peers.slice(0, -1).join(", ")} e ${peers.at(-1)}`;
+}
 
 /** Comparação de múltiplos vs história e pares. */
-export function BottomUpValuation({ bands, peerCount }: Props) {
+export function BottomUpValuation({ bands, peers }: Props) {
+  const pares =
+    peers.length === 0
+      ? "Não há pares com snapshot no mesmo setor LSEG."
+      : `A mediana do setor usa o múltiplo atual de ${joinPeers(peers)}.`;
+
   return (
     <div className="space-y-5">
       <p className="text-xs text-ink/45 leading-relaxed">
-        Banda histórica do próprio papel (mín / média / máx) e mediana do
-        setor{peerCount > 0 ? ` (${peerCount} pares)` : ""}. Atual abaixo da
-        média sugere margem de segurança relativa.
+        Mínimo, média e máximo usam um ponto por mês do próprio papel, o último
+        snapshot de cada mês, no histórico disponível (até 5 anos). Atual é o
+        snapshot mais recente. {pares}
       </p>
       {bands.map((b) => (
         <div key={b.key} className="border border-line bg-white p-3 sm:p-4">

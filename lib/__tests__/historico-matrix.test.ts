@@ -45,6 +45,30 @@ describe("buildHistoricoMatrix", () => {
     expect(out.metricas).toEqual(["P/E"]);
   });
 
+  it("tira 2026 e 2027 quando existem 2026E e 2027E", () => {
+    const out = buildHistoricoMatrix(
+      [
+        row("P/E", "2025", 3.9),
+        row("P/E", "2025E", 4),
+        row("P/E", "2026A", 3.8),
+        row("P/E", "2026", 4.2),
+        row("P/E", "2026E", 4.8),
+        row("P/E", "2027", 5.5),
+        row("P/E", "2027E", 5.2),
+        row("P/E", "2028E", 5.3),
+      ],
+      2026
+    );
+    expect(out.periodos).toEqual([
+      "2025",
+      "2025E",
+      "2026A",
+      "2026E",
+      "2027E",
+      "2028E",
+    ]);
+  });
+
   it("fica com o relatório mais recente no mesmo ano", () => {
     const out = buildHistoricoMatrix([
       row("P/E", "2026", 3, "2025-01-01"),

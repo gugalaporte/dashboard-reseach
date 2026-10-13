@@ -159,7 +159,7 @@ export function BottomUpDrawer({ row, onClose }: Props) {
                 ) : (
                   <BottomUpValuation
                     bands={payload?.bands ?? []}
-                    peerCount={payload?.peerCount ?? 0}
+                    peers={payload?.peers ?? []}
                   />
                 )}
               </TabsContent>

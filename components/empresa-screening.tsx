@@ -144,7 +144,7 @@ export function EmpresaScreening({ ticker, row }: Props) {
         ) : (
           <BottomUpValuation
             bands={payload?.bands ?? []}
-            peerCount={payload?.peerCount ?? 0}
+            peers={payload?.peers ?? []}
           />
         )}
       </div>

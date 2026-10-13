@@ -1,6 +1,7 @@
 "use client";
 
 import type { IntrinsicEstimate } from "@/lib/bottom-up-types";
+import { evFairSteps } from "@/lib/fair-price-steps";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,13 @@ export function BottomUpIntrinsic({ estimate }: Props) {
     currentMultiple,
     notes,
   } = estimate;
+  const steps = evFairSteps(estimate);
+  const alvoSetor = notes.includes("mediana do EV/EBITDA do setor");
+  const dividaLiquida = notes.includes("dívida líquida");
+  const ccy = estimate.marketCapCurrency?.trim();
+  const mesmaLinha = ccy
+    ? `Enterprise value, market cap, preço e o múltiplo atual vêm da mesma linha do último daily_snapshot (LSEG), em ${ccy}.`
+    : "Enterprise value, market cap, preço e o múltiplo atual vêm da mesma linha do último daily_snapshot (LSEG).";
 
   const cheap =
     upsidePct != null ? upsidePct > 10 : null;
@@ -25,7 +33,40 @@ export function BottomUpIntrinsic({ estimate }: Props) {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-ink/45 leading-relaxed">{notes}</p>
+      {steps ? (
+        <div className="space-y-2">
+          <div className="space-y-1 text-xs text-ink/45 leading-relaxed">
+            <p>
+              {alvoSetor
+                ? "O múltiplo-alvo é a mediana do EV/EBITDA atual dos pares do mesmo setor LSEG."
+                : "O múltiplo-alvo é a média histórica do EV/EBITDA: um ponto por mês, o último snapshot de cada mês."}
+            </p>
+            <p>{mesmaLinha}</p>
+            <p>
+              {dividaLiquida
+                ? "A dívida líquida é o campo net_debt. O enterprise value é market cap + essa dívida. O preço justo é preço × (EV justo − dívida líquida) ÷ market cap."
+                : "A dívida líquida implícita é enterprise value − market cap e inclui caixa, arrendamentos e minoritários. O preço justo é preço × (EV justo − essa dívida) ÷ market cap."}
+            </p>
+          </div>
+          <dl className="border border-line bg-white divide-y divide-line">
+            {steps.map((step) => (
+              <div
+                key={step.label}
+                className="px-3 py-2 sm:flex sm:items-baseline sm:justify-between sm:gap-6"
+              >
+                <dt className="whitespace-nowrap text-[10px] uppercase tracking-wide text-ink/45">
+                  {step.label}
+                </dt>
+                <dd className="text-xs tabular text-ink sm:text-right">
+                  {step.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : (
+        <p className="text-xs text-ink/45 leading-relaxed">{notes}</p>
+      )}
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <PriceCard label="Preço mercado" value={marketPrice} />

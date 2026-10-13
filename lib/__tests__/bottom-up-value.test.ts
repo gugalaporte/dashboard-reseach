@@ -40,22 +40,43 @@ describe("buildMultipleBands", () => {
 });
 
 describe("estimateIntrinsic", () => {
-  it("estima preço justo via EV/EBITDA alvo", () => {
+  it("estima preço justo pelo EBITDA implícito no múltiplo", () => {
     const est = estimateIntrinsic({
       price: 10,
       pe: 8,
       evEbitda: 5,
       ebitda: 200,
+      enterpriseValue: 1100,
       netDebt: 100,
       marketCap: 1000,
       histAvgEvEbitda: 6,
       peerMedianEvEbitda: 7,
       histAvgPe: 10,
     });
-    // fair EV = 6 * 200 = 1200; equity = 1100; shares = 100; fair = 11
+    // EBITDA = 1100 / 5 = 220; EV justo = 6 * 220 = 1320
+    // dívida na base do EV = 1100 - 1000 = 100; equity = 1220; fair = 12,2
     expect(est.method).toBe("Múltiplo-alvo EV/EBITDA");
-    expect(est.fairPrice).toBeCloseTo(11, 5);
-    expect(est.upsidePct).toBeCloseTo(10, 5);
+    expect(est.ebitda).toBeCloseTo(220, 5);
+    expect(est.fairPrice).toBeCloseTo(12.2, 5);
+    expect(est.upsidePct).toBeCloseTo(22, 5);
+  });
+
+  it("ignora a coluna ebitda quando ela não bate com o múltiplo", () => {
+    const est = estimateIntrinsic({
+      price: 10,
+      pe: 8,
+      evEbitda: 5,
+      ebitda: 50,
+      enterpriseValue: 1100,
+      netDebt: 400,
+      marketCap: 1000,
+      histAvgEvEbitda: 6,
+      peerMedianEvEbitda: null,
+      histAvgPe: 10,
+    });
+    expect(est.ebitda).toBeCloseTo(220, 5);
+    expect(est.netDebt).toBeCloseTo(100, 5);
+    expect(est.fairPrice).toBeCloseTo(12.2, 5);
   });
 
   it("usa fallback P/E quando falta EBITDA", () => {
@@ -64,6 +85,7 @@ describe("estimateIntrinsic", () => {
       pe: 10,
       evEbitda: null,
       ebitda: null,
+      enterpriseValue: null,
       netDebt: null,
       marketCap: null,
       histAvgEvEbitda: null,

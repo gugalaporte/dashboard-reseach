@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getResearchSupabase } from "./supabase-research";
+import { displayTicker } from "./finacap-book";
 import { resolveRicForTicker } from "./lseg-series";
 import {
   buildMultipleBands,
@@ -33,8 +34,10 @@ const SNAP_SELECT = [
   "pe_ratio",
   "ev_ebitda",
   "ebitda",
+  "enterprise_value",
   "net_debt",
   "market_cap",
+  "market_cap_currency",
 ].join(",");
 
 /** Carrega payload Bottom-up para um ticker. */
@@ -105,18 +108,25 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
   // Pares do mesmo setor (snapshot mais recente de cada RIC)
   let peerPes: number[] = [];
   let peerEvs: number[] = [];
-  let peerCount = 0;
+  let peerTickers: string[] = [];
 
   if (sector) {
     const { data: peers, error: pErr } = await db
       .from("companies")
-      .select("ric")
+      .select("ric,ticker")
       .eq("sector", sector);
     if (pErr) throw pErr;
-    const rics = (peers ?? [])
-      .map((p) => String((p as { ric?: string }).ric ?? ""))
-      .filter((r) => r && r !== ric)
-      .slice(0, 80);
+    const tickerByRic = new Map<string, string>();
+    for (const p of peers ?? []) {
+      const r = String((p as { ric?: string }).ric ?? "");
+      if (!r || r === ric) continue;
+      const raw =
+        String((p as { ticker?: string }).ticker ?? "").trim() ||
+        r.split(".")[0] ||
+        r;
+      tickerByRic.set(r, displayTicker(raw));
+    }
+    const rics = [...tickerByRic.keys()].slice(0, 80);
 
     if (rics.length > 0) {
       const { data: peerSnaps, error: psErr } = await db
@@ -135,7 +145,9 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
           ev: num((row as { ev_ebitda?: unknown }).ev_ebitda),
         });
       }
-      peerCount = latest.size;
+      peerTickers = [...latest.keys()]
+        .map((r) => tickerByRic.get(r) ?? displayTicker(r.split(".")[0] ?? r))
+        .sort((a, b) => a.localeCompare(b, "pt"));
       peerPes = finite([...latest.values()].map((v) => v.pe));
       peerEvs = finite([...latest.values()].map((v) => v.ev));
     }
@@ -148,8 +160,13 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
   const currentEv = num(latestSnap?.ev_ebitda);
   const price = num(latestSnap?.price_close) ?? num(latestSnap?.last_price);
   const ebitda = num(latestSnap?.ebitda);
+  const enterpriseValue = num(latestSnap?.enterprise_value);
   const netDebt = num(latestSnap?.net_debt);
   const marketCap = num(latestSnap?.market_cap);
+  const marketCapCurrency =
+    typeof latestSnap?.market_cap_currency === "string"
+      ? latestSnap.market_cap_currency
+      : null;
 
   const bands = buildMultipleBands(
     series,
@@ -166,8 +183,10 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
     pe: currentPe,
     evEbitda: currentEv,
     ebitda,
+    enterpriseValue,
     netDebt,
     marketCap,
+    marketCapCurrency,
     histAvgEvEbitda: evBand?.avg ?? null,
     peerMedianEvEbitda: evBand?.peerMedian ?? null,
     histAvgPe: peBand?.avg ?? null,
@@ -183,6 +202,7 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
     fiscal,
     bands,
     intrinsic,
-    peerCount,
+    peerCount: peerTickers.length,
+    peers: peerTickers,
   };
 }

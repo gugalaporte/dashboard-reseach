@@ -12,6 +12,23 @@ function sortPeriodos(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
+/**
+ * Ano corrente ou futuro sem letra some quando o mesmo ano existe com E.
+ * 2025 fica. 2026 e 2027 saem se houver 2026E e 2027E. 2026A permanece.
+ */
+export function dropBareForwardYears(
+  periodos: string[],
+  yearNow = new Date().getFullYear()
+): string[] {
+  const set = new Set(periodos);
+  return periodos.filter((p) => {
+    if (!/^\d{4}$/.test(p)) return true;
+    const y = Number(p);
+    if (y < yearNow) return true;
+    return !set.has(`${p}E`);
+  });
+}
+
 export type HistoricoMatrix = {
   periodos: string[];
   metricas: string[];
@@ -19,7 +36,10 @@ export type HistoricoMatrix = {
 };
 
 /** Matriz métrica × ano, sem colunas de data e sem linhas/colunas vazias. */
-export function buildHistoricoMatrix(hist: MetricaRow[]): HistoricoMatrix {
+export function buildHistoricoMatrix(
+  hist: MetricaRow[],
+  yearNow = new Date().getFullYear()
+): HistoricoMatrix {
   const map = new Map<string, Map<string, MetricaRow>>();
   const pSet = new Set<string>();
 
@@ -35,14 +55,17 @@ export function buildHistoricoMatrix(hist: MetricaRow[]): HistoricoMatrix {
     }
   }
 
-  const periodos = Array.from(pSet)
-    .filter((p) =>
-      [...map.values()].some((m) => {
-        const v = m.get(p)?.valor;
-        return v != null;
-      })
-    )
-    .sort(sortPeriodos);
+  const periodos = dropBareForwardYears(
+    Array.from(pSet)
+      .filter((p) =>
+        [...map.values()].some((m) => {
+          const v = m.get(p)?.valor;
+          return v != null;
+        })
+      )
+      .sort(sortPeriodos),
+    yearNow
+  );
 
   const metricas = Array.from(map.keys())
     .filter((m) => periodos.some((p) => map.get(m)?.get(p)?.valor != null))
