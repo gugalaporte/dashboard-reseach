@@ -204,6 +204,20 @@ function yearSpan(points: SeriesPoint[]): number {
   return new Set(points.map((p) => p.date.slice(0, 4))).size;
 }
 
+/**
+ * Pontos com valor, se der para desenhar.
+ * Menos de 2 pontos, ou valores só numa minoria do eixo, devolve vazio.
+ */
+export function seriesForChart(
+  points: SeriesPoint[],
+  keys: (keyof SeriesPoint)[]
+): SeriesPoint[] {
+  const filled = points.filter((p) => keys.some((k) => p[k] != null));
+  if (filled.length < 2) return [];
+  if (filled.length * 2 < points.length) return [];
+  return filled;
+}
+
 /** Prefere trimestre/ano fiscal; snapshot diário só se cobrir 2+ anos. */
 export function pickEvolutionSeries(
   daily: SeriesPoint[],

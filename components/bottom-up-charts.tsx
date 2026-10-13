@@ -13,7 +13,11 @@ import {
   ComposedChart,
 } from "recharts";
 import type { AnnualPoint, SeriesPoint } from "@/lib/bottom-up-types";
-import { pickEvolutionSeries, seriesFromAnnual } from "@/lib/bottom-up-series";
+import {
+  pickEvolutionSeries,
+  seriesForChart,
+  seriesFromAnnual,
+} from "@/lib/bottom-up-series";
 import { formatNumber } from "@/lib/format";
 
 const BRAND = "#1b61b6";
@@ -80,7 +84,10 @@ export function BottomUpCharts({ series, annual, fiscal }: Props) {
   const hist = fiscal ?? seriesFromAnnual(annual);
   const roe = pickEvolutionSeries(series, hist, ["roe", "roic"]);
   const margins = pickEvolutionSeries(series, hist, ["ebitdaMargin", "netMargin"]);
-  const nd = pickEvolutionSeries(series, hist, ["netDebtEbitda"]);
+  const nd = seriesForChart(
+    pickEvolutionSeries(series, hist, ["netDebtEbitda"]),
+    ["netDebtEbitda"]
+  );
   const useQBars = isQuarterly(hist);
   const annualOk = annual.filter((a) => a.freeCashFlow != null || a.ebitda != null);
   const barData = useQBars

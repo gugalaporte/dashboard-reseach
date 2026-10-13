@@ -5,6 +5,7 @@ import {
   lastPointPerYear,
   parseQuarter,
   pickEvolutionSeries,
+  seriesForChart,
   seriesFromAnnual,
 } from "../bottom-up-series";
 import type { SeriesPoint } from "../bottom-up-types";
@@ -146,6 +147,30 @@ describe("pickEvolutionSeries", () => {
       ["roe"]
     );
     expect(picked).toEqual([]);
+  });
+});
+
+describe("seriesForChart", () => {
+  it("omite o gráfico quando só uns poucos períodos têm o número", () => {
+    const points = [
+      pt("2023-12-31", { label: "2023", netDebtEbitda: 1.1 }),
+      pt("2024-12-31", { label: "2024", netDebtEbitda: 1.6 }),
+      pt("2025-03-01", { label: "1T25" }),
+      pt("2025-06-01", { label: "2T25" }),
+      pt("2025-09-01", { label: "3T25" }),
+      pt("2025-12-01", { label: "4T25" }),
+      pt("2026-03-01", { label: "1T26" }),
+      pt("2026-06-01", { label: "2T26" }),
+    ];
+    expect(seriesForChart(points, ["netDebtEbitda"])).toEqual([]);
+  });
+
+  it("mantém a série quando a maior parte dos períodos tem valor", () => {
+    const points = [
+      pt("2024-12-31", { label: "2024", netDebtEbitda: 1.2 }),
+      pt("2025-12-31", { label: "2025", netDebtEbitda: 1.4 }),
+    ];
+    expect(seriesForChart(points, ["netDebtEbitda"])).toHaveLength(2);
   });
 });
 
