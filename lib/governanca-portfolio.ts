@@ -19,7 +19,7 @@ function classRank(ticker: string): number {
 type PortfolioCard = {
   empresa: string;
   name: string | null;
-  sector: string | null;
+  sector?: string | null;
 };
 
 /** Um card por empresa: escolhe o ticker com mais dados (setor/nome). */

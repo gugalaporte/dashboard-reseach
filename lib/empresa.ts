@@ -16,7 +16,7 @@ export function empresaHref(ticker: string): string {
 }
 
 export function pickEmpresaRow<
-  T extends { empresa: string; name: string | null; sector: string | null },
+  T extends { empresa: string; name: string | null; sector?: string | null },
 >(rows: T[], ticker: string): T | null {
   const t = displayTicker(ticker).trim().toUpperCase();
   const sibs = rows.filter((r) => issuerKey(r.empresa) === issuerKey(t));
