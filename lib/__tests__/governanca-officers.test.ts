@@ -72,10 +72,81 @@ describe("officerRoleLine", () => {
 describe("sortOfficers", () => {
   it("ordena por display_order", () => {
     const out = sortOfficers([
-      officer({ id: 2, displayOrder: 1, name: "B" }),
-      officer({ id: 1, displayOrder: 0, name: "A" }),
+      officer({ id: 2, displayOrder: 1, name: "B", roleLabel: "Diretor" }),
+      officer({ id: 1, displayOrder: 0, name: "A", roleLabel: "Diretor" }),
     ]);
     expect(out.map((o) => o.id)).toEqual([1, 2]);
+  });
+
+  it("coloca CEO e CFO no início, nessa ordem", () => {
+    const out = sortOfficers([
+      officer({
+        id: 1,
+        displayOrder: 0,
+        name: "Elio",
+        roleLabel: "Vice-Presidente Executivo",
+      }),
+      officer({
+        id: 2,
+        displayOrder: 1,
+        name: "Ivan",
+        roleLabel: "Presidente",
+      }),
+      officer({
+        id: 3,
+        displayOrder: 2,
+        name: "Eduardo",
+        roleLabel:
+          "Vice-Presidente Executivo Financeiro e de Relações com Investidores",
+      }),
+      officer({
+        id: 4,
+        displayOrder: 3,
+        name: "Antônio",
+        roleLabel: "Vice-Presidente Executivo de Operações",
+      }),
+    ]);
+    expect(out.map((o) => o.name)).toEqual([
+      "Ivan",
+      "Eduardo",
+      "Elio",
+      "Antônio",
+    ]);
+  });
+
+  it("não trata CEO de área nem negócios financeiros como liderança", () => {
+    const out = sortOfficers([
+      officer({
+        id: 1,
+        displayOrder: 0,
+        name: "Area",
+        roleLabel: "Vice-Presidente Executivo e CEO de Lubrificantes",
+      }),
+      officer({
+        id: 2,
+        displayOrder: 1,
+        name: "Negocios",
+        roleLabel: "Diretor Vice-Presidente – Negócios Financeiros",
+      }),
+      officer({
+        id: 3,
+        displayOrder: 2,
+        name: "Chefe",
+        roleLabel: "Diretor Presidente (CEO)",
+      }),
+      officer({
+        id: 4,
+        displayOrder: 3,
+        name: "Financas",
+        roleLabel: "Diretor de Finanças e de Relações com Investidores (CFO)",
+      }),
+    ]);
+    expect(out.map((o) => o.name)).toEqual([
+      "Chefe",
+      "Financas",
+      "Area",
+      "Negocios",
+    ]);
   });
 });
 

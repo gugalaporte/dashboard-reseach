@@ -48,8 +48,45 @@ export function officerRoleLine(officer: Officer): string | null {
   return parts.length ? parts.join(" · ") : null;
 }
 
+function normRole(role: string): string {
+  return role
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[-–—]/g, " ");
+}
+
+/** Presidente ou CEO da companhia. Vice e CEO de área ficam de fora. */
+function isCeo(role: string | null): boolean {
+  if (!role) return false;
+  const r = normRole(role);
+  if (/\bvice\b/.test(r)) return false;
+  if (/\bceo\s+(de|do|da)\b/.test(r)) return false;
+  if (/\bceo\b/.test(r)) return true;
+  return /\b(presidente|presidenta)\b/.test(r);
+}
+
+/** Financeiro ou CFO. "Negócios financeiros" é área, não o CFO. */
+function isCfo(role: string | null): boolean {
+  if (!role || isCeo(role)) return false;
+  const r = normRole(role);
+  if (/\bcfo\b/.test(r)) return true;
+  if (/\bnegocios?\s+financeir/.test(r)) return false;
+  return /\b(financeiro|financeira|financas)\b/.test(r);
+}
+
+function leadRank(officer: Officer): number {
+  if (isCeo(officer.roleLabel)) return 0;
+  if (isCfo(officer.roleLabel)) return 1;
+  return 2;
+}
+
+/** CEO, depois CFO, depois a ordem original. */
 export function sortOfficers(officers: Officer[]): Officer[] {
   return [...officers].sort(
-    (a, b) => a.displayOrder - b.displayOrder || a.id - b.id
+    (a, b) =>
+      leadRank(a) - leadRank(b) ||
+      a.displayOrder - b.displayOrder ||
+      a.id - b.id
   );
 }
