@@ -142,6 +142,7 @@ export function PipelineCompanyCard({ note, close }: Props) {
         <NoteBlock label="Principais riscos" text={note.risk} />
         <NoteBlock label="Governança" text={note.governance} />
       </div>
+      <NoteBlock label="Anotações e comentários" text={note.comments} />
 
       {note.updatedAt && (
         <p className="text-[10px] text-ink/35">

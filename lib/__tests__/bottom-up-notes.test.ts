@@ -57,6 +57,7 @@ describe("rowToNotes", () => {
       thesis: null,
       risk: "ciclo",
       governance: null,
+      comments: "ligar na sexta",
       updated_at: "2026-09-04T12:00:00.000Z",
     });
     expect(n.ticker).toBe("POMO4");
@@ -65,6 +66,7 @@ describe("rowToNotes", () => {
     expect(n.targetPrice).toBe(18.2);
     expect(n.thesis).toBe("");
     expect(n.risk).toBe("ciclo");
+    expect(n.comments).toBe("ligar na sexta");
     expect(n.updatedAt).toBe("2026-09-04T12:00:00.000Z");
   });
 });
@@ -94,6 +96,9 @@ describe("notesHaveContent", () => {
     ).toBe(true);
     expect(
       notesHaveContent({ ...emptyNotes("POMO4"), rating: "sell" })
+    ).toBe(true);
+    expect(
+      notesHaveContent({ ...emptyNotes("POMO4"), comments: "nota" })
     ).toBe(true);
   });
 });

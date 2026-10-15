@@ -39,6 +39,8 @@ export function evFairSteps(estimate: IntrinsicEstimate): FairStep[] | null {
   const {
     ebitda,
     netDebt,
+    grossDebt,
+    cash,
     marketCap,
     marketPrice,
     targetMultiple,
@@ -59,10 +61,19 @@ export function evFairSteps(estimate: IntrinsicEstimate): FairStep[] | null {
     return null;
   }
 
-  const ev = marketCap + netDebt;
+  const ev = currentMultiple * ebitda;
   const fairEv = targetMultiple * ebitda;
   const equity = fairEv - netDebt;
-  const scale = scaleOf([ev, fairEv, equity, ebitda, netDebt, marketCap]);
+  const scale = scaleOf([
+    ev,
+    fairEv,
+    equity,
+    ebitda,
+    netDebt,
+    marketCap,
+    grossDebt ?? 0,
+    cash ?? 0,
+  ]);
   const evTxt = amount(ev, scale);
   const ebitdaTxt = amount(ebitda, scale);
   const fairEvTxt = amount(fairEv, scale);
@@ -71,7 +82,8 @@ export function evFairSteps(estimate: IntrinsicEstimate): FairStep[] | null {
   const capTxt = amount(marketCap, scale);
   const priceTxt = `R$ ${formatNumber(marketPrice, 2)}`;
   const debtOp = netDebt < 0 ? "+" : "−";
-  const impliedDebt = !estimate.notes.includes("dívida líquida");
+  const fromBalance = grossDebt != null && cash != null;
+  const impliedDebt = !fromBalance && !estimate.notes.includes("dívida líquida");
 
   return [
     { label: "Enterprise value", value: reais(ev, scale) },
@@ -84,10 +96,14 @@ export function evFairSteps(estimate: IntrinsicEstimate): FairStep[] | null {
       value: `${multiple(targetMultiple)} × ${ebitdaTxt} = ${fairEvTxt}`,
     },
     {
-      label: impliedDebt
-        ? "Dívida líquida implícita (EV − market cap)"
-        : "Dívida líquida",
-      value: `${evTxt} − ${capTxt} = ${amount(netDebt, scale)}`,
+      label: fromBalance
+        ? "Dívida líquida"
+        : impliedDebt
+          ? "Dívida líquida implícita (EV − market cap)"
+          : "Dívida líquida",
+      value: fromBalance
+        ? `${amount(grossDebt, scale)} − ${amount(cash, scale)} = ${amount(netDebt, scale)}`
+        : `${evTxt} − ${capTxt} = ${amount(netDebt, scale)}`,
     },
     {
       label: "Equity",

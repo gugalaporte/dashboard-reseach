@@ -18,6 +18,8 @@ describe("evFairSteps", () => {
     currentMultiple: 3.56849507085573,
     ebitda: 304886000000,
     netDebt: 313673000000,
+    grossDebt: null,
+    cash: null,
     marketCap: 774311188172.92,
     marketCapCurrency: "BRL",
     notes: "",

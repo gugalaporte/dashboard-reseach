@@ -20,7 +20,8 @@ export function BottomUpIntrinsic({ estimate }: Props) {
   } = estimate;
   const steps = evFairSteps(estimate);
   const alvoSetor = notes.includes("mediana do EV/EBITDA do setor");
-  const dividaLiquida = notes.includes("dívida líquida");
+  const fromBalance = estimate.grossDebt != null && estimate.cash != null;
+  const dividaLiquida = !fromBalance && notes.includes("dívida líquida");
   const ccy = estimate.marketCapCurrency?.trim();
   const mesmaLinha = ccy
     ? `Enterprise value, market cap, preço e o múltiplo atual vêm da mesma linha do último daily_snapshot (LSEG), em ${ccy}.`
@@ -43,9 +44,11 @@ export function BottomUpIntrinsic({ estimate }: Props) {
             </p>
             <p>{mesmaLinha}</p>
             <p>
-              {dividaLiquida
-                ? "A dívida líquida é o campo net_debt. O enterprise value é market cap + essa dívida. O preço justo é preço × (EV justo − dívida líquida) ÷ market cap."
-                : "A dívida líquida implícita é enterprise value − market cap e inclui caixa, arrendamentos e minoritários. O preço justo é preço × (EV justo − essa dívida) ÷ market cap."}
+              {fromBalance
+                ? "A dívida líquida é dívida − caixa no último daily_snapshot. O preço justo é preço × (EV justo − essa dívida) ÷ market cap."
+                : dividaLiquida
+                  ? "A dívida líquida é o campo net_debt. O enterprise value é market cap + essa dívida. O preço justo é preço × (EV justo − dívida líquida) ÷ market cap."
+                  : "A dívida líquida implícita é enterprise value − market cap e inclui caixa, arrendamentos e minoritários. O preço justo é preço × (EV justo − essa dívida) ÷ market cap."}
             </p>
           </div>
           <dl className="border border-line bg-white divide-y divide-line">

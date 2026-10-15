@@ -36,6 +36,7 @@ const SNAP_SELECT = [
   "ebitda",
   "enterprise_value",
   "net_debt",
+  "total_debt",
   "market_cap",
   "market_cap_currency",
 ].join(",");
@@ -162,6 +163,7 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
   const ebitda = num(latestSnap?.ebitda);
   const enterpriseValue = num(latestSnap?.enterprise_value);
   const netDebt = num(latestSnap?.net_debt);
+  const totalDebt = num(latestSnap?.total_debt);
   const marketCap = num(latestSnap?.market_cap);
   const marketCapCurrency =
     typeof latestSnap?.market_cap_currency === "string"
@@ -185,6 +187,7 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
     ebitda,
     enterpriseValue,
     netDebt,
+    totalDebt,
     marketCap,
     marketCapCurrency,
     histAvgEvEbitda: evBand?.avg ?? null,

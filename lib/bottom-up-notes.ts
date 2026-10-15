@@ -12,7 +12,13 @@ const RATINGS = new Set<string>(NOTES_RATINGS.map((r) => r.id));
 export type NotesPatch = Partial<
   Pick<
     BottomUpNotes,
-    "status" | "rating" | "targetPrice" | "thesis" | "risk" | "governance"
+    | "status"
+    | "rating"
+    | "targetPrice"
+    | "thesis"
+    | "risk"
+    | "governance"
+    | "comments"
   >
 >;
 
@@ -24,6 +30,7 @@ export type NotesRow = {
   thesis: string | null;
   risk: string | null;
   governance: string | null;
+  comments: string | null;
   updated_at: string | null;
 };
 
@@ -54,6 +61,7 @@ export function emptyNotes(ticker: string): BottomUpNotes {
     thesis: "",
     risk: "",
     governance: "",
+    comments: "",
     updatedAt: null,
   };
 }
@@ -67,6 +75,7 @@ export function rowToNotes(row: NotesRow): BottomUpNotes {
     thesis: row.thesis ?? "",
     risk: row.risk ?? "",
     governance: row.governance ?? "",
+    comments: row.comments ?? "",
     updatedAt: row.updated_at ?? null,
   };
 }
@@ -80,6 +89,7 @@ export function notesToRow(n: BottomUpNotes): NotesRow {
     thesis: n.thesis,
     risk: n.risk,
     governance: n.governance,
+    comments: n.comments,
     updated_at: n.updatedAt ?? new Date().toISOString(),
   };
 }
@@ -101,7 +111,8 @@ export function notesHaveContent(n: BottomUpNotes): boolean {
       n.targetPrice != null ||
       n.thesis.trim() ||
       n.risk.trim() ||
-      n.governance.trim()
+      n.governance.trim() ||
+      n.comments.trim()
   );
 }
 

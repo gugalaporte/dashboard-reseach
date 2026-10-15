@@ -75,7 +75,7 @@ function parsePatch(body: unknown): NotesPatch | string {
       patch.targetPrice = n;
     }
   }
-  for (const key of ["thesis", "risk", "governance"] as const) {
+  for (const key of ["thesis", "risk", "governance", "comments"] as const) {
     if (key in raw) {
       if (typeof raw[key] !== "string") return `${key} deve ser texto`;
       patch[key] = raw[key];

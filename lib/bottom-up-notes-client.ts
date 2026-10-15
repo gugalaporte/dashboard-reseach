@@ -43,5 +43,6 @@ export async function fetchBottomUpNotes(ticker: string): Promise<BottomUpNotes>
     thesis: local.thesis,
     risk: local.risk,
     governance: local.governance,
+    comments: local.comments,
   });
 }

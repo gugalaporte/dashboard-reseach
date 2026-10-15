@@ -24,6 +24,7 @@ export type BottomUpNotes = {
   thesis: string;
   risk: string;
   governance: string;
+  comments: string;
   updatedAt: string | null;
 };
 
@@ -72,6 +73,9 @@ export type IntrinsicEstimate = {
   currentMultiple: number | null;
   ebitda: number | null;
   netDebt: number | null;
+  /** Dívida bruta do balanço. Com caixa, a líquida é dívida − caixa. */
+  grossDebt: number | null;
+  cash: number | null;
   marketCap: number | null;
   /** Moeda de market cap e enterprise value na mesma linha do snapshot. */
   marketCapCurrency: string | null;

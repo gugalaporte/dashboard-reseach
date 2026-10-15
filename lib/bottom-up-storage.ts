@@ -34,6 +34,7 @@ export function loadBottomUpNotes(ticker: string): BottomUpNotes {
     ...raw,
     ticker: t,
     risk: raw.risk || raw.moat || "",
+    comments: raw.comments ?? "",
   };
 }
 

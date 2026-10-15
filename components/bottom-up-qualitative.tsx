@@ -25,6 +25,7 @@ type Draft = {
   thesis: string;
   risk: string;
   governance: string;
+  comments: string;
   targetPrice: string;
 };
 
@@ -34,6 +35,7 @@ const EMPTY_DRAFT: Draft = {
   thesis: "",
   risk: "",
   governance: "",
+  comments: "",
   targetPrice: "",
 };
 
@@ -44,6 +46,7 @@ function draftFrom(n: BottomUpNotes): Draft {
     thesis: n.thesis,
     risk: n.risk,
     governance: n.governance,
+    comments: n.comments,
     targetPrice: n.targetPrice == null ? "" : String(n.targetPrice),
   };
 }
@@ -122,6 +125,7 @@ export function BottomUpQualitative({ ticker }: Props) {
       thesis: draft.thesis,
       risk: draft.risk,
       governance: draft.governance,
+      comments: draft.comments,
       targetPrice,
     });
     if (!next) return;
@@ -217,6 +221,13 @@ export function BottomUpQualitative({ ticker }: Props) {
         onChange={(governance) => setDraft((d) => ({ ...d, governance }))}
         rows={3}
         placeholder="Alinhamento, capital allocation, histórico de gestão…"
+      />
+      <Field
+        label="Anotações e comentários"
+        value={draft.comments}
+        onChange={(comments) => setDraft((d) => ({ ...d, comments }))}
+        rows={4}
+        placeholder="Observações livres sobre o papel."
       />
 
       {error && <p className="text-xs text-destructive">{error}</p>}

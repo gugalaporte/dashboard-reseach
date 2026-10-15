@@ -11,14 +11,22 @@ import {
 import { sortPipelineByDate, type PipelineNote } from "./pipeline";
 import type { BottomUpNotes } from "./bottom-up-types";
 
-const SELECT =
+const SELECT_BASE =
   "ticker,status,rating,target_price,thesis,risk,governance,updated_at";
+const SELECT = `${SELECT_BASE},comments`;
 
 const MISSING_TABLE =
   "Tabela bottom_up_notes não existe. Rode supabase/migrations/20260904_bottom_up_notes.sql no SQL Editor do banco Research.";
+const MISSING_COMMENTS =
+  "Falta a coluna comments. Rode supabase/migrations/20261015_bottom_up_notes_comments.sql no SQL Editor do banco Research.";
+
+function missingComments(error: { message: string }): boolean {
+  return /comments/i.test(error.message) && /does not exist|schema cache/i.test(error.message);
+}
 
 function throwQueryError(error: { code?: string; message: string }): never {
   if (error.code === "PGRST205") throw new Error(MISSING_TABLE);
+  if (missingComments(error)) throw new Error(MISSING_COMMENTS);
   throw new Error(error.message);
 }
 
@@ -29,24 +37,42 @@ export async function loadBottomUpNotesFromDb(
   if (!t) throw new Error("Ticker obrigatório");
 
   const db = getResearchSupabase();
-  const { data, error } = await db
+  const first = await db
     .from("bottom_up_notes")
     .select(SELECT)
     .eq("ticker", t)
     .maybeSingle();
-  if (error) throwQueryError(error);
-  if (!data) return emptyNotes(t);
-  return rowToNotes(data);
+  if (first.error && missingComments(first.error)) {
+    const second = await db
+      .from("bottom_up_notes")
+      .select(SELECT_BASE)
+      .eq("ticker", t)
+      .maybeSingle();
+    if (second.error) throwQueryError(second.error);
+    if (!second.data) return emptyNotes(t);
+    return rowToNotes({ ...second.data, comments: "" });
+  }
+  if (first.error) throwQueryError(first.error);
+  if (!first.data) return emptyNotes(t);
+  return rowToNotes(first.data);
 }
 
 export async function loadPipelineNotes(): Promise<PipelineNote[]> {
   const db = getResearchSupabase();
-  const { data, error } = await db
+  const first = await db
     .from("bottom_up_notes")
     .select(SELECT)
     .order("updated_at", { ascending: false, nullsFirst: false });
-  if (error) throwQueryError(error);
-  const notes = (data ?? []).map(rowToNotes);
+  const rows = first.error && missingComments(first.error)
+    ? await db
+        .from("bottom_up_notes")
+        .select(SELECT_BASE)
+        .order("updated_at", { ascending: false, nullsFirst: false })
+    : first;
+  if (rows.error) throwQueryError(rows.error);
+  const notes = (rows.data ?? []).map((row) =>
+    rowToNotes({ ...row, comments: "comments" in row ? row.comments : "" })
+  );
   if (notes.length === 0) return [];
 
   const tickers = notes.map((n) => n.ticker);

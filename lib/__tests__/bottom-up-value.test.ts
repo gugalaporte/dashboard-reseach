@@ -61,6 +61,27 @@ describe("estimateIntrinsic", () => {
     expect(est.upsidePct).toBeCloseTo(22, 5);
   });
 
+  it("usa dívida menos caixa do balanço no equity", () => {
+    const est = estimateIntrinsic({
+      price: 10,
+      pe: 8,
+      evEbitda: 5,
+      ebitda: 200,
+      enterpriseValue: 1100,
+      totalDebt: 250,
+      netDebt: 80,
+      marketCap: 1000,
+      histAvgEvEbitda: 6,
+      peerMedianEvEbitda: null,
+      histAvgPe: 10,
+    });
+    // caixa = 250 - 80 = 170; equity = 1320 - 80 = 1240; fair = 12,4
+    expect(est.grossDebt).toBe(250);
+    expect(est.cash).toBeCloseTo(170, 5);
+    expect(est.netDebt).toBeCloseTo(80, 5);
+    expect(est.fairPrice).toBeCloseTo(12.4, 5);
+  });
+
   it("ignora a coluna ebitda quando ela não bate com o múltiplo", () => {
     const est = estimateIntrinsic({
       price: 10,
