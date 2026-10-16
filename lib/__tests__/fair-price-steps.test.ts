@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { evFairSteps } from "../fair-price-steps";
-import type { IntrinsicEstimate } from "../bottom-up-types";
+import type { FairPriceView } from "../bottom-up-types";
 
-function step(label: string, estimate: IntrinsicEstimate): string {
+function step(label: string, estimate: FairPriceView): string {
   const found = evFairSteps(estimate)?.find((s) => s.label === label);
   if (!found) throw new Error(`passo ausente: ${label}`);
   return found.value;
 }
 
 describe("evFairSteps", () => {
-  const petr4: IntrinsicEstimate = {
+  const petr4: FairPriceView = {
     method: "Múltiplo-alvo EV/EBITDA",
     marketPrice: 56,
     fairPrice: 37.893276122670564,

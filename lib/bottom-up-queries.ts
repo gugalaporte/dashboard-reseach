@@ -4,9 +4,11 @@ import { getResearchSupabase } from "./supabase-research";
 import { displayTicker } from "./finacap-book";
 import { resolveRicForTicker } from "./lseg-series";
 import {
+  avg,
   buildMultipleBands,
   estimateIntrinsic,
   finite,
+  median,
 } from "./bottom-up-value";
 import { buildAnnualPoints, buildFiscalSeries } from "./bottom-up-series";
 import type { BottomUpPayload, SeriesPoint } from "./bottom-up-types";
@@ -32,8 +34,11 @@ const SNAP_SELECT = [
   "net_debt_ebitda",
   "free_cash_flow",
   "pe_ratio",
+  "pb_ratio",
   "ev_ebitda",
   "ebitda",
+  "net_income",
+  "total_equity",
   "enterprise_value",
   "net_debt",
   "total_debt",
@@ -95,6 +100,7 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
       netDebtEbitda: num((row as { net_debt_ebitda?: unknown }).net_debt_ebitda),
       freeCashFlow: num((row as { free_cash_flow?: unknown }).free_cash_flow),
       peRatio: num((row as { pe_ratio?: unknown }).pe_ratio),
+      pbRatio: num((row as { pb_ratio?: unknown }).pb_ratio),
       evEbitda: num((row as { ev_ebitda?: unknown }).ev_ebitda),
       price: close ?? last,
     };
@@ -109,6 +115,7 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
   // Pares do mesmo setor (snapshot mais recente de cada RIC)
   let peerPes: number[] = [];
   let peerEvs: number[] = [];
+  let peerPbs: number[] = [];
   let peerTickers: string[] = [];
 
   if (sector) {
@@ -132,18 +139,22 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
     if (rics.length > 0) {
       const { data: peerSnaps, error: psErr } = await db
         .from("daily_snapshot")
-        .select("ric,as_of_date,pe_ratio,ev_ebitda")
+        .select("ric,as_of_date,pe_ratio,pb_ratio,ev_ebitda")
         .in("ric", rics)
         .order("as_of_date", { ascending: false });
       if (psErr) throw psErr;
 
-      const latest = new Map<string, { pe: number | null; ev: number | null }>();
+      const latest = new Map<
+        string,
+        { pe: number | null; ev: number | null; pb: number | null }
+      >();
       for (const row of peerSnaps ?? []) {
         const r = String((row as { ric?: string }).ric ?? "");
         if (!r || latest.has(r)) continue;
         latest.set(r, {
           pe: num((row as { pe_ratio?: unknown }).pe_ratio),
           ev: num((row as { ev_ebitda?: unknown }).ev_ebitda),
+          pb: num((row as { pb_ratio?: unknown }).pb_ratio),
         });
       }
       peerTickers = [...latest.keys()]
@@ -151,6 +162,7 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
         .sort((a, b) => a.localeCompare(b, "pt"));
       peerPes = finite([...latest.values()].map((v) => v.pe));
       peerEvs = finite([...latest.values()].map((v) => v.ev));
+      peerPbs = finite([...latest.values()].map((v) => v.pb));
     }
   }
 
@@ -161,6 +173,8 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
   const currentEv = num(latestSnap?.ev_ebitda);
   const price = num(latestSnap?.price_close) ?? num(latestSnap?.last_price);
   const ebitda = num(latestSnap?.ebitda);
+  const netIncome = num(latestSnap?.net_income);
+  const totalEquity = num(latestSnap?.total_equity);
   const enterpriseValue = num(latestSnap?.enterprise_value);
   const netDebt = num(latestSnap?.net_debt);
   const totalDebt = num(latestSnap?.total_debt);
@@ -177,6 +191,10 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
     peerPes,
     peerEvs
   );
+  const pbValues = finite(series.map((p) => p.pbRatio ?? null)).filter(
+    (v) => v > 0
+  );
+  const peerPbPos = peerPbs.filter((v) => v > 0);
   const evBand = bands.find((b) => b.key === "evEbitda");
   const peBand = bands.find((b) => b.key === "pe");
 
@@ -185,6 +203,8 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
     pe: currentPe,
     evEbitda: currentEv,
     ebitda,
+    netIncome,
+    totalEquity,
     enterpriseValue,
     netDebt,
     totalDebt,
@@ -193,6 +213,9 @@ export async function loadBottomUp(ticker: string): Promise<BottomUpPayload> {
     histAvgEvEbitda: evBand?.avg ?? null,
     peerMedianEvEbitda: evBand?.peerMedian ?? null,
     histAvgPe: peBand?.avg ?? null,
+    peerMedianPe: peBand?.peerMedian ?? null,
+    histAvgPb: avg(pbValues),
+    peerMedianPb: median(peerPbPos),
   });
 
   return {

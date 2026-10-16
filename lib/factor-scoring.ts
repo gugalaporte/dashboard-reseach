@@ -135,7 +135,7 @@ export const FACTOR_FORMULA: Record<FactorId, string> = {
   momentum:
     "Retorno 3M. Ranking 1º = maior retorno no universo da tela.",
   carry:
-    "DY fwd ou dividend yield. Ranking 1º = maior yield no universo da tela.",
+    "DY fwd. Ranking 1º = maior yield no universo da tela.",
   liquidity:
     "Média dos z-scores no universo da tela: market cap, volume diário.",
 };
@@ -386,16 +386,10 @@ function carryYield(row: FactorInput): {
   label: string;
   raw: number | null;
 } {
-  if (row.dyFwd != null && Number.isFinite(row.dyFwd)) {
-    return { key: "dyFwd", label: "DY fwd", raw: row.dyFwd };
-  }
   return {
-    key: "dividendYield",
-    label: "Dividend yield",
-    raw:
-      row.dividendYield != null && Number.isFinite(row.dividendYield)
-        ? row.dividendYield
-        : null,
+    key: "dyFwd",
+    label: "DY fwd",
+    raw: row.dyFwd != null && Number.isFinite(row.dyFwd) ? row.dyFwd : null,
   };
 }
 

@@ -40,7 +40,7 @@ describe("buildMultipleBands", () => {
 });
 
 describe("estimateIntrinsic", () => {
-  it("estima preço justo pelo EBITDA implícito no múltiplo", () => {
+  it("estima o preço alvo com múltiplo × EBITDA", () => {
     const est = estimateIntrinsic({
       price: 10,
       pe: 8,
@@ -53,12 +53,15 @@ describe("estimateIntrinsic", () => {
       peerMedianEvEbitda: 7,
       histAvgPe: 10,
     });
-    // EBITDA = 1100 / 5 = 220; EV justo = 6 * 220 = 1320
-    // dívida na base do EV = 1100 - 1000 = 100; equity = 1220; fair = 12,2
-    expect(est.method).toBe("Múltiplo-alvo EV/EBITDA");
-    expect(est.ebitda).toBeCloseTo(220, 5);
-    expect(est.fairPrice).toBeCloseTo(12.2, 5);
-    expect(est.upsidePct).toBeCloseTo(22, 5);
+    // EV = 6 × 200 = 1200; equity = 1200 − 100 = 1100; preço = 10 × 1100 / 1000
+    expect(est.method).toBe("EV/EBITDA histórico");
+    expect(est.ebitda).toBe(200);
+    expect(est.fairPrice).toBeCloseTo(11, 5);
+    expect(est.upsidePct).toBeCloseTo(10, 5);
+    expect(est.targets[0]?.method).toBe("EV/EBITDA");
+    // Preço justo antigo: EBITDA implícito 1100 / 5 = 220; equity 1220; preço 12,2
+    expect(est.justo?.ebitda).toBeCloseTo(220, 5);
+    expect(est.justo?.fairPrice).toBeCloseTo(12.2, 5);
   });
 
   it("usa dívida menos caixa do balanço no equity", () => {
@@ -75,45 +78,54 @@ describe("estimateIntrinsic", () => {
       peerMedianEvEbitda: null,
       histAvgPe: 10,
     });
-    // caixa = 250 - 80 = 170; equity = 1320 - 80 = 1240; fair = 12,4
+    // EV = 6 × 200 = 1200; equity = 1200 − 80 = 1120; preço = 11,2
     expect(est.grossDebt).toBe(250);
     expect(est.cash).toBeCloseTo(170, 5);
     expect(est.netDebt).toBeCloseTo(80, 5);
-    expect(est.fairPrice).toBeCloseTo(12.4, 5);
+    expect(est.fairPrice).toBeCloseTo(11.2, 5);
+    // Justo ainda usa o EBITDA implícito: EV 1320 − dívida 80 → preço 12,4
+    expect(est.justo?.fairPrice).toBeCloseTo(12.4, 5);
+    expect(est.justo?.cash).toBeCloseTo(170, 5);
   });
 
-  it("ignora a coluna ebitda quando ela não bate com o múltiplo", () => {
+  it("usa o EBITDA do snapshot, não o implícito no múltiplo", () => {
     const est = estimateIntrinsic({
       price: 10,
       pe: 8,
       evEbitda: 5,
       ebitda: 50,
       enterpriseValue: 1100,
-      netDebt: 400,
+      netDebt: 40,
       marketCap: 1000,
       histAvgEvEbitda: 6,
       peerMedianEvEbitda: null,
       histAvgPe: 10,
     });
-    expect(est.ebitda).toBeCloseTo(220, 5);
-    expect(est.netDebt).toBeCloseTo(100, 5);
-    expect(est.fairPrice).toBeCloseTo(12.2, 5);
+    // EV = 6 × 50 = 300; equity = 300 − 40 = 260; preço = 2,6
+    expect(est.ebitda).toBe(50);
+    expect(est.fairPrice).toBeCloseTo(2.6, 5);
+    expect(est.justo?.ebitda).toBeCloseTo(220, 5);
+    expect(est.justo?.netDebt).toBeCloseTo(100, 5);
+    expect(est.justo?.fairPrice).toBeCloseTo(12.2, 5);
   });
 
-  it("usa fallback P/E quando falta EBITDA", () => {
+  it("usa P/L explícito quando falta EBITDA", () => {
     const est = estimateIntrinsic({
       price: 20,
       pe: 10,
       evEbitda: null,
       ebitda: null,
+      netIncome: 100,
       enterpriseValue: null,
       netDebt: null,
-      marketCap: null,
+      marketCap: 1000,
       histAvgEvEbitda: null,
       peerMedianEvEbitda: null,
       histAvgPe: 12,
     });
-    expect(est.method).toBe("Re-rating P/E histórico");
+    // equity = 100 × 12 = 1200; preço = 20 × 1200 / 1000 = 24
+    expect(est.method).toBe("P/L histórico");
     expect(est.fairPrice).toBeCloseTo(24, 5);
+    expect(est.justo).toBeNull();
   });
 });

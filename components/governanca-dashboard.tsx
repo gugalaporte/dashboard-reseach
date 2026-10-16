@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { sectorPt } from "@/lib/sector-labels";
 import { pickPortfolioCompanies } from "@/lib/governanca-portfolio";
 import { GovernancaCalendario } from "@/components/governanca-calendario";
+import { GovernancaInsider } from "@/components/governanca-insider";
 import { GovernancaEventosTimeline } from "@/components/governanca-eventos-timeline";
 import type { LsegViewRow } from "@/lib/lseg-transform";
 import { empresaHref } from "@/lib/empresa";
@@ -87,6 +88,10 @@ export function GovernancaDashboard() {
 
         <div className="mb-6">
           <GovernancaEventosTimeline />
+        </div>
+
+        <div className="mb-8">
+          <GovernancaInsider />
         </div>
 
         <div className="mb-4 flex items-start justify-between gap-3">

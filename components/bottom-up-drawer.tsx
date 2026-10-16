@@ -129,7 +129,7 @@ export function BottomUpDrawer({ row, onClose }: Props) {
                 <TabsTrigger value="snapshot">Snapshot</TabsTrigger>
                 <TabsTrigger value="historico">Histórico</TabsTrigger>
                 <TabsTrigger value="valuation">Valuation</TabsTrigger>
-                <TabsTrigger value="intrinseco">Preço justo</TabsTrigger>
+                <TabsTrigger value="intrinseco">Preço alvo</TabsTrigger>
                 <TabsTrigger value="tese">Tese</TabsTrigger>
               </TabsList>
 

@@ -1,4 +1,4 @@
-import type { IntrinsicEstimate } from "./bottom-up-types";
+import type { FairPriceView } from "./bottom-up-types";
 import { formatNumber } from "./format";
 
 export type FairStep = { label: string; value: string };
@@ -33,7 +33,7 @@ function multiple(v: number): string {
  * Passos do preço justo com os números da conta.
  * Bilhões em 3 casas e múltiplo em 5, para cada igualdade fechar.
  */
-export function evFairSteps(estimate: IntrinsicEstimate): FairStep[] | null {
+export function evFairSteps(estimate: FairPriceView): FairStep[] | null {
   if (estimate.method !== "Múltiplo-alvo EV/EBITDA") return null;
 
   const {

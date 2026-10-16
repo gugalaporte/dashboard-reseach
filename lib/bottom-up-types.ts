@@ -41,6 +41,7 @@ export type SeriesPoint = {
   freeCashFlow: number | null;
   peRatio: number | null;
   evEbitda: number | null;
+  pbRatio?: number | null;
   price: number | null;
 };
 
@@ -64,6 +65,32 @@ export type MultipleBand = {
   peerMedian: number | null;
 };
 
+export type PriceTarget = {
+  method: "EV/EBITDA" | "P/L" | "P/BV";
+  source: "histórico" | "setor";
+  multiple: number;
+  price: number;
+  upsidePct: number;
+  lines: string[];
+};
+
+/** Preço justo: EV/EBITDA histórico (ou do setor) sobre o EBITDA implícito no múltiplo atual. */
+export type FairPriceView = {
+  method: string;
+  marketPrice: number | null;
+  fairPrice: number | null;
+  upsidePct: number | null;
+  targetMultiple: number | null;
+  currentMultiple: number | null;
+  ebitda: number | null;
+  netDebt: number | null;
+  grossDebt: number | null;
+  cash: number | null;
+  marketCap: number | null;
+  marketCapCurrency: string | null;
+  notes: string;
+};
+
 export type IntrinsicEstimate = {
   method: string;
   marketPrice: number | null;
@@ -71,6 +98,10 @@ export type IntrinsicEstimate = {
   upsidePct: number | null;
   targetMultiple: number | null;
   currentMultiple: number | null;
+  /** Seção de cima: a conta de preço justo que já existia. */
+  justo: FairPriceView | null;
+  /** Preços alvo por múltiplo e por base (histórico do papel ou mediana do setor). */
+  targets: PriceTarget[];
   ebitda: number | null;
   netDebt: number | null;
   /** Dívida bruta do balanço. Com caixa, a líquida é dívida − caixa. */

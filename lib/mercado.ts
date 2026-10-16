@@ -328,7 +328,7 @@ export function buildMarketPayload(
   }
   const rows = sortRows(
     list
-      .filter((inst) => inst.group_code !== "curve")
+      .filter((inst) => inst.group_code !== "curve" && inst.ric !== "B3.TURNOVER")
       .map((inst) => toRow(inst, byPrice.get(inst.ric) ?? []))
   );
   const series: Record<string, MarketPoint[]> = {};

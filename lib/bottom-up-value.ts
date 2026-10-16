@@ -1,10 +1,12 @@
-/** Cálculos puros: bandas de múltiplos e preço justo simples. */
+/** Cálculos puros: bandas de múltiplos e preço alvo. */
 
 import type {
+  FairPriceView,
   IntrinsicEstimate,
   MultipleBand,
   SeriesPoint,
 } from "./bottom-up-types";
+import { buildPriceTargets } from "./target-price";
 
 function finite(vals: Array<number | null | undefined>): number[] {
   return vals.filter((v): v is number => v != null && Number.isFinite(v));
@@ -60,7 +62,8 @@ type IntrinsicInput = {
   pe: number | null;
   evEbitda: number | null;
   ebitda: number | null;
-  /** EV do LSEG. O EBITDA da fórmula sai daqui, não da coluna ebitda. */
+  netIncome?: number | null;
+  totalEquity?: number | null;
   enterpriseValue: number | null;
   netDebt: number | null;
   /** Dívida bruta. Caixa = dívida bruta − dívida líquida do snapshot. */
@@ -70,6 +73,9 @@ type IntrinsicInput = {
   histAvgEvEbitda: number | null;
   peerMedianEvEbitda: number | null;
   histAvgPe: number | null;
+  peerMedianPe?: number | null;
+  histAvgPb?: number | null;
+  peerMedianPb?: number | null;
 };
 
 /**
@@ -91,11 +97,61 @@ function evOnMultipleBasis(input: IntrinsicInput): {
   return { ev, netDebt: input.netDebt };
 }
 
-/**
- * Preço justo: múltiplo-alvo × EBITDA implícito no múltiplo atual.
- * EBITDA = EV ÷ EV/EBITDA atual. Equity = EV justo − dívida dessa mesma base.
- * Fallback: preço × (P/E médio histórico / P/E atual).
- */
+/** Preço justo antigo: múltiplo-alvo × EBITDA implícito no EV atual. */
+function buildJusto(input: IntrinsicInput): FairPriceView | null {
+  const targetEv = input.histAvgEvEbitda ?? input.peerMedianEvEbitda ?? null;
+  const basis = evOnMultipleBasis(input);
+  const { price, marketCap, evEbitda } = input;
+  if (
+    targetEv == null ||
+    targetEv <= 0 ||
+    basis == null ||
+    evEbitda == null ||
+    evEbitda <= 0 ||
+    price == null ||
+    price <= 0 ||
+    marketCap == null ||
+    marketCap <= 0
+  ) {
+    return null;
+  }
+
+  const impliedEbitda = basis.ev / evEbitda;
+  if (!(impliedEbitda > 0)) return null;
+
+  const grossDebt = input.totalDebt ?? null;
+  const cash =
+    grossDebt != null && input.netDebt != null ? grossDebt - input.netDebt : null;
+  const fromBalance = cash != null && input.netDebt != null;
+  const netDebt = fromBalance ? input.netDebt : basis.netDebt;
+  const equity = targetEv * impliedEbitda - netDebt;
+  const fairPrice = (price * equity) / marketCap;
+  const sector = input.histAvgEvEbitda == null;
+  const notes = [
+    sector ? "mediana do EV/EBITDA do setor" : "",
+    !fromBalance && input.enterpriseValue == null ? "dívida líquida" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return {
+    method: "Múltiplo-alvo EV/EBITDA",
+    marketPrice: price,
+    fairPrice,
+    upsidePct: ((fairPrice - price) / price) * 100,
+    targetMultiple: targetEv,
+    currentMultiple: evEbitda,
+    ebitda: impliedEbitda,
+    netDebt,
+    grossDebt: fromBalance ? grossDebt : null,
+    cash: fromBalance ? cash : null,
+    marketCap,
+    marketCapCurrency: input.marketCapCurrency ?? null,
+    notes,
+  };
+}
+
+/** Preço alvo por múltiplo. EV = equity + dívida − caixa. */
 export function estimateIntrinsic(input: IntrinsicInput): IntrinsicEstimate {
   const targetEv =
     input.histAvgEvEbitda ?? input.peerMedianEvEbitda ?? null;
@@ -108,87 +164,51 @@ export function estimateIntrinsic(input: IntrinsicInput): IntrinsicEstimate {
     histAvgPe,
     evEbitda,
   } = input;
-  const basis = evOnMultipleBasis(input);
-  const impliedEbitda =
-    basis != null && evEbitda != null && evEbitda > 0 ? basis.ev / evEbitda : null;
+  const grossDebt = input.totalDebt ?? null;
+  const cash =
+    grossDebt != null && netDebt != null ? grossDebt - netDebt : null;
+  const targets = buildPriceTargets({
+    price,
+    marketCap,
+    ebitda,
+    netIncome: input.netIncome ?? null,
+    totalEquity: input.totalEquity ?? null,
+    netDebt,
+    histEv: input.histAvgEvEbitda,
+    sectorEv: input.peerMedianEvEbitda,
+    histPe: histAvgPe,
+    sectorPe: input.peerMedianPe ?? null,
+    histPb: input.histAvgPb ?? null,
+    sectorPb: input.peerMedianPb ?? null,
+  });
+  const headline =
+    targets.find((t) => t.method === "EV/EBITDA" && t.source === "histórico") ??
+    targets[0] ??
+    null;
+  const shownDebt = cash != null ? grossDebt : null;
+  const shownCash = cash != null ? cash : null;
+  const justo = buildJusto(input);
 
-  // Método principal: EV/EBITDA alvo, na mesma base do múltiplo
-  if (
-    targetEv != null &&
-    impliedEbitda != null &&
-    impliedEbitda > 0 &&
-    basis != null &&
-    price != null &&
-    price > 0 &&
-    marketCap != null &&
-    marketCap > 0
-  ) {
-    const grossDebt = input.totalDebt ?? null;
-    const cash =
-      grossDebt != null && netDebt != null ? grossDebt - netDebt : null;
-    const balanceNet = cash != null ? netDebt : null;
-    const debtForEquity = balanceNet ?? basis.netDebt;
-    const fairEv = targetEv * impliedEbitda;
-    const equity = fairEv - debtForEquity;
-    // market cap ÷ preço não é o número de ações quando o cap mistura classes.
-    const fairPrice = (price * equity) / marketCap;
-    const upsidePct =
-      fairPrice != null && price > 0
-        ? ((fairPrice - price) / price) * 100
-        : null;
-    const alvo =
-      input.histAvgEvEbitda != null
-        ? "média histórica do EV/EBITDA"
-        : "mediana do EV/EBITDA do setor";
-    const usaEv =
-      input.enterpriseValue != null && input.enterpriseValue > 0;
-    const evFonte = usaEv
-      ? "enterprise value ÷ EV/EBITDA atual"
-      : "(market cap + dívida líquida) ÷ EV/EBITDA atual";
-    const divida =
-      balanceNet != null
-        ? "dívida − caixa"
-        : usaEv
-          ? "enterprise value − market cap"
-          : "dívida líquida";
-
+  if (headline && price != null) {
     return {
-      method: "Múltiplo-alvo EV/EBITDA",
+      method: `${headline.method} ${headline.source}`,
       marketPrice: price,
-      fairPrice,
-      upsidePct,
-      targetMultiple: targetEv,
-      currentMultiple: evEbitda,
-      ebitda: impliedEbitda,
-      netDebt: debtForEquity,
-      grossDebt: balanceNet != null ? grossDebt : null,
-      cash: balanceNet != null ? cash : null,
+      fairPrice: headline.price,
+      upsidePct: headline.upsidePct,
+      targetMultiple: headline.multiple,
+      currentMultiple: evEbitda ?? pe,
+      justo,
+      targets,
+      ebitda,
+      netDebt,
+      grossDebt: shownDebt,
+      cash: shownCash,
       marketCap,
       marketCapCurrency: input.marketCapCurrency ?? null,
       notes:
-        `EBITDA implícito = ${evFonte}, para o múltiplo e o EBITDA ficarem na mesma base. ` +
-        `EV justo = ${alvo} × esse EBITDA. Equity = EV justo − (${divida}). ` +
-        "Preço = preço × equity ÷ market cap.",
-    };
-  }
-
-  // Fallback: re-rating pelo P/E médio histórico
-  if (price != null && pe != null && pe > 0 && histAvgPe != null && histAvgPe > 0) {
-    const fairPrice = price * (histAvgPe / pe);
-    return {
-      method: "Re-rating P/E histórico",
-      marketPrice: price,
-      fairPrice,
-      upsidePct: ((fairPrice - price) / price) * 100,
-      targetMultiple: histAvgPe,
-      currentMultiple: pe,
-      ebitda,
-      netDebt,
-      grossDebt: null,
-      cash: null,
-      marketCap,
-      marketCapCurrency: input.marketCapCurrency ?? null,
-      notes: "Preço justo ≈ preço atual × (P/E médio histórico / P/E atual).",
+        "EV = equity + dívida − caixa. EV/EBITDA: múltiplo × EBITDA = EV. " +
+        "Equity = EV − dívida líquida. P/L: lucro × P/L. P/BV: patrimônio × P/BV. " +
+        "Preço alvo = preço × equity ÷ market cap.",
     };
   }
 
@@ -199,13 +219,15 @@ export function estimateIntrinsic(input: IntrinsicInput): IntrinsicEstimate {
     upsidePct: null,
     targetMultiple: targetEv,
     currentMultiple: evEbitda ?? pe,
+    justo,
+    targets,
     ebitda,
     netDebt,
     grossDebt: null,
     cash: null,
     marketCap,
     marketCapCurrency: input.marketCapCurrency ?? null,
-    notes: "Faltam EBITDA, preço ou histórico de múltiplos para estimar.",
+    notes: "Faltam EBITDA, lucro ou patrimônio para estimar o preço alvo.",
   };
 }
 

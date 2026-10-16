@@ -169,7 +169,7 @@ describe("scoreFactors", () => {
         evEbitda: 10,
         ret3m: 20,
         dividendYield: 1,
-        dyFwd: null,
+        dyFwd: 1,
       }),
       base({
         ticker: "AV",
@@ -179,7 +179,7 @@ describe("scoreFactors", () => {
         evEbitda: 4,
         ret3m: 0,
         dividendYield: 8,
-        dyFwd: null,
+        dyFwd: 8,
       }),
     ]);
     const aq = rows.find((r) => r.ticker === "AQ")!;
@@ -203,7 +203,7 @@ describe("scoreFactors", () => {
       roic: 40,
       revenueCagr: 25,
       dividendYield: 1,
-      dyFwd: null,
+      dyFwd: 1,
     });
     const highC = base({
       ticker: "HIGHC",
@@ -212,7 +212,7 @@ describe("scoreFactors", () => {
       roic: 5,
       revenueCagr: 2,
       dividendYield: 12,
-      dyFwd: null,
+      dyFwd: 12,
     });
     const equal = scoreFactors([highQ, highC]);
     const tilt = scoreFactors(
@@ -309,6 +309,30 @@ describe("scoreFactors", () => {
     expect(lossRow.breakdown.find((b) => b.key === "evEbitda")?.z).toBeNull();
     expect(lossRow.breakdown.some((b) => b.key === "peFwd")).toBe(false);
     expect(cheap1.value!).toBeGreaterThan(lossRow.value ?? -Infinity);
+  });
+
+  it("carry usa só DY fwd e ignora o dividend yield do snapshot", () => {
+    const rows = scoreFactors([
+      base({
+        ticker: "FWD",
+        ric: "FWD.SA",
+        sector: "Energy",
+        dividendYield: 1,
+        dyFwd: 9,
+      }),
+      base({
+        ticker: "SNAP",
+        ric: "SNAP.SA",
+        sector: "Energy",
+        dividendYield: 20,
+        dyFwd: null,
+      }),
+    ]);
+    const fwd = rows.find((r) => r.ticker === "FWD")!;
+    const snap = rows.find((r) => r.ticker === "SNAP")!;
+    expect(fwd.breakdown.find((b) => b.factor === "carry")?.key).toBe("dyFwd");
+    expect(fwd.carryRank).toBe(1);
+    expect(snap.carry).toBeNull();
   });
 
   it("banco usa só P/E fwd; demais usam só EV/EBITDA", () => {

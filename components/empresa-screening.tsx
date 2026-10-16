@@ -13,7 +13,7 @@ import type { BottomUpPayload } from "@/lib/bottom-up-types";
 
 type Props = { ticker: string; row: FactorRow | null };
 
-/** Screening: scores, snapshot, histórico, valuation e preço justo. */
+/** Screening: scores, snapshot, histórico, valuation e preço alvo. */
 export function EmpresaScreening({ ticker, row }: Props) {
   const [payload, setPayload] = React.useState<BottomUpPayload | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -150,9 +150,6 @@ export function EmpresaScreening({ ticker, row }: Props) {
       </div>
 
       <div>
-        <h3 className="text-[11px] uppercase tracking-[0.14em] text-ink/45 mb-3">
-          Preço justo
-        </h3>
         {loading ? (
           <Skeleton className="h-40 w-full" />
         ) : payload?.intrinsic ? (

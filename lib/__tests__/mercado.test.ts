@@ -74,6 +74,27 @@ describe("buildMarketPayload", () => {
     expect(payload.series[".BVSP"]?.length).toBe(2);
   });
 
+  it("não leva o volume negociado da B3 para o painel", () => {
+    const payload = buildMarketPayload(
+      [
+        {
+          ric: "B3.TURNOVER",
+          name: "B3 valor negociado",
+          group_code: "equity",
+          quote_type: "price",
+          currency: "BRL",
+          curve_id: null,
+          tenor: null,
+          enabled: true,
+          notes: null,
+        },
+      ],
+      [{ ric: "B3.TURNOVER", trade_date: "2026-10-16", value: 27e9 }]
+    );
+    expect(payload.rows.some((r) => r.ric === "B3.TURNOVER")).toBe(false);
+    expect(payload.series["B3.TURNOVER"]).toBeUndefined();
+  });
+
   it("liga ETF Anbima ao índice e não inclui vértices de curva", () => {
     const inst: MarketInst[] = [
       {
