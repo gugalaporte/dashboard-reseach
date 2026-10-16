@@ -8,7 +8,7 @@ import {
   zScore,
   type FactorInput,
 } from "../factor-scoring";
-import { buildFactorInputs, latestForwardByRic } from "../factor-build";
+import { buildFactorInputs, latestFilledForward, latestForwardByRic } from "../factor-build";
 
 function base(partial: Partial<FactorInput> & Pick<FactorInput, "ticker" | "ric" | "sector">): FactorInput {
   return {
@@ -490,6 +490,20 @@ describe("latestForwardByRic", () => {
       { ric: "X.SA", as_of_date: "2026-06-01", fiscal_year: 2026, eps_mean: 2, dps_mean: 1, pe_fwd: 9 },
     ]);
     expect(map.get("X.SA")?.pe_fwd).toBe(9);
+  });
+});
+
+describe("latestFilledForward", () => {
+  it("pega o DY do ano que tem valor, no mesmo dia", () => {
+    const rows = [
+      { ric: "PETR4.SA", as_of_date: "2026-10-16", fiscal_year: 2028, pe_fwd: 5.82, dy_fwd: null },
+      { ric: "PETR4.SA", as_of_date: "2026-10-16", fiscal_year: 2026, pe_fwd: 4.35, dy_fwd: 8.72 },
+      { ric: "PETR4.SA", as_of_date: "2026-10-10", fiscal_year: 2026, pe_fwd: 4.49, dy_fwd: 8.77 },
+    ];
+    const dy = latestFilledForward(rows, (r) => r.dy_fwd ?? null);
+    expect(dy.get("PETR4.SA")?.fiscal_year).toBe(2026);
+    expect(dy.get("PETR4.SA")?.dy_fwd).toBe(8.72);
+    expect(latestForwardByRic(rows).get("PETR4.SA")?.pe_fwd).toBe(5.82);
   });
 });
 

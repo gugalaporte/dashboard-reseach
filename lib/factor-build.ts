@@ -12,6 +12,17 @@ function num(v: unknown): number | null {
   return null;
 }
 
+function newerForward(
+  row: LsegForwardEstimateRow,
+  prev: LsegForwardEstimateRow
+): boolean {
+  const d = row.as_of_date ?? "";
+  const pd = prev.as_of_date ?? "";
+  if (d > pd) return true;
+  if (d < pd) return false;
+  return (Number(row.fiscal_year) || 0) > (Number(prev.fiscal_year) || 0);
+}
+
 /** Forward mais recente por ric (as_of_date, depois fiscal_year). */
 export function latestForwardByRic(
   rows: LsegForwardEstimateRow[]
@@ -19,21 +30,22 @@ export function latestForwardByRic(
   const map = new Map<string, LsegForwardEstimateRow>();
   for (const row of rows) {
     const prev = map.get(row.ric);
-    if (!prev) {
-      map.set(row.ric, row);
-      continue;
-    }
-    const d = row.as_of_date ?? "";
-    const pd = prev.as_of_date ?? "";
-    if (d > pd) {
-      map.set(row.ric, row);
-      continue;
-    }
-    if (d === pd) {
-      const y = Number(row.fiscal_year) || 0;
-      const py = Number(prev.fiscal_year) || 0;
-      if (y > py) map.set(row.ric, row);
-    }
+    if (!prev || newerForward(row, prev)) map.set(row.ric, row);
+  }
+  return map;
+}
+
+/** Mesma regra, mas só entre linhas em que o campo existe.
+ *  2028E costuma vir sem DY; o 2026E do mesmo dia tem o yield. */
+export function latestFilledForward(
+  rows: LsegForwardEstimateRow[],
+  read: (row: LsegForwardEstimateRow) => number | null
+): Map<string, LsegForwardEstimateRow> {
+  const map = new Map<string, LsegForwardEstimateRow>();
+  for (const row of rows) {
+    if (read(row) == null) continue;
+    const prev = map.get(row.ric);
+    if (!prev || newerForward(row, prev)) map.set(row.ric, row);
   }
   return map;
 }
@@ -77,6 +89,7 @@ export function buildFactorInputs(
   const snaps = latestSnapshots(snapshots);
   const lastVolume = lastKnownByRic(snapshots, (r) => num(r.day_volume));
   const fwdMap = latestForwardByRic(forward);
+  const dyMap = latestFilledForward(forward, (r) => num(r.dy_fwd));
   const byRic = new Map(companies.map((c) => [c.ric, c]));
 
   let maxAsOf: string | null = null;
@@ -118,7 +131,7 @@ export function buildFactorInputs(
       ret3m: num(snap.ret_3m),
       ret6m: num(snap.ret_6m),
       dividendYield: num(snap.dividend_yield),
-      dyFwd: num(fwd?.dy_fwd),
+      dyFwd: num(dyMap.get(snap.ric)?.dy_fwd),
       marketCap: num(snap.market_cap),
       dayVolume: num(snap.day_volume) ?? lastVolume.get(snap.ric) ?? null,
       analystCount: analystCount(snap),
