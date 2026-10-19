@@ -118,7 +118,19 @@ export async function loadInsiderTrades(month?: string | null): Promise<InsiderP
     .filter((row): row is InsiderTrade & { cnpj: string } => row != null && Boolean(row.ticker));
 
   const rows = keepLatestVersion(parsed)
-    .map(({ cnpj: _cnpj, ...trade }) => trade)
+    .map((row) => ({
+      id: row.id,
+      ticker: row.ticker,
+      company: row.company,
+      date: row.date,
+      versao: row.versao,
+      cargo: row.cargo,
+      movimentacao: row.movimentacao,
+      valorMobiliario: row.valorMobiliario,
+      quantidade: row.quantidade,
+      preco: row.preco,
+      volume: row.volume,
+    }))
     .sort((a, b) => a.ticker.localeCompare(b.ticker) || a.movimentacao.localeCompare(b.movimentacao));
 
   return { month: selected, months, rows };
