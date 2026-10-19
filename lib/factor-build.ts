@@ -109,6 +109,7 @@ export function buildFactorInputs(
   const dyMap = nearestFilledForward(forward, (r) => num(r.dy_fwd));
   const qualityMap = nearestFilledForward(forward, (r) => num(r.quality_return_mean));
   const peMap = nearestFilledForward(forward, (r) => num(r.pe_fwd));
+  const evMap = nearestFilledForward(forward, (r) => num(r.ev_ebitda_mean));
   const byRic = new Map(companies.map((c) => [c.ric, c]));
 
   let maxAsOf: string | null = null;
@@ -151,7 +152,7 @@ export function buildFactorInputs(
       peRatio: num(snap.pe_ratio),
       peFwd: num(peMap.get(snap.ric)?.pe_fwd),
       pbRatio: num(snap.pb_ratio),
-      evEbitda: num(snap.ev_ebitda),
+      evEbitda: num(evMap.get(snap.ric)?.ev_ebitda_mean),
       upsidePct: num(snap.upside_pct),
       epsRev4wPct: num(fwd?.eps_rev_4w_pct),
       ret3m: num(snap.ret_3m),

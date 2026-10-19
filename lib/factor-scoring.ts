@@ -140,7 +140,7 @@ export const FACTOR_FORMULA: Record<FactorId, string> = {
   quality:
     "FY1 de forward_estimates (quality_return_mean). Financeiras: ROE. Demais: ROIC do consenso; se faltar, ROIC calculado. Ranking 1º = maior retorno no universo da tela.",
   value:
-    "Bancos e financeiras: P/E fwd do FY1. Demais: EV/EBITDA atual. Múltiplo ≤ 0 é ignorado. Ranking único na tela: 1º = mais barato.",
+    "Bancos e financeiras: P/E fwd do FY1. Demais: EV/EBITDA fwd do FY1. Múltiplo ≤ 0 é ignorado. Ranking único na tela: 1º = mais barato.",
   momentum:
     "Retorno 3M. Ranking 1º = maior retorno no universo da tela.",
   carry:
@@ -346,7 +346,7 @@ function valueMetric(row: FactorInput): MetricBreakdown {
   }
   return {
     key: "evEbitda",
-    label: "EV/EBITDA",
+    label: "EV/EBITDA fwd",
     raw: row.evEbitda,
     z: null,
     inverted: true,

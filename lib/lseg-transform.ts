@@ -110,6 +110,7 @@ export type LsegForwardEstimateRow = {
   tax_rate_mean?: number | null;
   equity_mean?: number | null;
   net_debt_mean?: number | null;
+  ev_ebitda_mean?: number | null;
 };
 
 export type LsegHistoricalSeriesRow = {

@@ -757,6 +757,34 @@ describe("buildFactorInputs", () => {
     expect(inputs[0]!.dyFwd).toBe(8.72);
   });
 
+  it("EV/EBITDA do value vem do FY1 e ignora o snapshot", () => {
+    const inputs = buildFactorInputs(
+      [{ ticker: "LREN3", ric: "LREN3.SA", sector: "Retail", name: "Renner", gics_industry: null, updated_at: null }],
+      [{
+        ric: "LREN3.SA",
+        as_of_date: "2026-10-19",
+        last_price: 15,
+        price_target: null,
+        rating_label: null,
+        upside_pct: null,
+        pe_ratio: 9,
+        ev_ebitda: 3.6,
+        dividend_yield: 4,
+        revenue: 1,
+        ebitda: 1,
+        net_income: 1,
+        roic: 13,
+        roe: 16,
+        analyst_count: 12,
+      }],
+      [
+        { ric: "LREN3.SA", as_of_date: "2026-10-19", fiscal_year: 2028, eps_mean: 1, dps_mean: null, ev_ebitda_mean: 5.1 },
+        { ric: "LREN3.SA", as_of_date: "2026-10-19", fiscal_year: 2026, eps_mean: 1, dps_mean: null, ev_ebitda_mean: 4.2 },
+      ]
+    );
+    expect(inputs[0]!.evEbitda).toBe(4.2);
+  });
+
   it("usa day_volume do snapshot anterior se o mais recente vier vazio", () => {
     const company = {
       ticker: "PETR4",
