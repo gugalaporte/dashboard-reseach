@@ -123,7 +123,7 @@ function buildJusto(input: IntrinsicInput): FairPriceView | null {
   const cash =
     grossDebt != null && input.netDebt != null ? grossDebt - input.netDebt : null;
   const fromBalance = cash != null && input.netDebt != null;
-  const netDebt = fromBalance ? input.netDebt : basis.netDebt;
+  const netDebt = fromBalance && input.netDebt != null ? input.netDebt : basis.netDebt;
   const equity = targetEv * impliedEbitda - netDebt;
   const fairPrice = (price * equity) / marketCap;
   const sector = input.histAvgEvEbitda == null;

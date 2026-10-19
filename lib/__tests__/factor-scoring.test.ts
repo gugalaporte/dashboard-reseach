@@ -493,9 +493,9 @@ describe("latestForwardByRic", () => {
 describe("latestFilledForward", () => {
   it("pega o DY do ano que tem valor, no mesmo dia", () => {
     const rows = [
-      { ric: "PETR4.SA", as_of_date: "2026-10-16", fiscal_year: 2028, pe_fwd: 5.82, dy_fwd: null },
-      { ric: "PETR4.SA", as_of_date: "2026-10-16", fiscal_year: 2026, pe_fwd: 4.35, dy_fwd: 8.72 },
-      { ric: "PETR4.SA", as_of_date: "2026-10-10", fiscal_year: 2026, pe_fwd: 4.49, dy_fwd: 8.77 },
+      { ric: "PETR4.SA", as_of_date: "2026-10-16", fiscal_year: 2028, eps_mean: null, dps_mean: null, pe_fwd: 5.82, dy_fwd: null },
+      { ric: "PETR4.SA", as_of_date: "2026-10-16", fiscal_year: 2026, eps_mean: null, dps_mean: null, pe_fwd: 4.35, dy_fwd: 8.72 },
+      { ric: "PETR4.SA", as_of_date: "2026-10-10", fiscal_year: 2026, eps_mean: null, dps_mean: null, pe_fwd: 4.49, dy_fwd: 8.77 },
     ];
     const dy = latestFilledForward(rows, (r) => r.dy_fwd ?? null);
     expect(dy.get("PETR4.SA")?.fiscal_year).toBe(2026);
@@ -534,10 +534,10 @@ describe("roicCalcFormulaLines", () => {
 describe("nearestFilledForward", () => {
   it("fica no FY1 quando os três anos têm retorno", () => {
     const rows = [
-      { ric: "PETR4.SA", as_of_date: "2026-10-19", fiscal_year: 2028, quality_return_mean: 13.63 },
-      { ric: "PETR4.SA", as_of_date: "2026-10-19", fiscal_year: 2027, quality_return_mean: 16.52 },
-      { ric: "PETR4.SA", as_of_date: "2026-10-19", fiscal_year: 2026, quality_return_mean: 20.97 },
-      { ric: "PETR4.SA", as_of_date: "2026-10-10", fiscal_year: 2026, quality_return_mean: 19 },
+      { ric: "PETR4.SA", as_of_date: "2026-10-19", fiscal_year: 2028, eps_mean: null, dps_mean: null, quality_return_mean: 13.63 },
+      { ric: "PETR4.SA", as_of_date: "2026-10-19", fiscal_year: 2027, eps_mean: null, dps_mean: null, quality_return_mean: 16.52 },
+      { ric: "PETR4.SA", as_of_date: "2026-10-19", fiscal_year: 2026, eps_mean: null, dps_mean: null, quality_return_mean: 20.97 },
+      { ric: "PETR4.SA", as_of_date: "2026-10-10", fiscal_year: 2026, eps_mean: null, dps_mean: null, quality_return_mean: 19 },
     ];
     const q = nearestFilledForward(rows, (r) => r.quality_return_mean ?? null);
     expect(q.get("PETR4.SA")?.fiscal_year).toBe(2026);

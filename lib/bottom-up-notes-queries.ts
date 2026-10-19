@@ -24,6 +24,12 @@ function missingComments(error: { message: string }): boolean {
   return /comments/i.test(error.message) && /does not exist|schema cache/i.test(error.message);
 }
 
+function commentsFrom(row: object): string | null {
+  if (!("comments" in row)) return "";
+  const value = (row as { comments?: unknown }).comments;
+  return typeof value === "string" ? value : null;
+}
+
 function throwQueryError(error: { code?: string; message: string }): never {
   if (error.code === "PGRST205") throw new Error(MISSING_TABLE);
   if (missingComments(error)) throw new Error(MISSING_COMMENTS);
@@ -71,7 +77,7 @@ export async function loadPipelineNotes(): Promise<PipelineNote[]> {
     : first;
   if (rows.error) throwQueryError(rows.error);
   const notes = (rows.data ?? []).map((row) =>
-    rowToNotes({ ...row, comments: "comments" in row ? row.comments : "" })
+    rowToNotes({ ...row, comments: commentsFrom(row) })
   );
   if (notes.length === 0) return [];
 
