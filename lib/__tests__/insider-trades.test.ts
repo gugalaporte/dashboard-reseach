@@ -80,7 +80,7 @@ describe("mês e cargo", () => {
       row({ id: 1, volume: 100, movimentacao: "Venda à vista", cargo: "Controlador ou Vinculado" }),
       row({ id: 2, volume: 40 }),
       row({ id: 3, volume: 10, movimentacao: "Venda", cargo: "Diretor ou Vinculado" }),
-    ])).toEqual({ buys: 1, sells: 2, buyVolume: 40, sellVolume: 110 });
+    ])).toEqual({ buys: 1, sells: 2, buyVolume: 40, sellVolume: 110, netVolume: -70 });
   });
 
   it("soma compras e vendas por empresa", () => {
@@ -104,8 +104,20 @@ describe("mês e cargo", () => {
       row({ id: 3, ticker: "PETR4", volume: 10, movimentacao: "Venda à vista" }),
     ]);
     expect(totals.map((t) => t.ticker)).toEqual(["PETR4", "VALE3"]);
-    expect(totals[0]).toMatchObject({ buys: 1, sells: 1, buyVolume: 40, sellVolume: 10 });
-    expect(totals[1]).toMatchObject({ buys: 0, sells: 1, buyVolume: 0, sellVolume: 5 });
+    expect(totals[0]).toMatchObject({
+      buys: 1,
+      sells: 1,
+      buyVolume: 40,
+      sellVolume: 10,
+      netVolume: 30,
+    });
+    expect(totals[1]).toMatchObject({
+      buys: 0,
+      sells: 1,
+      buyVolume: 0,
+      sellVolume: 5,
+      netVolume: -5,
+    });
   });
 });
 

@@ -60,11 +60,19 @@ export type InsiderTotals = {
   sells: number;
   buyVolume: number;
   sellVolume: number;
+  /** Compras menos vendas. */
+  netVolume: number;
 };
 
 /** Soma de compras e vendas do mês. */
 export function tradeTotals(rows: InsiderTrade[]): InsiderTotals {
-  const totals: InsiderTotals = { buys: 0, sells: 0, buyVolume: 0, sellVolume: 0 };
+  const totals: InsiderTotals = {
+    buys: 0,
+    sells: 0,
+    buyVolume: 0,
+    sellVolume: 0,
+    netVolume: 0,
+  };
   for (const row of rows) {
     const volume = row.volume ?? 0;
     if (normMove(row.movimentacao).startsWith("compra")) {
@@ -75,6 +83,7 @@ export function tradeTotals(rows: InsiderTrade[]): InsiderTotals {
       totals.sellVolume += volume;
     }
   }
+  totals.netVolume = totals.buyVolume - totals.sellVolume;
   return totals;
 }
 
