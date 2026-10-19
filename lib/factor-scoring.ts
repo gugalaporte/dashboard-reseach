@@ -84,6 +84,15 @@ export type FactorInput = {
   asOfDate: string | null;
   roe: number | null;
   roic: number | null;
+  /** quality_return_mean do FY1. Null se a estimativa não veio. */
+  qualityReturn: number | null;
+  /** roe, roic ou roic_calc. */
+  qualitySource: string | null;
+  /** Insumos do ROIC calculado no mesmo FY1. Vazios se a fonte não for roic_calc. */
+  roicEbit: number | null;
+  roicTaxRate: number | null;
+  roicEquity: number | null;
+  roicNetDebt: number | null;
   netMargin: number | null;
   ebitdaMargin: number | null;
   currentRatio: number | null;
@@ -129,13 +138,13 @@ export const FACTOR_LABELS: Record<FactorId, string> = {
 /** Descrição genérica da composição de cada fator (para tooltip). */
 export const FACTOR_FORMULA: Record<FactorId, string> = {
   quality:
-    "Bancos e financeiras: ROE. Demais: ROIC. Ranking 1º = maior valor no universo da tela.",
+    "FY1 de forward_estimates (quality_return_mean). Financeiras: ROE. Demais: ROIC do consenso; se faltar, ROIC calculado. Ranking 1º = maior retorno no universo da tela.",
   value:
-    "Bancos e financeiras: P/E fwd (menor é melhor), só entre financeiras na tela. Demais: EV/EBITDA (menor é melhor), só entre não-financeiras. Múltiplo ≤ 0 é ignorado. Ranking 1º = mais barato no grupo.",
+    "Bancos e financeiras: P/E fwd do FY1. Demais: EV/EBITDA atual. Múltiplo ≤ 0 é ignorado. Ranking único na tela: 1º = mais barato.",
   momentum:
     "Retorno 3M. Ranking 1º = maior retorno no universo da tela.",
   carry:
-    "DY fwd. Ranking 1º = maior yield no universo da tela.",
+    "DY fwd do FY1. Ranking 1º = maior yield no universo da tela.",
   liquidity:
     "Média dos z-scores no universo da tela: market cap, volume diário.",
 };
@@ -352,22 +361,19 @@ function valueNominal(row: FactorInput): number | null {
   return usableMetric("evEbitda", row.evEbitda) ? row.evEbitda : null;
 }
 
-/** Quality: ROE (financeiras) ou ROIC (demais). */
+const QUALITY_SOURCE_LABEL: Record<string, { key: string; label: string }> = {
+  roe: { key: "roe", label: "ROE fwd" },
+  roic: { key: "roic", label: "ROIC fwd" },
+  roic_calc: { key: "roic_calc", label: "ROIC calc" },
+};
+
+/** Quality: retorno forward já resolvido na tabela (FY1). */
 function qualityReturnMetric(row: FactorInput): MetricBreakdown {
-  if (isFinancialForValue(row)) {
-    return {
-      key: "roe",
-      label: "ROE",
-      raw: row.roe,
-      z: null,
-      inverted: false,
-      factor: "quality",
-    };
-  }
+  const known = row.qualitySource ? QUALITY_SOURCE_LABEL[row.qualitySource] : undefined;
   return {
-    key: "roic",
-    label: "ROIC",
-    raw: row.roic,
+    key: known?.key ?? "qualityReturn",
+    label: known?.label ?? "Retorno fwd",
+    raw: row.qualityReturn,
     z: null,
     inverted: false,
     factor: "quality",
@@ -375,10 +381,8 @@ function qualityReturnMetric(row: FactorInput): MetricBreakdown {
 }
 
 function qualityNominal(row: FactorInput): number | null {
-  if (isFinancialForValue(row)) {
-    return usableMetric("roe", row.roe) ? row.roe : null;
-  }
-  return usableMetric("roic", row.roic) ? row.roic : null;
+  const v = row.qualityReturn;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
 function carryYield(row: FactorInput): {
@@ -543,12 +547,8 @@ export function scoreFactors(
     ok.map((r) => ({ ticker: r.ticker, value: r.carry })),
     false
   );
-  const finRanks = assignRanks(
-    ok.filter((r) => isFinancialForValue(r.raw)).map((r) => ({ ticker: r.ticker, value: r.value })),
-    true
-  );
-  const othRanks = assignRanks(
-    ok.filter((r) => !isFinancialForValue(r.raw)).map((r) => ({ ticker: r.ticker, value: r.value })),
+  const valueRanks = assignRanks(
+    ok.map((r) => ({ ticker: r.ticker, value: r.value })),
     true
   );
 
@@ -557,11 +557,10 @@ export function scoreFactors(
     row.qualityRank = qualityRanks.get(row.ticker) ?? null;
     row.momentumRank = momentumRanks.get(row.ticker) ?? null;
     row.carryRank = carryRanks.get(row.ticker) ?? null;
-    const fin = isFinancialForValue(row.raw);
-    row.valueRank = (fin ? finRanks : othRanks).get(row.ticker) ?? null;
+    row.valueRank = valueRanks.get(row.ticker) ?? null;
     const pool = {
       quality: qualityRanks.size,
-      value: (fin ? finRanks : othRanks).size,
+      value: valueRanks.size,
       momentum: momentumRanks.size,
       carry: carryRanks.size,
     };

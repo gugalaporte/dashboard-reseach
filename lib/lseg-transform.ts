@@ -102,6 +102,14 @@ export type LsegForwardEstimateRow = {
   revenue_mean?: number | null;
   ebitda_mean?: number | null;
   net_income_mean?: number | null;
+  /** ROIC/ROE forward já escolhido para o score Quality. */
+  quality_return_mean?: number | null;
+  /** roe, roic ou roic_calc. */
+  quality_return_source?: string | null;
+  ebit_mean?: number | null;
+  tax_rate_mean?: number | null;
+  equity_mean?: number | null;
+  net_debt_mean?: number | null;
 };
 
 export type LsegHistoricalSeriesRow = {

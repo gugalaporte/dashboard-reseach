@@ -8,14 +8,17 @@ import {
   zScore,
   type FactorInput,
 } from "../factor-scoring";
-import { buildFactorInputs, latestFilledForward, latestForwardByRic } from "../factor-build";
+import { buildFactorInputs, latestFilledForward, latestForwardByRic, nearestFilledForward } from "../factor-build";
+import { roicCalcFormulaLines } from "../factor-display";
 
 function base(partial: Partial<FactorInput> & Pick<FactorInput, "ticker" | "ric" | "sector">): FactorInput {
+  const roic = partial.roic !== undefined ? partial.roic : 12;
+  const qualityReturn = partial.qualityReturn !== undefined ? partial.qualityReturn : roic;
+  const qualitySource = partial.qualitySource !== undefined ? partial.qualitySource : "roic";
   return {
     name: partial.name ?? partial.ticker,
     asOfDate: "2026-07-01",
     roe: 15,
-    roic: 12,
     netMargin: 10,
     ebitdaMargin: 20,
     currentRatio: 1.5,
@@ -35,7 +38,14 @@ function base(partial: Partial<FactorInput> & Pick<FactorInput, "ticker" | "ric"
     analystCount: 8,
     revenueCagr: 10,
     inPortfolio: false,
+    roicEbit: null,
+    roicTaxRate: null,
+    roicEquity: null,
+    roicNetDebt: null,
     ...partial,
+    roic,
+    qualityReturn,
+    qualitySource,
   };
 }
 
@@ -370,8 +380,12 @@ describe("scoreFactors", () => {
     const petr = rows.find((r) => r.ticker === "PETR4")!;
     const prio = rows.find((r) => r.ticker === "PRIO3")!;
 
-    expect(itub.valueRank!).toBeLessThan(sanb.valueRank!);
-    expect(petr.valueRank!).toBeLessThan(prio.valueRank!);
+    expect(petr.valueRank).toBe(1);
+    expect(itub.valueRank).toBe(2);
+    expect(prio.valueRank).toBe(3);
+    expect(sanb.valueRank).toBe(4);
+    expect(itub.rankPool?.value).toBe(4);
+    expect(petr.rankPool?.value).toBe(4);
     expect(itub.breakdown.filter((b) => b.factor === "value").map((b) => b.key)).toEqual([
       "peFwd",
     ]);
@@ -380,55 +394,38 @@ describe("scoreFactors", () => {
     ]);
   });
 
-  it("não-financeira usa só ROIC no Quality; banco usa só ROE", () => {
-    const bankHigh = base({
+  it("quality usa o retorno forward e ignora o ROIC do snapshot", () => {
+    const bank = base({
       ticker: "ITUB4",
       ric: "ITUB4.SA",
       sector: "Banks",
-      roe: 22,
+      roe: 2,
       roic: 2,
-      revenueCagr: 8,
+      qualityReturn: 24.8,
+      qualitySource: "roe",
     });
-    const bankLow = base({
-      ticker: "SANB11",
-      ric: "SANB11.SA",
-      sector: "Banks",
-      roe: 8,
-      roic: 40,
-      revenueCagr: 8,
-    });
-    const oilHigh = base({
+    const oil = base({
       ticker: "PETR4",
       ric: "PETR4.SA",
       sector: "Energy",
-      roe: 5,
-      roic: 30,
-      revenueCagr: 8,
-    });
-    const oilLow = base({
-      ticker: "PRIO3",
-      ric: "PRIO3.SA",
-      sector: "Energy",
       roe: 40,
-      roic: 6,
-      revenueCagr: 8,
+      roic: 99,
+      qualityReturn: 20.97,
+      qualitySource: "roic_calc",
     });
-    const rows = scoreFactors([bankHigh, bankLow, oilHigh, oilLow]);
+    const rows = scoreFactors([bank, oil]);
     const itub = rows.find((r) => r.ticker === "ITUB4")!;
-    const sanb = rows.find((r) => r.ticker === "SANB11")!;
     const petr = rows.find((r) => r.ticker === "PETR4")!;
-    const prio = rows.find((r) => r.ticker === "PRIO3")!;
 
-    expect(itub.quality!).toBeGreaterThan(sanb.quality!);
-    expect(petr.quality!).toBeGreaterThan(prio.quality!);
+    expect(itub.quality).toBe(24.8);
+    expect(petr.quality).toBe(20.97);
+    expect(itub.qualityRank).toBe(1);
     expect(itub.breakdown.filter((b) => b.factor === "quality").map((b) => b.key)).toEqual([
       "roe",
     ]);
     expect(petr.breakdown.filter((b) => b.factor === "quality").map((b) => b.key)).toEqual([
-      "roic",
+      "roic_calc",
     ]);
-    expect(itub.quality).toBe(22);
-    expect(petr.quality).toBe(30);
   });
 
   it("evolução da receita não entra no Quality", () => {
@@ -504,6 +501,47 @@ describe("latestFilledForward", () => {
     expect(dy.get("PETR4.SA")?.fiscal_year).toBe(2026);
     expect(dy.get("PETR4.SA")?.dy_fwd).toBe(8.72);
     expect(latestForwardByRic(rows).get("PETR4.SA")?.pe_fwd).toBe(5.82);
+  });
+});
+
+describe("roicCalcFormulaLines", () => {
+  it("mostra a conta com a alíquota do consenso", () => {
+    expect(
+      roicCalcFormulaLines({
+        ebit: 248_466_077_140,
+        taxRate: 30.6,
+        equity: 537_279_651_200,
+        netDebt: 284_997_998_570,
+      })
+    ).toEqual([
+      "EBIT × (1 − alíquota) ÷ (patrimônio + dívida líquida)",
+      "248,5 bi × (1 − 30,6%) ÷ (537,3 bi + 285,0 bi)",
+    ]);
+  });
+
+  it("usa 34% quando não há alíquota", () => {
+    const lines = roicCalcFormulaLines({
+      ebit: 6_359_946_880,
+      taxRate: null,
+      equity: 14_672_080_000,
+      netDebt: 27_578_768_750,
+    });
+    expect(lines[1]).toBe("6,4 bi × (1 − 34%) ÷ (14,7 bi + 27,6 bi)");
+    expect(lines[2]).toBe("Alíquota sem consenso: 34%.");
+  });
+});
+
+describe("nearestFilledForward", () => {
+  it("fica no FY1 quando os três anos têm retorno", () => {
+    const rows = [
+      { ric: "PETR4.SA", as_of_date: "2026-10-19", fiscal_year: 2028, quality_return_mean: 13.63 },
+      { ric: "PETR4.SA", as_of_date: "2026-10-19", fiscal_year: 2027, quality_return_mean: 16.52 },
+      { ric: "PETR4.SA", as_of_date: "2026-10-19", fiscal_year: 2026, quality_return_mean: 20.97 },
+      { ric: "PETR4.SA", as_of_date: "2026-10-10", fiscal_year: 2026, quality_return_mean: 19 },
+    ];
+    const q = nearestFilledForward(rows, (r) => r.quality_return_mean ?? null);
+    expect(q.get("PETR4.SA")?.fiscal_year).toBe(2026);
+    expect(q.get("PETR4.SA")?.quality_return_mean).toBe(20.97);
   });
 });
 
@@ -607,6 +645,116 @@ describe("buildFactorInputs", () => {
       []
     );
     expect(inputs[0]!.roic).toBe(10);
+    expect(inputs[0]!.qualityReturn).toBeNull();
+  });
+
+  it("quality do screening vem do FY1, não do snapshot", () => {
+    const inputs = buildFactorInputs(
+      [{ ticker: "PETR4", ric: "PETR4.SA", sector: "Energy", name: "Petrobras", gics_industry: null, updated_at: null }],
+      [{
+        ric: "PETR4.SA",
+        as_of_date: "2026-10-19",
+        last_price: 57,
+        price_target: null,
+        rating_label: null,
+        upside_pct: null,
+        pe_ratio: 6,
+        ev_ebitda: 4,
+        dividend_yield: 6,
+        revenue: 1,
+        ebitda: 1,
+        net_income: 1,
+        roic: null,
+        roic_calc: 14.06,
+        roe: 38,
+        analyst_count: 12,
+      }],
+      [
+        {
+          ric: "PETR4.SA",
+          as_of_date: "2026-10-19",
+          fiscal_year: 2028,
+          eps_mean: 1,
+          dps_mean: null,
+          quality_return_mean: 13.63,
+          quality_return_source: "roic_calc",
+        },
+        {
+          ric: "PETR4.SA",
+          as_of_date: "2026-10-19",
+          fiscal_year: 2026,
+          eps_mean: 1,
+          dps_mean: null,
+          quality_return_mean: 20.97,
+          quality_return_source: "roic_calc",
+          ebit_mean: 248_466_077_140,
+          tax_rate_mean: 30.6,
+          equity_mean: 537_279_651_200,
+          net_debt_mean: 284_997_998_570,
+        },
+      ]
+    );
+    expect(inputs[0]!.qualityReturn).toBe(20.97);
+    expect(inputs[0]!.qualitySource).toBe("roic_calc");
+    expect(inputs[0]!.roicEbit).toBe(248_466_077_140);
+    expect(inputs[0]!.roicTaxRate).toBe(30.6);
+    expect(inputs[0]!.roic).toBeCloseTo(14.06, 2);
+  });
+
+  it("P/E fwd do value vem do FY1", () => {
+    const inputs = buildFactorInputs(
+      [{ ticker: "ITUB4", ric: "ITUB4.SA", sector: "Banks", name: "Itau", gics_industry: null, updated_at: null }],
+      [{
+        ric: "ITUB4.SA",
+        as_of_date: "2026-10-19",
+        last_price: 48,
+        price_target: null,
+        rating_label: null,
+        upside_pct: null,
+        pe_ratio: 10,
+        ev_ebitda: null,
+        dividend_yield: 5,
+        revenue: 1,
+        ebitda: 1,
+        net_income: 1,
+        roic: null,
+        roe: 24,
+        analyst_count: 12,
+      }],
+      [
+        { ric: "ITUB4.SA", as_of_date: "2026-10-19", fiscal_year: 2028, eps_mean: 1, dps_mean: null, pe_fwd: 8.75 },
+        { ric: "ITUB4.SA", as_of_date: "2026-10-19", fiscal_year: 2026, eps_mean: 1, dps_mean: null, pe_fwd: 10.55 },
+      ]
+    );
+    expect(inputs[0]!.peFwd).toBe(10.55);
+  });
+
+  it("DY fwd do carry vem do FY1", () => {
+    const inputs = buildFactorInputs(
+      [{ ticker: "PETR4", ric: "PETR4.SA", sector: "Energy", name: "Petrobras", gics_industry: null, updated_at: null }],
+      [{
+        ric: "PETR4.SA",
+        as_of_date: "2026-10-19",
+        last_price: 57,
+        price_target: null,
+        rating_label: null,
+        upside_pct: null,
+        pe_ratio: 4,
+        ev_ebitda: 3,
+        dividend_yield: 6,
+        revenue: 1,
+        ebitda: 1,
+        net_income: 1,
+        roic: 14,
+        roe: 30,
+        analyst_count: 12,
+      }],
+      [
+        { ric: "PETR4.SA", as_of_date: "2026-10-19", fiscal_year: 2027, eps_mean: 1, dps_mean: 1, dy_fwd: 7.1 },
+        { ric: "PETR4.SA", as_of_date: "2026-10-19", fiscal_year: 2026, eps_mean: 1, dps_mean: 1, dy_fwd: 8.72 },
+      ]
+    );
+    expect(inputs[0]!.dyFwd).toBe(8.72);
   });
 
   it("usa day_volume do snapshot anterior se o mais recente vier vazio", () => {

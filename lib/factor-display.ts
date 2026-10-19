@@ -28,7 +28,9 @@ export function formatMetricRaw(key: string, v: number | null): string {
     key === "roic" ||
     key === "ret3m" ||
     key === "dividendYield" ||
-    key === "dyFwd"
+    key === "dyFwd" ||
+    key === "qualityReturn" ||
+    key === "roic_calc"
   ) {
     return `${formatNumber(v, 1)}%`;
   }
@@ -36,6 +38,43 @@ export function formatMetricRaw(key: string, v: number | null): string {
     return `${formatNumber(v, 1)}x`;
   }
   return formatNumber(v, 2);
+}
+
+function compactMoney(v: number): string {
+  const abs = Math.abs(v);
+  const body =
+    abs >= 1e9
+      ? `${formatNumber(v / 1e9, 1)} bi`
+      : abs >= 1e6
+        ? `${formatNumber(v / 1e6, 1)} mi`
+        : formatNumber(v, 0);
+  return v < 0 ? `(${body})` : body;
+}
+
+function taxLabel(v: number): string {
+  const rounded = Math.round(v * 10) / 10;
+  const digits = Number.isInteger(rounded) ? 0 : 1;
+  return `${formatNumber(rounded, digits)}%`;
+}
+
+/** Conta do ROIC calculado, com os números do FY1 quando existirem. */
+export function roicCalcFormulaLines(parts: {
+  ebit: number | null;
+  taxRate: number | null;
+  equity: number | null;
+  netDebt: number | null;
+}): string[] {
+  const lines = ["EBIT × (1 − alíquota) ÷ (patrimônio + dívida líquida)"];
+  if (parts.ebit == null || parts.equity == null || parts.netDebt == null) {
+    if (parts.taxRate == null) lines.push("Alíquota sem consenso: 34%.");
+    return lines;
+  }
+  const tax = parts.taxRate ?? 34;
+  lines.push(
+    `${compactMoney(parts.ebit)} × (1 − ${taxLabel(tax)}) ÷ (${compactMoney(parts.equity)} + ${compactMoney(parts.netDebt)})`
+  );
+  if (parts.taxRate == null) lines.push("Alíquota sem consenso: 34%.");
+  return lines;
 }
 
 function valueBreakdown(row: FactorRow): MetricBreakdown | undefined {

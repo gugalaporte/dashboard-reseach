@@ -22,7 +22,8 @@ import { buildFactorInputs } from "./factor-build";
 const SNAPSHOT_BASE =
   "ric,as_of_date,roe,roic,roic_calc,net_margin,ebitda_margin,current_ratio,net_debt_ebitda,pe_ratio,pb_ratio,ev_ebitda,upside_pct,ret_3m,ret_6m,dividend_yield,market_cap,day_volume,num_buys,num_holds,num_sells";
 
-const FORWARD_BASE = "ric,as_of_date,fiscal_year,pe_fwd,dy_fwd";
+const FORWARD_BASE =
+  "ric,as_of_date,fiscal_year,pe_fwd,dy_fwd,quality_return_mean,quality_return_source,ebit_mean,tax_rate_mean,equity_mean,net_debt_mean";
 
 export type FactorPayload = {
   asOfDate: string | null;

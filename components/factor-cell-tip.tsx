@@ -21,6 +21,7 @@ import {
   formatMetricRaw,
   formatRank,
   formatScore,
+  roicCalcFormulaLines,
 } from "@/lib/factor-display";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -86,6 +87,15 @@ function HoverTip({
 function FactorTipBody({ row, factor }: { row: FactorRow; factor: FactorId }) {
   const metrics = metricsForFactor(row, factor);
   const rank = factorRankOf(row, factor);
+  const calcFormula =
+    factor === "quality" && row.raw.qualitySource === "roic_calc"
+      ? roicCalcFormulaLines({
+          ebit: row.raw.roicEbit,
+          taxRate: row.raw.roicTaxRate,
+          equity: row.raw.roicEquity,
+          netDebt: row.raw.roicNetDebt,
+        })
+      : null;
 
   return (
     <div className="space-y-2">
@@ -112,6 +122,15 @@ function FactorTipBody({ row, factor }: { row: FactorRow; factor: FactorId }) {
             </li>
           ))}
         </ul>
+      )}
+      {calcFormula && (
+        <div className="space-y-1 text-[10px] leading-snug">
+          {calcFormula.map((line) => (
+            <p key={line} className="text-surface-soft/80">
+              {line}
+            </p>
+          ))}
+        </div>
       )}
       <p className="pt-1 border-t border-surface-soft/15 font-semibold tabular">
         {FACTOR_LABELS[factor]} = {formatFactorNominal(row, factor)}

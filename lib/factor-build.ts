@@ -12,15 +12,17 @@ function num(v: unknown): number | null {
   return null;
 }
 
-function newerForward(
+function winsForward(
   row: LsegForwardEstimateRow,
-  prev: LsegForwardEstimateRow
+  prev: LsegForwardEstimateRow,
+  preferHigherYear: boolean
 ): boolean {
   const d = row.as_of_date ?? "";
   const pd = prev.as_of_date ?? "";
-  if (d > pd) return true;
-  if (d < pd) return false;
-  return (Number(row.fiscal_year) || 0) > (Number(prev.fiscal_year) || 0);
+  if (d !== pd) return d > pd;
+  const y = Number(row.fiscal_year) || 0;
+  const py = Number(prev.fiscal_year) || 0;
+  return preferHigherYear ? y > py : y < py;
 }
 
 /** Forward mais recente por ric (as_of_date, depois fiscal_year). */
@@ -30,24 +32,39 @@ export function latestForwardByRic(
   const map = new Map<string, LsegForwardEstimateRow>();
   for (const row of rows) {
     const prev = map.get(row.ric);
-    if (!prev || newerForward(row, prev)) map.set(row.ric, row);
+    if (!prev || winsForward(row, prev, true)) map.set(row.ric, row);
   }
   return map;
 }
 
-/** Mesma regra, mas só entre linhas em que o campo existe.
- *  2028E costuma vir sem DY; o 2026E do mesmo dia tem o yield. */
-export function latestFilledForward(
+function filledForward(
   rows: LsegForwardEstimateRow[],
-  read: (row: LsegForwardEstimateRow) => number | null
+  read: (row: LsegForwardEstimateRow) => number | null,
+  preferHigherYear: boolean
 ): Map<string, LsegForwardEstimateRow> {
   const map = new Map<string, LsegForwardEstimateRow>();
   for (const row of rows) {
     if (read(row) == null) continue;
     const prev = map.get(row.ric);
-    if (!prev || newerForward(row, prev)) map.set(row.ric, row);
+    if (!prev || winsForward(row, prev, preferHigherYear)) map.set(row.ric, row);
   }
   return map;
+}
+
+/** Maior ano fiscal com o campo preenchido, na data mais recente. */
+export function latestFilledForward(
+  rows: LsegForwardEstimateRow[],
+  read: (row: LsegForwardEstimateRow) => number | null
+): Map<string, LsegForwardEstimateRow> {
+  return filledForward(rows, read, true);
+}
+
+/** FY1: menor ano fiscal com o campo preenchido, na data mais recente. */
+export function nearestFilledForward(
+  rows: LsegForwardEstimateRow[],
+  read: (row: LsegForwardEstimateRow) => number | null
+): Map<string, LsegForwardEstimateRow> {
+  return filledForward(rows, read, false);
 }
 
 function analystCount(snap: LsegDailySnapshotRow): number | null {
@@ -89,7 +106,9 @@ export function buildFactorInputs(
   const snaps = latestSnapshots(snapshots);
   const lastVolume = lastKnownByRic(snapshots, (r) => num(r.day_volume));
   const fwdMap = latestForwardByRic(forward);
-  const dyMap = latestFilledForward(forward, (r) => num(r.dy_fwd));
+  const dyMap = nearestFilledForward(forward, (r) => num(r.dy_fwd));
+  const qualityMap = nearestFilledForward(forward, (r) => num(r.quality_return_mean));
+  const peMap = nearestFilledForward(forward, (r) => num(r.pe_fwd));
   const byRic = new Map(companies.map((c) => [c.ric, c]));
 
   let maxAsOf: string | null = null;
@@ -109,6 +128,7 @@ export function buildFactorInputs(
         snap.ric
     );
     const fwd = fwdMap.get(snap.ric);
+    const quality = qualityMap.get(snap.ric);
 
     inputs.push({
       ticker,
@@ -118,12 +138,18 @@ export function buildFactorInputs(
       asOfDate: snap.as_of_date ?? null,
       roe: num(snap.roe),
       roic: num(snap.roic) ?? num(snap.roic_calc),
+      qualityReturn: num(quality?.quality_return_mean),
+      qualitySource: quality?.quality_return_source ?? null,
+      roicEbit: quality?.quality_return_source === "roic_calc" ? num(quality.ebit_mean) : null,
+      roicTaxRate: quality?.quality_return_source === "roic_calc" ? num(quality.tax_rate_mean) : null,
+      roicEquity: quality?.quality_return_source === "roic_calc" ? num(quality.equity_mean) : null,
+      roicNetDebt: quality?.quality_return_source === "roic_calc" ? num(quality.net_debt_mean) : null,
       netMargin: num(snap.net_margin),
       ebitdaMargin: num(snap.ebitda_margin),
       currentRatio: num(snap.current_ratio),
       netDebtEbitda: num(snap.net_debt_ebitda),
       peRatio: num(snap.pe_ratio),
-      peFwd: num(fwd?.pe_fwd),
+      peFwd: num(peMap.get(snap.ric)?.pe_fwd),
       pbRatio: num(snap.pb_ratio),
       evEbitda: num(snap.ev_ebitda),
       upsidePct: num(snap.upside_pct),
