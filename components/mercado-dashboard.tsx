@@ -210,6 +210,7 @@ export function MercadoDashboard() {
                     "IMAB11=SA",
                     "B5MB11=SA",
                     "IRFM11=SA",
+                    "PACB11=SA",
                   ])}
                 />
               </div>

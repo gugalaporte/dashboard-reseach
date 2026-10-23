@@ -83,10 +83,12 @@ const ETF_TRACKS: Record<string, string> = {
   "IMAB11=SA": "IMA-B",
   "B5MB11=SA": "IMA-B 5+",
   "IRFM11=SA": "IRF-M",
+  "PACB11=SA": "IPCA Ultra Longo",
   B5P211: "IMA-B 5",
   IMAB11: "IMA-B",
   B5MB11: "IMA-B 5+",
   IRFM11: "IRF-M",
+  PACB11: "IPCA Ultra Longo",
 };
 
 export function trackedIndex(ric: string, name: string): string | null {
@@ -270,6 +272,7 @@ const RIC_ORDER = [
   "IMAB11=SA",
   "B5MB11=SA",
   "IRFM11=SA",
+  "PACB11=SA",
   "RTDI1=B3",
   "BRCDIACC1M=RR",
   "BRCDIACC3M=RR",
