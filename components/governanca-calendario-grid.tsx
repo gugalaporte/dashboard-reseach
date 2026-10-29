@@ -14,6 +14,7 @@ import {
   type ResultadoEvent,
 } from "@/lib/governanca-calendario";
 import { empresaHref } from "@/lib/empresa";
+import { issuerKey } from "@/lib/governanca-portfolio";
 
 type Props = {
   events: ResultadoEvent[];
@@ -106,7 +107,7 @@ export function GovernancaCalendarioGrid({
                     key={e.id}
                     className={cn(
                       "mt-1 block text-[10px] leading-tight truncate",
-                      inPortfolio.has(e.ticker)
+                      inPortfolio.has(issuerKey(e.ticker))
                         ? "text-brand font-medium"
                         : "text-ink/65",
                       !cell.inMonth && "opacity-50"
@@ -164,7 +165,7 @@ function DayEvents({
             <div className="text-sm text-ink font-medium">{e.ticker}</div>
             <div className="text-xs text-ink/50 truncate">{e.name ?? "—"}</div>
           </div>
-          {inPortfolio.has(e.ticker) ? (
+          {inPortfolio.has(issuerKey(e.ticker)) ? (
             <Link
               href={empresaHref(e.ticker)}
               className="text-[10px] uppercase tracking-[0.12em] text-brand shrink-0"

@@ -1,3 +1,5 @@
+import { issuerKey } from "./governanca-portfolio";
+
 /** Tipos e grade do calendário de resultados (BancoAsset.resultados). */
 
 export type ResultadoEvent = {
@@ -14,6 +16,15 @@ export type CalCell = {
 };
 
 export const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+
+/** Fica só a carteira. PETR3 entra se a carteira tem PETR4. */
+export function eventsInPortfolio(
+  events: ResultadoEvent[],
+  portfolioTickers: string[]
+): ResultadoEvent[] {
+  const issuers = new Set(portfolioTickers.map((t) => issuerKey(t)));
+  return events.filter((e) => issuers.has(issuerKey(e.ticker)));
+}
 
 export function blankToNull(v: string | null | undefined): string | null {
   const s = v?.trim();

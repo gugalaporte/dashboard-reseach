@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   eventsInMonth,
+  eventsInPortfolio,
   firstEventIsoInMonth,
   groupEventsByDate,
   initialMonth,
@@ -66,6 +67,20 @@ describe("groupEventsByDate / eventsInMonth", () => {
     expect(eventsInMonth(events, 2026, 7).map((e) => e.ticker)).toEqual([
       "ITUB4",
       "GOAU4",
+    ]);
+  });
+});
+
+describe("eventsInPortfolio", () => {
+  it("fica na carteira e aceita outra classe do mesmo papel", () => {
+    const events = [
+      ev({ id: 1, ticker: "PETR3" }),
+      ev({ id: 2, ticker: "VALE3" }),
+      ev({ id: 3, ticker: "MGLU3" }),
+    ];
+    expect(eventsInPortfolio(events, ["PETR4", "VALE3"]).map((e) => e.ticker)).toEqual([
+      "PETR3",
+      "VALE3",
     ]);
   });
 });

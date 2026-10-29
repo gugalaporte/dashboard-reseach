@@ -6,12 +6,14 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GovernancaCalendarioGrid } from "@/components/governanca-calendario-grid";
 import {
+  eventsInPortfolio,
   firstEventIsoInMonth,
   initialMonth,
   shiftMonth,
   todayIso,
   type ResultadoEvent,
 } from "@/lib/governanca-calendario";
+import { issuerKey } from "@/lib/governanca-portfolio";
 
 type Props = { portfolioTickers?: string[] };
 
@@ -22,9 +24,14 @@ export function GovernancaCalendario({ portfolioTickers = [] }: Props) {
   const [error, setError] = React.useState<string | null>(null);
   const [cursor, setCursor] = React.useState({ year: 2026, month: 0 });
   const [selected, setSelected] = React.useState<string | null>(null);
+  const tickerKey = portfolioTickers.join(",");
   const inPortfolio = React.useMemo(
-    () => new Set(portfolioTickers.map((t) => t.toUpperCase())),
-    [portfolioTickers]
+    () => new Set(tickerKey.split(",").filter(Boolean).map((t) => issuerKey(t))),
+    [tickerKey]
+  );
+  const shown = React.useMemo(
+    () => (events ? eventsInPortfolio(events, portfolioTickers) : undefined),
+    [events, tickerKey]
   );
 
   React.useEffect(() => {
@@ -40,14 +47,7 @@ export function GovernancaCalendario({ portfolioTickers = [] }: Props) {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
         if (cancelled) return;
-        const list = json as ResultadoEvent[];
-        setEvents(list);
-        const today = todayIso();
-        const start = initialMonth(list, today);
-        setCursor(start);
-        setSelected(
-          firstEventIsoInMonth(list, start.year, start.month, today)
-        );
+        setEvents(json as ResultadoEvent[]);
       } catch (e) {
         if (!cancelled)
           setError(e instanceof Error ? e.message : "Erro ao carregar");
@@ -57,6 +57,14 @@ export function GovernancaCalendario({ portfolioTickers = [] }: Props) {
       cancelled = true;
     };
   }, [open]);
+
+  React.useEffect(() => {
+    if (!shown) return;
+    const today = todayIso();
+    const start = initialMonth(shown, today);
+    setCursor(start);
+    setSelected(firstEventIsoInMonth(shown, start.year, start.month, today));
+  }, [shown]);
 
   return (
     <>
@@ -83,11 +91,11 @@ export function GovernancaCalendario({ portfolioTickers = [] }: Props) {
                 {error}
               </p>
             )}
-            {events === undefined ? (
+            {shown === undefined ? (
               <Skeleton className="h-80 w-full m-5" />
             ) : (
               <GovernancaCalendarioGrid
-                events={events}
+                events={shown}
                 year={cursor.year}
                 month={cursor.month}
                 selected={selected}
@@ -98,7 +106,7 @@ export function GovernancaCalendario({ portfolioTickers = [] }: Props) {
                   setCursor(next);
                   setSelected(
                     firstEventIsoInMonth(
-                      events,
+                      shown,
                       next.year,
                       next.month,
                       todayIso()
