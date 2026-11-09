@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  EXTRA_TARGET_TICKERS,
   parseAmount,
   parseAmountType,
   parseSide,
@@ -12,6 +13,11 @@ describe("parseTicker", () => {
   it("normaliza e aceita papel B3", () => {
     expect(parseTicker(" petr4 ")).toBe("PETR4");
     expect(parseTicker("BPAC11")).toBe("BPAC11");
+  });
+
+  it("aceita o ETF DOLA11 nas metas", () => {
+    expect(parseTicker("dola11")).toBe("DOLA11");
+    expect(EXTRA_TARGET_TICKERS).toContain("DOLA11");
   });
 
   it("rejeita vazio ou curto demais", () => {

@@ -14,6 +14,20 @@ export function formatRank(rank: number | null | undefined): string {
   return `${rank}º`;
 }
 
+/** 1 = maior score na lista. Empate desempata pelo ticker. Sem score fica de fora. */
+export function scoreRanks(rows: readonly FactorRow[]): Map<string, number> {
+  const ordered = rows
+    .filter((row) => row.score != null)
+    .sort((a, b) => {
+      const byScore = (b.score ?? 0) - (a.score ?? 0);
+      if (byScore !== 0) return byScore;
+      return a.ticker.localeCompare(b.ticker);
+    });
+  const ranks = new Map<string, number>();
+  ordered.forEach((row, index) => ranks.set(row.ric, index + 1));
+  return ranks;
+}
+
 export function formatMetricRaw(key: string, v: number | null): string {
   if (v == null) return "–";
   if (key === "marketCap" || key === "dayVolume") {

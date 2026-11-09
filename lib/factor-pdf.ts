@@ -1,6 +1,6 @@
 import { formatDateShort } from "./format";
 import type { FactorRow, FactorWeightPct } from "./factor-scoring";
-import { formatFactorCell, formatScore } from "./factor-display";
+import { formatFactorCell, formatScore, scoreRanks } from "./factor-display";
 
 export type FactorPdfOpts = {
   rows: FactorRow[];
@@ -21,7 +21,9 @@ export function factorPdfTable(opts: FactorPdfOpts): {
   head: string[];
   body: string[][];
 } {
+  const ranks = scoreRanks(opts.rows);
   const head = [
+    "Posição",
     "Papel",
     "Setor",
     "Quality",
@@ -35,6 +37,7 @@ export function factorPdfTable(opts: FactorPdfOpts): {
 
   const body = opts.rows.map((r) => {
     const row = [
+      ranks.has(r.ric) ? String(ranks.get(r.ric)) : "–",
       r.inPortfolio ? `${r.ticker} *` : r.ticker,
       opts.sectorLabel(r) || "–",
       formatFactorCell(r, "quality"),
@@ -87,8 +90,9 @@ export async function downloadFactorPdf(opts: FactorPdfOpts): Promise<void> {
     },
     alternateRowStyles: { fillColor: [241, 241, 241] },
     columnStyles: {
-      0: { cellWidth: 22, fontStyle: "bold" },
-      7: { halign: "center", cellWidth: 16 },
+      0: { halign: "center", cellWidth: 14 },
+      1: { cellWidth: 22, fontStyle: "bold" },
+      8: { halign: "center", cellWidth: 16 },
     },
   });
 

@@ -35,6 +35,7 @@ import {
 import { FactorMobileList } from "@/components/factor-mobile-list";
 import { useRouter } from "next/navigation";
 import { empresaHref } from "@/lib/empresa";
+import { scoreRanks } from "@/lib/factor-display";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { downloadFactorPdf } from "@/lib/factor-pdf";
@@ -55,6 +56,7 @@ type FactorPayload = {
 };
 
 type SortKey =
+  | "rank"
   | "score"
   | "quality"
   | "value"
@@ -62,6 +64,8 @@ type SortKey =
   | "carry"
   | "liquidity"
   | "ticker";
+
+const STICKY_HEAD = "sticky top-0 z-10 bg-navy";
 
 function SortHead({
   label,
@@ -79,6 +83,7 @@ function SortHead({
   return (
     <TableHead
       className={cn(
+        STICKY_HEAD,
         "text-[9px] uppercase tracking-[0.14em] font-medium h-9 cursor-pointer select-none text-surface-soft/80 hover:text-surface-soft",
         align === "left" && "text-left",
         align === "center" && "text-center",
@@ -164,14 +169,27 @@ export function FactorInvestingDashboard() {
     );
   }, [data, onlyEligible, onlyPortfolio, setor, sectorSource]);
 
-  const rows = React.useMemo(() => {
-    let list = scored;
-    if (classFilter !== "all") list = list.filter((r) => r.factorClass === classFilter);
+  const listed = React.useMemo(() => {
+    if (classFilter === "all") return scored;
+    return scored.filter((r) => r.factorClass === classFilter);
+  }, [scored, classFilter]);
 
+  const scoreRankByRic = React.useMemo(() => scoreRanks(listed), [listed]);
+
+  const rows = React.useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
     const RANK_KEYS = new Set(["quality", "value", "momentum", "carry"]);
-    return [...list].sort((a, b) => {
+    return [...listed].sort((a, b) => {
       if (sortKey === "ticker") return dir * a.ticker.localeCompare(b.ticker);
+      if (sortKey === "rank") {
+        const ar = scoreRankByRic.get(a.ric);
+        const br = scoreRankByRic.get(b.ric);
+        if (ar == null && br == null) return a.ticker.localeCompare(b.ticker);
+        if (ar == null) return 1;
+        if (br == null) return -1;
+        // desc = melhor primeiro = menor posição
+        return (sortDir === "desc" ? 1 : -1) * (ar - br);
+      }
       if (RANK_KEYS.has(sortKey)) {
         const av = a[`${sortKey}Rank` as "qualityRank"];
         const bv = b[`${sortKey}Rank` as "qualityRank"];
@@ -188,7 +206,7 @@ export function FactorInvestingDashboard() {
       if (bv == null) return -1;
       return dir * (Number(av) - Number(bv));
     });
-  }, [scored, classFilter, sortKey, sortDir]);
+  }, [listed, scoreRankByRic, sortKey, sortDir]);
 
   const counts = React.useMemo(() => {
     const eligible = scored.filter((r) => r.eligible);
@@ -257,14 +275,14 @@ export function FactorInvestingDashboard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen md:min-h-0 md:h-dvh md:overflow-hidden flex flex-col">
       <AppHeader
         active="factors"
         subtitle="Screening"
         lastUpdate={data?.asOfDate}
       />
 
-      <div className="bg-surface-soft border-b border-line sticky top-14 md:top-16 z-[35]">
+      <div className="bg-surface-soft border-b border-line shrink-0 sticky top-14 z-[35] md:static">
         <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-3 md:py-4 flex flex-wrap items-center gap-2 md:gap-3">
           <div className="flex items-center gap-1 rounded-md bg-surface p-1 w-full sm:w-auto">
             <TogglePill
@@ -382,15 +400,15 @@ export function FactorInvestingDashboard() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-[1600px] w-full px-4 sm:px-6 lg:px-8 py-5 md:py-8 space-y-5 md:space-y-6 flex-1">
+      <main className="mx-auto max-w-[1600px] w-full px-4 sm:px-6 lg:px-8 py-5 md:py-8 flex-1 md:min-h-0 md:flex md:flex-col">
         {error && (
-          <p className="text-sm text-destructive bg-destructive/5 border border-destructive/20 px-4 py-3">
+          <p className="text-sm text-destructive bg-destructive/5 border border-destructive/20 px-4 py-3 mb-4 shrink-0">
             {error}
           </p>
         )}
 
-        <section>
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <section className="md:flex-1 md:min-h-0 md:flex md:flex-col">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3 shrink-0">
             <div className="min-w-0">
               <h2 className="font-display text-lg text-ink tracking-tight">
                 Screening multifatorial
@@ -421,17 +439,20 @@ export function FactorInvestingDashboard() {
             data={rows}
             isLoading={loading}
             onRowClick={openEmpresa}
+            scoreRank={scoreRankByRic}
             sectorLabel={(r) =>
               sectorForFilter(r.ticker, r.sector, sectorSource) ?? "Sem setor"
             }
           />
 
-          <div className="hidden md:block overflow-x-auto border border-line bg-white">
-            <Table>
-              <TableHeader>
+          {/* A lista rola nesta caixa. Os nomes das colunas ficam grudados no topo. */}
+          <div className="hidden md:block flex-1 min-h-0 overflow-auto scrollbar-thin border border-line bg-white">
+            <Table className="border-separate border-spacing-0">
+              <TableHeader className="sticky top-0 z-10">
                 <TableRow className="bg-navy hover:bg-navy border-none">
+                  <SortHead label="Posição" active={sortKey === "rank"} dir={sortDir} onClick={() => toggleSort("rank")} />
                   <SortHead label="Papel" active={sortKey === "ticker"} dir={sortDir} onClick={() => toggleSort("ticker")} align="left" />
-                  <TableHead className="text-[9px] uppercase tracking-[0.14em] text-surface-soft/80 font-medium h-9 text-left">
+                  <TableHead className={cn(STICKY_HEAD, "text-[9px] uppercase tracking-[0.14em] text-surface-soft/80 font-medium h-9 text-left")}>
                     Setor
                   </TableHead>
                   <SortHead label="Quality" active={sortKey === "quality"} dir={sortDir} onClick={() => toggleSort("quality")} />
@@ -439,27 +460,27 @@ export function FactorInvestingDashboard() {
                   <SortHead label="Carry" active={sortKey === "carry"} dir={sortDir} onClick={() => toggleSort("carry")} />
                   <SortHead label="Momentum" active={sortKey === "momentum"} dir={sortDir} onClick={() => toggleSort("momentum")} />
                   <SortHead label="Score" active={sortKey === "score"} dir={sortDir} onClick={() => toggleSort("score")} />
-                  <TableHead className="text-[9px] uppercase tracking-[0.14em] text-surface-soft/80 font-medium h-9 text-center">
+                  <TableHead className={cn(STICKY_HEAD, "text-[9px] uppercase tracking-[0.14em] text-surface-soft/80 font-medium h-9 text-center")}>
                     Classe
                   </TableHead>
                   {!onlyEligible && (
-                    <TableHead className="text-[9px] uppercase tracking-[0.14em] text-surface-soft/80 font-medium h-9 text-left">
+                    <TableHead className={cn(STICKY_HEAD, "text-[9px] uppercase tracking-[0.14em] text-surface-soft/80 font-medium h-9 text-left")}>
                       Motivo
                     </TableHead>
                   )}
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="[&_td]:border-b [&_td]:border-line">
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={onlyEligible ? 8 : 9} className="py-8">
+                    <TableCell colSpan={onlyEligible ? 9 : 10} className="py-8">
                       <Skeleton className="h-6 w-full" />
                     </TableCell>
                   </TableRow>
                 ) : rows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={onlyEligible ? 8 : 9}
+                      colSpan={onlyEligible ? 9 : 10}
                       className="text-center text-ink/50 py-10 text-sm"
                     >
                       Nenhuma empresa no filtro atual.
@@ -476,6 +497,9 @@ export function FactorInvestingDashboard() {
                       )}
                       onClick={() => openEmpresa(r)}
                     >
+                      <TableCell className="text-center tabular text-sm font-medium text-ink/70">
+                        {scoreRankByRic.get(r.ric) ?? "–"}
+                      </TableCell>
                       <TableCell className="font-medium text-ink tabular text-sm">
                         {r.ticker}
                         {r.inPortfolio && (

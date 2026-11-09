@@ -48,6 +48,7 @@ describe("factorPdfTable", () => {
       includeReason: false,
     });
     expect(table.head).toEqual([
+      "Posição",
       "Papel",
       "Setor",
       "Quality",
@@ -57,10 +58,12 @@ describe("factorPdfTable", () => {
       "Score",
       "Classe",
     ]);
-    expect(table.body[0]![0]).toBe("PETR4 *");
-    expect(table.body[0]![2]).toContain("12,4%");
-    expect(table.body[0]![2]).toContain("3º");
-    expect(table.body[1]![2]).toBe("–");
+    expect(table.body[0]![0]).toBe("1");
+    expect(table.body[0]![1]).toBe("PETR4 *");
+    expect(table.body[0]![3]).toContain("12,4%");
+    expect(table.body[0]![3]).toContain("3º");
+    expect(table.body[1]![0]).toBe("2");
+    expect(table.body[1]![3]).toBe("–");
     expect(table.subtitle).toContain("30%");
   });
 

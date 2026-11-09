@@ -51,6 +51,9 @@ export type TradeTargetRow = {
 const SIDES = new Set<TradeSide>(["buy", "sell"]);
 const AMOUNT_TYPES = new Set<TradeAmountType>(["qty", "value"]);
 
+/** Fora do universo de research, mas pode ter meta de compra/venda. */
+export const EXTRA_TARGET_TICKERS = ["DOLA11"] as const;
+
 export function parseTicker(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const t = v.trim().toUpperCase();

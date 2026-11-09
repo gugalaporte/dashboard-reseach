@@ -15,6 +15,8 @@ type Props = {
   isLoading: boolean;
   onRowClick?: (row: FactorRow) => void;
   sectorLabel?: (row: FactorRow) => string;
+  /** Posição pelo score. 1 = maior score. */
+  scoreRank?: Map<string, number>;
 };
 
 function FactorChip({
@@ -50,7 +52,7 @@ const CLASS_STYLES: Record<FactorClass, string> = {
  * Lista compacta para mobile — ticker, score, classe e fatores.
  * Toque abre a página consolidada da empresa.
  */
-export function FactorMobileList({ data, isLoading, onRowClick, sectorLabel }: Props) {
+export function FactorMobileList({ data, isLoading, onRowClick, sectorLabel, scoreRank }: Props) {
   if (isLoading) {
     return (
       <div className="space-y-2 md:hidden">
@@ -90,6 +92,11 @@ export function FactorMobileList({ data, isLoading, onRowClick, sectorLabel }: P
                     <span className="font-display text-[17px] text-ink truncate">
                       {row.ticker}
                     </span>
+                    {scoreRank?.has(row.ric) && (
+                      <span title="Posição" className="tabular text-[11px] text-ink/45 shrink-0">
+                        {scoreRank.get(row.ric)}
+                      </span>
+                    )}
                     {row.inPortfolio && (
                       <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500 shrink-0" />
                     )}

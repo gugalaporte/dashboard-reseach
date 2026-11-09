@@ -17,6 +17,7 @@ import {
   uniqueTickers,
 } from "./trade-target-progress";
 import {
+  EXTRA_TARGET_TICKERS,
   parseTicker,
   rowToTarget,
   type TradeTarget,
@@ -133,7 +134,7 @@ export async function loadTradeTargets(): Promise<TradeTarget[]> {
 }
 
 export async function loadTargetTickers(): Promise<string[]> {
-  const set = new Set<string>(ALLOWED_TICKERS);
+  const set = new Set<string>([...ALLOWED_TICKERS, ...EXTRA_TARGET_TICKERS]);
   try {
     const db = getResearchSupabase();
     const { data, error } = await db.from("companies").select("ticker");
