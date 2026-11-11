@@ -1,24 +1,37 @@
 /** Tipos e parse das metas de compra/venda (aba Execução). */
 
 export type TradeSide = "buy" | "sell";
-export type TradeAmountType = "qty" | "value";
+export type TradeAmountType = "qty" | "value" | "pct";
+
+/** Fundos que podem ter meta. O texto é o trading_desk de mov_ativo. */
+export const TARGET_DESKS = [
+  "FINACAP MAURITSSTAD FIF - CIA",
+  "FINACAP FIF - CI Mult CP",
+] as const;
+
+export type TargetDesk = (typeof TARGET_DESKS)[number];
+
+export const MAURITSSTAD_DESK: TargetDesk = TARGET_DESKS[0];
 
 export type TradeTarget = {
   id: string;
   ticker: string;
   side: TradeSide;
+  desk: TargetDesk;
   amountType: TradeAmountType;
   amount: number;
   startDate: string | null;
   dueDate: string | null;
   createdAt: string;
   updatedAt: string;
-  /** Ações já executadas no intervalo, só Mauritsstad. */
+  /** Ações já executadas no intervalo, no fundo da meta. */
   filledQty: number | null;
-  /** Financeiro já executado no intervalo (R$), só Mauritsstad. */
+  /** Financeiro já executado no intervalo (R$), no fundo da meta. */
   filledValue: number | null;
-  /** Meta menos o financeiro executado no intervalo, só Mauritsstad. */
+  /** Meta menos o financeiro executado no intervalo, no fundo da meta. */
   remaining: number | null;
+  /** PL mais recente do fundo. Usado quando a meta é porcentagem. */
+  fundNav: number | null;
   /** VWAP das execuções do mesmo lado no intervalo. */
   avgPrice: number | null;
   /** Último fechamento do papel. */
@@ -30,6 +43,7 @@ export type TradeTarget = {
 export type TradeTargetInput = {
   ticker: string;
   side: TradeSide;
+  desk: TargetDesk;
   amountType: TradeAmountType;
   amount: number;
   startDate: string;
@@ -40,6 +54,7 @@ export type TradeTargetRow = {
   id: string;
   ticker: string;
   side: string;
+  desk?: string | null;
   amount_type: string;
   amount: number | string;
   start_date?: string | null;
@@ -49,7 +64,7 @@ export type TradeTargetRow = {
 };
 
 const SIDES = new Set<TradeSide>(["buy", "sell"]);
-const AMOUNT_TYPES = new Set<TradeAmountType>(["qty", "value"]);
+const AMOUNT_TYPES = new Set<TradeAmountType>(["qty", "value", "pct"]);
 
 /** Fora do universo de research, mas pode ter meta de compra/venda. */
 export const EXTRA_TARGET_TICKERS = ["DOLA11"] as const;
@@ -59,6 +74,20 @@ export function parseTicker(v: unknown): string | null {
   const t = v.trim().toUpperCase();
   if (!/^[A-Z0-9]{4,8}$/.test(t)) return null;
   return t;
+}
+
+export function parseDesk(v: unknown): TargetDesk | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim().toUpperCase();
+  return TARGET_DESKS.find((d) => d.toUpperCase() === t) ?? null;
+}
+
+/** Nome curto para a tabela. O select usa o nome completo. */
+export function deskLabel(desk: string): string {
+  const found = parseDesk(desk);
+  if (found === TARGET_DESKS[1]) return "FIF - CI Mult CP";
+  if (found === TARGET_DESKS[0]) return "Mauritsstad";
+  return desk;
 }
 
 export function parseSide(v: unknown): TradeSide | null {
@@ -93,6 +122,14 @@ export function parseAmount(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/** Valor em reais, ou porcentagem do PL (maior que zero e até 100). */
+export function parseTargetAmount(type: TradeAmountType, v: unknown): number | null {
+  const n = parseAmount(v);
+  if (n == null) return null;
+  if (type === "pct" && n > 100) return null;
+  return n;
+}
+
 /** Data ISO YYYY-MM-DD. */
 export function parseDate(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -110,14 +147,20 @@ export function parseTargetInput(body: unknown): TradeTargetInput | string {
   const side = parseSide(raw.side);
   if (!side) return "side deve ser buy ou sell";
   const amountType = parseAmountType(raw.amountType) ?? "value";
-  const amount = parseAmount(raw.amount);
-  if (amount == null) return "amount deve ser um número maior que zero";
+  const amount = parseTargetAmount(amountType, raw.amount);
+  if (amount == null) {
+    return amountType === "pct"
+      ? "porcentagem deve ser maior que zero e no máximo 100"
+      : "amount deve ser um número maior que zero";
+  }
   const startDate = parseDate(raw.startDate);
   if (!startDate) return "data inicial inválida";
   const dueDate = parseDate(raw.dueDate);
   if (!dueDate) return "data 'fazer até' inválida";
   if (dueDate < startDate) return "fazer até deve ser igual ou depois da data inicial";
-  return { ticker, side, amountType, amount, startDate, dueDate };
+  const desk = raw.desk == null || raw.desk === "" ? MAURITSSTAD_DESK : parseDesk(raw.desk);
+  if (!desk) return "fundo inválido";
+  return { ticker, side, desk, amountType, amount, startDate, dueDate };
 }
 
 export function rowToTarget(row: TradeTargetRow): TradeTarget {
@@ -126,6 +169,7 @@ export function rowToTarget(row: TradeTargetRow): TradeTarget {
     id: String(row.id),
     ticker: String(row.ticker ?? "").trim().toUpperCase(),
     side: parseSide(row.side) ?? "buy",
+    desk: parseDesk(row.desk) ?? MAURITSSTAD_DESK,
     amountType: parseAmountType(row.amount_type) ?? "value",
     amount,
     startDate: parseDate(row.start_date) ?? null,
@@ -135,6 +179,7 @@ export function rowToTarget(row: TradeTargetRow): TradeTarget {
     filledQty: null,
     filledValue: null,
     remaining: null,
+    fundNav: null,
     avgPrice: null,
     currentPrice: null,
     pnlPct: null,

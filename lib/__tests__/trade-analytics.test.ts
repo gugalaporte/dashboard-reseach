@@ -69,6 +69,16 @@ describe("aggregateExecutions", () => {
     expect(base).toHaveLength(2);
   });
 
+  it("ignora ETF se a classe não for pedida e conta DOLA11 quando é", () => {
+    const rows = [row({ product: "DOLA11", amount: "100", price: "10", productclass: "ETF BR" })];
+    expect(aggregateExecutions(rows)).toHaveLength(0);
+    const etf = aggregateExecutions(rows, { productClasses: ["Equity", "ETF BR"] });
+    expect(etf).toHaveLength(1);
+    expect(etf[0]?.ric).toBe("DOLA11");
+    expect(etf[0]?.side).toBe("buy");
+    expect(etf[0]?.notional).toBe(1000);
+  });
+
   it("ignora recibo AZUL53 no volume", () => {
     const base = aggregateExecutions([
       row({ product: "AZUL53", amount: "604765000", price: "109659" }),

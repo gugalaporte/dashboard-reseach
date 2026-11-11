@@ -57,7 +57,12 @@ async function pageAll(
   const out: Record<string, unknown>[] = [];
   let from = 0;
   for (;;) {
-    let q = db.from("vlmo_movimentacoes").select(columns).in("nome_companhia", names);
+    // Ordem fixa por id. Sem isso a paginação pula linhas novas e o mês recente some.
+    let q = db
+      .from("vlmo_movimentacoes")
+      .select(columns)
+      .in("nome_companhia", names)
+      .order("id", { ascending: true });
     if (range) {
       q = q.gte("data_referencia", range.start).lt("data_referencia", range.end);
     }
@@ -71,21 +76,39 @@ async function pageAll(
   return out;
 }
 
+function monthsFrom(rows: Record<string, unknown>[]): string[] {
+  return rows
+    .filter((row) => isInsiderTrade(text(row.tipo_movimentacao)))
+    .map((row) => monthKey(isoDate(row.data_referencia)))
+    .filter((key) => key.length === 7);
+}
+
+/** Meses mais novos primeiro. A página recente não depende da varredura antiga. */
+async function recentMonths(names: string[]): Promise<string[]> {
+  const db = getResearchSupabase();
+  const { data, error } = await db
+    .from("vlmo_movimentacoes")
+    .select("data_referencia,tipo_movimentacao")
+    .in("nome_companhia", names)
+    .order("data_referencia", { ascending: false })
+    .limit(PAGE);
+  if (error) throw error;
+  return monthsFrom((data ?? []) as unknown as Record<string, unknown>[]);
+}
+
 /** Compras e vendas da carteira no mês, na versão mais recente de cada data. */
 export async function loadInsiderTrades(month?: string | null): Promise<InsiderPayload> {
   const issuers = portfolioIssuers(await portfolioTickers());
   const names = issuers.map((i) => i.cvmName);
   if (names.length === 0) return { month: null, months: [], rows: [] };
 
-  const dateRows = await pageAll(names, null, "data_referencia,tipo_movimentacao");
-  const months = [
-    ...new Set(
-      dateRows
-        .filter((row) => isInsiderTrade(text(row.tipo_movimentacao)))
-        .map((row) => monthKey(isoDate(row.data_referencia)))
-        .filter((key) => key.length === 7)
-    ),
-  ].sort((a, b) => b.localeCompare(a));
+  const [dateRows, fresh] = await Promise.all([
+    pageAll(names, null, "data_referencia,tipo_movimentacao"),
+    recentMonths(names),
+  ]);
+  const months = [...new Set([...monthsFrom(dateRows), ...fresh])].sort((a, b) =>
+    b.localeCompare(a)
+  );
 
   const asked = (month ?? "").trim().slice(0, 7);
   const selected = months.includes(asked) ? asked : (months[0] ?? null);

@@ -211,9 +211,10 @@ export function excludeStockConversions<T extends ReturnType<typeof aggregateExe
   return executions.filter((ex) => !toRemove.has(executionKey(ex)));
 }
 
-/** Agrega fills do dia por papel e lado. */
+/** Agrega fills do dia por papel e lado. Por padrão só Equity; metas também pedem ETF BR. */
 export function aggregateExecutions(
-  rows: MovAtivoRow[]
+  rows: MovAtivoRow[],
+  options?: { productClasses?: readonly string[] }
 ): Omit<
   DayExecution,
   | "marketClose"
@@ -236,8 +237,10 @@ export function aggregateExecutions(
     trader: string;
   }>();
 
+  const classes = new Set(options?.productClasses ?? ["Equity"]);
+
   for (const row of rows) {
-    if (!isEquityTrade(row)) continue;
+    if (!classes.has(row.productclass) || !isListedEquityTicker(row.product)) continue;
     const iso = parseMovTradeDate(row.trade_date);
     if (!iso) continue;
 

@@ -59,9 +59,60 @@ describe("parseTargetInput", () => {
       side: "buy",
       amountType: "qty",
       amount: 10000,
+      desk: "FINACAP MAURITSSTAD FIF - CIA",
       startDate: "2026-09-21",
       dueDate: "2026-10-15",
     });
+  });
+
+  it("aceita o fundo FIF - CI Mult CP", () => {
+    const parsed = parseTargetInput({
+      ticker: "DOLA11",
+      side: "buy",
+      amount: 1000,
+      startDate: "2026-08-01",
+      dueDate: "2026-12-31",
+      desk: "finacap fif - ci mult cp",
+    });
+    expect(parsed).toMatchObject({ desk: "FINACAP FIF - CI Mult CP" });
+  });
+
+  it("aceita porcentagem do fundo até 100", () => {
+    const parsed = parseTargetInput({
+      ticker: "VALE3",
+      side: "buy",
+      amountType: "pct",
+      amount: "2,5",
+      startDate: "2026-09-21",
+      dueDate: "2026-10-15",
+    });
+    expect(parsed).toMatchObject({ amountType: "pct", amount: 2.5 });
+  });
+
+  it("rejeita porcentagem acima de 100", () => {
+    expect(
+      parseTargetInput({
+        ticker: "VALE3",
+        side: "buy",
+        amountType: "pct",
+        amount: 150,
+        startDate: "2026-09-21",
+        dueDate: "2026-10-15",
+      })
+    ).toBe("porcentagem deve ser maior que zero e no máximo 100");
+  });
+
+  it("rejeita fundo fora da lista", () => {
+    expect(
+      parseTargetInput({
+        ticker: "VALE3",
+        side: "buy",
+        amount: 1,
+        startDate: "2026-09-21",
+        dueDate: "2026-10-15",
+        desk: "outro fundo",
+      })
+    ).toBe("fundo inválido");
   });
 
   it("assume valor financeiro se o tipo vier vazio", () => {
@@ -78,6 +129,7 @@ describe("parseTargetInput", () => {
       side: "buy",
       amountType: "value",
       amount: 1500000,
+      desk: "FINACAP MAURITSSTAD FIF - CIA",
       startDate: "2026-09-21",
       dueDate: "2026-10-15",
     });
@@ -123,6 +175,7 @@ describe("rowToTarget", () => {
     });
     expect(t.ticker).toBe("POMO4");
     expect(t.side).toBe("sell");
+    expect(t.desk).toBe("FINACAP MAURITSSTAD FIF - CIA");
     expect(t.amountType).toBe("value");
     expect(t.amount).toBe(250000);
     expect(t.startDate).toBe("2026-09-01");
@@ -134,6 +187,7 @@ describe("enums", () => {
   it("aceita qty/value e buy/sell", () => {
     expect(parseAmountType("qty")).toBe("qty");
     expect(parseAmountType("value")).toBe("value");
+    expect(parseAmountType("pct")).toBe("pct");
     expect(parseAmountType("shares")).toBe(null);
     expect(parseSide("buy")).toBe("buy");
     expect(parseSide("sell")).toBe("sell");

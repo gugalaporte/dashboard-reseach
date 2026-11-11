@@ -7,7 +7,7 @@ import {
   targetProgress,
   type TargetFillTrade,
 } from "../trade-target-progress";
-import type { TradeTarget } from "../trade-targets";
+import { TARGET_DESKS, type TradeTarget } from "../trade-targets";
 
 function trade(partial: Partial<TargetFillTrade> & Pick<TargetFillTrade, "qty" | "notional">): TargetFillTrade {
   return {
@@ -24,6 +24,7 @@ function target(partial: Partial<TradeTarget> = {}): TradeTarget {
     id: "1",
     ticker: "PETR4",
     side: "buy",
+    desk: MAURITSSTAD_DESK,
     amountType: "qty",
     amount: 10000,
     startDate: "2026-09-01",
@@ -33,6 +34,7 @@ function target(partial: Partial<TradeTarget> = {}): TradeTarget {
     filledQty: null,
     filledValue: null,
     remaining: null,
+    fundNav: null,
     avgPrice: null,
     currentPrice: null,
     pnlPct: null,
@@ -74,6 +76,36 @@ describe("targetProgress", () => {
     expect(p.filledValue).toBe(0);
     expect(p.remaining).toBe(10000);
     expect(p.avgPrice).toBe(null);
+  });
+
+  it("conta só o fundo da meta", () => {
+    const desk = TARGET_DESKS[1];
+    const p = targetProgress(target({ desk }), [
+      trade({ qty: 1000, notional: 10_000 }),
+      trade({ tradingDesk: desk, qty: 2000, notional: 20_000 }),
+    ]);
+    expect(p.filledQty).toBe(2000);
+    expect(p.filledValue).toBe(20_000);
+  });
+
+  it("converte porcentagem do PL em reais e desconta o executado", () => {
+    const p = targetProgress(
+      target({ amountType: "pct", amount: 2 }),
+      [trade({ qty: 1000, notional: 500_000 })],
+      100_000_000
+    );
+    expect(p.filledValue).toBe(500_000);
+    expect(p.remaining).toBe(1_500_000);
+  });
+
+  it("sem PL não calcula o restante da porcentagem", () => {
+    const p = targetProgress(
+      target({ amountType: "pct", amount: 2 }),
+      [trade({ qty: 1, notional: 10 })],
+      null
+    );
+    expect(p.filledValue).toBe(10);
+    expect(p.remaining).toBe(null);
   });
 
   it("sem datas não calcula", () => {

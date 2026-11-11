@@ -1,7 +1,6 @@
-import type { TradeSide, TradeTarget } from "./trade-targets";
+import { MAURITSSTAD_DESK, type TradeSide, type TradeTarget } from "./trade-targets";
 
-/** Único fundo desta tabela de metas. */
-export const MAURITSSTAD_DESK = "FINACAP MAURITSSTAD FIF - CIA";
+export { MAURITSSTAD_DESK };
 
 export type TargetFillTrade = {
   ric: string;
@@ -20,12 +19,23 @@ export function isMauritsstadDesk(desk: string): boolean {
   return desk.trim().toUpperCase() === MAURITSSTAD_DESK.toUpperCase();
 }
 
+/** Meta em reais. Porcentagem vira (pct / 100) × PL. */
+export function targetGoalValue(
+  target: Pick<TradeTarget, "amountType" | "amount">,
+  fundNav: number | null
+): number | null {
+  if (target.amountType !== "pct") return target.amount;
+  if (fundNav == null || !(fundNav > 0)) return null;
+  return (target.amount / 100) * fundNav;
+}
+
 export function targetProgress(
   target: Pick<
     TradeTarget,
-    "ticker" | "side" | "amountType" | "amount" | "startDate" | "dueDate"
+    "ticker" | "side" | "desk" | "amountType" | "amount" | "startDate" | "dueDate"
   >,
-  trades: TargetFillTrade[]
+  trades: TargetFillTrade[],
+  fundNav: number | null = null
 ): { filledQty: number | null; filledValue: number | null; remaining: number | null; avgPrice: number | null } {
   if (!target.startDate || !target.dueDate) {
     return { filledQty: null, filledValue: null, remaining: null, avgPrice: null };
@@ -34,9 +44,10 @@ export function targetProgress(
   let qty = 0;
   let notional = 0;
   const ticker = normTicker(target.ticker);
+  const desk = (target.desk ?? MAURITSSTAD_DESK).trim().toUpperCase();
 
   for (const t of trades) {
-    if (!isMauritsstadDesk(t.tradingDesk)) continue;
+    if (t.tradingDesk.trim().toUpperCase() !== desk) continue;
     if (normTicker(t.ric) !== ticker) continue;
     if (t.side !== target.side) continue;
     if (t.tradeDateIso < target.startDate || t.tradeDateIso > target.dueDate) continue;
@@ -44,20 +55,36 @@ export function targetProgress(
     notional += t.notional;
   }
 
+  const goal = targetGoalValue(target, fundNav);
   const filled = target.amountType === "qty" ? qty : notional;
   return {
     filledQty: qty,
     filledValue: notional,
-    remaining: target.amount - filled,
+    remaining: goal == null ? null : goal - filled,
     avgPrice: qty > 0 ? notional / qty : null,
   };
 }
 
+function navOf(navByDesk: ReadonlyMap<string, number>, desk: string): number | null {
+  return navByDesk.get(desk.trim().toUpperCase()) ?? null;
+}
+
+export function attachFundNav(
+  targets: TradeTarget[],
+  navByDesk: ReadonlyMap<string, number>
+): TradeTarget[] {
+  return targets.map((target) => ({ ...target, fundNav: navOf(navByDesk, target.desk) }));
+}
+
 export function attachTargetProgress(
   targets: TradeTarget[],
-  trades: TargetFillTrade[]
+  trades: TargetFillTrade[],
+  navByDesk: ReadonlyMap<string, number> = new Map()
 ): TradeTarget[] {
-  return targets.map((target) => ({ ...target, ...targetProgress(target, trades) }));
+  return targets.map((target) => {
+    const fundNav = navOf(navByDesk, target.desk) ?? target.fundNav;
+    return { ...target, fundNav, ...targetProgress(target, trades, fundNav) };
+  });
 }
 
 /** Lucro/prejuízo vs o preço médio da execução no intervalo. */

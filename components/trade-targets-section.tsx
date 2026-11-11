@@ -23,7 +23,18 @@ import {
 import { TickerSearch } from "@/components/ticker-search";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateShort, formatValue } from "@/lib/format";
-import { parseAmount, parseDate, type TradeSide, type TradeTarget } from "@/lib/trade-targets";
+import { targetGoalValue } from "@/lib/trade-target-progress";
+import {
+  deskLabel,
+  MAURITSSTAD_DESK,
+  parseDate,
+  parseTargetAmount,
+  TARGET_DESKS,
+  type TargetDesk,
+  type TradeAmountType,
+  type TradeSide,
+  type TradeTarget,
+} from "@/lib/trade-targets";
 import { cn } from "@/lib/utils";
 
 type Props = { extraTickers?: string[] };
@@ -34,8 +45,10 @@ function formatMoney(n: number | null | undefined): string {
 }
 
 const EMPTY = {
+  desk: MAURITSSTAD_DESK as TargetDesk,
   ticker: "",
   side: "" as "" | TradeSide,
+  amountType: "value" as Extract<TradeAmountType, "value" | "pct">,
   amount: "",
   startDate: "",
   dueDate: "",
@@ -88,7 +101,7 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
   const canSave = Boolean(
     draft.ticker &&
       draft.side &&
-      parseAmount(draft.amount) &&
+      parseTargetAmount(draft.amountType, draft.amount) &&
       parseDate(draft.startDate) &&
       parseDate(draft.dueDate)
   );
@@ -104,7 +117,8 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
         body: JSON.stringify({
           ticker: draft.ticker,
           side: draft.side,
-          amountType: "value",
+          desk: draft.desk,
+          amountType: draft.amountType,
           amount: draft.amount,
           startDate: draft.startDate,
           dueDate: draft.dueDate,
@@ -140,11 +154,29 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
       <div className="px-4 py-3 border-b border-line bg-surface">
         <h2 className="font-display text-[15px] text-ink">Metas de Compra/Venda</h2>
         <p className="text-[11px] text-ink/50 mt-0.5">
-          Fundo FINACAP MAURITSSTAD FIF - CIA · restante e preço médio no intervalo das datas
+          Valor em reais ou porcentagem do PL do fundo. Restante no intervalo das datas.
         </p>
       </div>
 
       <div className="px-4 py-3 border-b border-line bg-surface-soft/80 flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <label className="text-[10px] uppercase tracking-wide text-ink/50">Fundo</label>
+          <Select
+            value={draft.desk}
+            onValueChange={(v) => setDraft((p) => ({ ...p, desk: v as TargetDesk }))}
+          >
+            <SelectTrigger className="w-[280px] h-8 text-xs bg-surface border-line">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TARGET_DESKS.map((desk) => (
+                <SelectItem key={desk} value={desk} className="text-xs">
+                  {desk}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-1">
           <label className="text-[10px] uppercase tracking-wide text-ink/50">Empresa</label>
           <TickerSearch
@@ -171,14 +203,34 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
           </Select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] uppercase tracking-wide text-ink/50">Valor</label>
-          <Input
-            inputMode="decimal"
-            value={draft.amount}
-            onChange={(e) => setDraft((p) => ({ ...p, amount: e.target.value }))}
-            placeholder="1.500.000"
-            className="w-[140px] h-8 text-xs bg-surface border-line tabular"
-          />
+          <label className="text-[10px] uppercase tracking-wide text-ink/50">Meta</label>
+          <div className="flex gap-1.5">
+            <Select
+              value={draft.amountType}
+              onValueChange={(v) =>
+                setDraft((p) => ({
+                  ...p,
+                  amountType: v as "value" | "pct",
+                  amount: "",
+                }))
+              }
+            >
+              <SelectTrigger className="w-[132px] h-8 text-xs bg-surface border-line">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="value" className="text-xs">Valor</SelectItem>
+                <SelectItem value="pct" className="text-xs">% do fundo</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              inputMode="decimal"
+              value={draft.amount}
+              onChange={(e) => setDraft((p) => ({ ...p, amount: e.target.value }))}
+              placeholder={draft.amountType === "pct" ? "5" : "1.500.000"}
+              className="w-[120px] h-8 text-xs bg-surface border-line tabular"
+            />
+          </div>
         </div>
         <div className="space-y-1">
           <label className="text-[10px] uppercase tracking-wide text-ink/50">Data inicial</label>
@@ -214,6 +266,7 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
             <TableRow className="bg-navy hover:bg-navy border-none">
               {[
                 "Papel",
+                "Fundo",
                 "Lado",
                 "Meta",
                 "Realizado",
@@ -236,13 +289,13 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={10} className="py-8">
+                <TableCell colSpan={11} className="py-8">
                   <Skeleton className="h-6 w-full" />
                 </TableCell>
               </TableRow>
             ) : targets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-ink/50 py-8 text-sm">
+                <TableCell colSpan={11} className="text-center text-ink/50 py-8 text-sm">
                   Nenhuma meta cadastrada.
                 </TableCell>
               </TableRow>
@@ -250,6 +303,9 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
               targets.map((t, i) => (
                 <TableRow key={t.id} className={cn("border-line", i % 2 === 0 ? "bg-surface-soft" : "bg-white")}>
                   <TableCell className="text-center font-medium text-ink tabular">{t.ticker}</TableCell>
+                  <TableCell className="text-center text-xs text-ink/70" title={t.desk}>
+                    {deskLabel(t.desk)}
+                  </TableCell>
                   <TableCell className="text-center">
                     <Badge
                       variant="outline"
@@ -263,8 +319,24 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
                       {t.side === "buy" ? "Compra" : "Venda"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-center tabular text-sm font-medium text-ink">
-                    {formatMoney(t.amount)}
+                  <TableCell
+                    className="text-center tabular text-sm font-medium text-ink"
+                    title={
+                      t.amountType === "pct" && t.fundNav != null
+                        ? `PL ${formatMoney(t.fundNav)}`
+                        : undefined
+                    }
+                  >
+                    {t.amountType === "pct" ? (
+                      <>
+                        <div>{formatValue(t.amount, "pct")}</div>
+                        <div className="text-[11px] font-normal text-ink/50">
+                          {formatMoney(targetGoalValue(t, t.fundNav))}
+                        </div>
+                      </>
+                    ) : (
+                      formatMoney(t.amount)
+                    )}
                   </TableCell>
                   <TableCell className="text-center tabular text-sm font-medium text-ink">
                     {formatMoney(t.filledValue)}
