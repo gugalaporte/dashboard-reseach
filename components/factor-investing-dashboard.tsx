@@ -17,6 +17,7 @@ import {
 import {
   DEFAULT_ELIGIBILITY,
   DEFAULT_WEIGHT_PCT,
+  FEW_FACTORS_REASON,
   scoreFactors,
   weightsFromPct,
   type FactorClass,
@@ -39,7 +40,7 @@ import { scoreRanks } from "@/lib/factor-display";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { downloadFactorPdf } from "@/lib/factor-pdf";
-import { Star } from "lucide-react";
+import { Search, Star } from "lucide-react";
 import {
   FINACAP_BOOKS,
   sectorForFilter,
@@ -101,6 +102,7 @@ export function FactorInvestingDashboard() {
   const [data, setData] = React.useState<FactorPayload | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [query, setQuery] = React.useState("");
   const [setor, setSetor] = React.useState<string | undefined>();
   const [sectorSource, setSectorSource] = React.useState<SectorSource>("bovespa");
   const [classFilter, setClassFilter] = React.useState<FactorClass | "all">("all");
@@ -155,7 +157,13 @@ export function FactorInvestingDashboard() {
   const scored = React.useMemo(() => {
     if (!data) return [];
     let list = data.rows;
-    if (onlyEligible) list = list.filter((r) => r.eligible || r.inPortfolio);
+    if (onlyEligible) {
+      list = list.filter(
+        (r) =>
+          (r.eligible || r.inPortfolio) &&
+          r.ineligibleReason !== FEW_FACTORS_REASON
+      );
+    }
     if (onlyPortfolio) list = list.filter((r) => r.inPortfolio);
     if (setor) {
       list = list.filter(
@@ -208,6 +216,12 @@ export function FactorInvestingDashboard() {
     });
   }, [listed, scoreRankByRic, sortKey, sortDir]);
 
+  const shown = React.useMemo(() => {
+    const q = query.trim().toUpperCase();
+    if (!q) return rows;
+    return rows.filter((r) => r.ticker.toUpperCase().includes(q));
+  }, [rows, query]);
+
   const counts = React.useMemo(() => {
     const eligible = scored.filter((r) => r.eligible);
     return {
@@ -234,6 +248,7 @@ export function FactorInvestingDashboard() {
   const appliedWeights = data?.weights ?? DEFAULT_WEIGHT_PCT;
 
   const hasFilters =
+    query.trim() !== "" ||
     setor !== undefined ||
     classFilter !== "all" ||
     !onlyEligible ||
@@ -246,6 +261,7 @@ export function FactorInvestingDashboard() {
     weightInputs.momentum !== String(DEFAULT_WEIGHT_PCT.momentum);
 
   function clearFilters() {
+    setQuery("");
     setSetor(undefined);
     setClassFilter("all");
     setOnlyEligible(true);
@@ -256,11 +272,11 @@ export function FactorInvestingDashboard() {
   }
 
   async function savePdf() {
-    if (rows.length === 0 || savingPdf) return;
+    if (shown.length === 0 || savingPdf) return;
     setSavingPdf(true);
     try {
       await downloadFactorPdf({
-        rows,
+        rows: shown,
         asOfDate: data?.asOfDate ?? null,
         weights: appliedWeights,
         sectorLabel: (r) =>
@@ -284,6 +300,16 @@ export function FactorInvestingDashboard() {
 
       <div className="bg-surface-soft border-b border-line shrink-0 sticky top-14 z-[35] md:static">
         <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-3 md:py-4 flex flex-wrap items-center gap-2 md:gap-3">
+          <div className="relative w-full sm:w-[180px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink/40 pointer-events-none" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar papel"
+              aria-label="Buscar papel"
+              className="h-8 pl-8 text-xs bg-surface border-line"
+            />
+          </div>
           <div className="flex items-center gap-1 rounded-md bg-surface p-1 w-full sm:w-auto">
             <TogglePill
               active={sectorSource === "lseg"}
@@ -413,7 +439,7 @@ export function FactorInvestingDashboard() {
               <h2 className="font-display text-lg text-ink tracking-tight">
                 Screening multifatorial
                 <span className="ml-2 font-sans text-sm text-ink/45 tabular font-normal tracking-normal">
-                  {formatNumber(rows.length)} {rows.length === 1 ? "empresa" : "empresas"}
+                  {formatNumber(shown.length)} {shown.length === 1 ? "empresa" : "empresas"}
                 </span>
               </h2>
               <p className="text-xs text-ink/45 mt-0.5 leading-relaxed">
@@ -428,7 +454,7 @@ export function FactorInvestingDashboard() {
               variant="outline"
               size="sm"
               className="h-8 text-[11px] uppercase tracking-[0.08em] shrink-0"
-              disabled={loading || rows.length === 0 || savingPdf}
+              disabled={loading || shown.length === 0 || savingPdf}
               onClick={() => void savePdf()}
             >
               {savingPdf ? "Salvando…" : "Salvar PDF"}
@@ -436,7 +462,7 @@ export function FactorInvestingDashboard() {
           </div>
 
           <FactorMobileList
-            data={rows}
+            data={shown}
             isLoading={loading}
             onRowClick={openEmpresa}
             scoreRank={scoreRankByRic}
@@ -477,7 +503,7 @@ export function FactorInvestingDashboard() {
                       <Skeleton className="h-6 w-full" />
                     </TableCell>
                   </TableRow>
-                ) : rows.length === 0 ? (
+                ) : shown.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={onlyEligible ? 9 : 10}
@@ -487,7 +513,7 @@ export function FactorInvestingDashboard() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((r, i) => (
+                  shown.map((r, i) => (
                     <TableRow
                       key={r.ric}
                       className={cn(

@@ -120,6 +120,46 @@ describe("scoreFactors", () => {
     expect(ranked.every((r) => r.factorClass != null)).toBe(true);
   });
 
+  it("descarta quem tem menos de 2 dos 4 fatores", () => {
+    const rows = scoreFactors([
+      base({
+        ticker: "ONE",
+        ric: "ONE.SA",
+        sector: "Energy",
+        qualityReturn: null,
+        evEbitda: null,
+        ret3m: 20,
+        dyFwd: null,
+      }),
+      base({ ticker: "FULL", ric: "FULL.SA", sector: "Energy" }),
+    ]);
+    const one = rows.find((r) => r.ticker === "ONE")!;
+    expect(one.eligible).toBe(false);
+    expect(one.ineligibleReason).toBe("Menos de 2 fatores");
+    expect(one.score).toBeNull();
+    expect(rows.find((r) => r.ticker === "FULL")!.eligible).toBe(true);
+  });
+
+  it("mantém quem tem exatamente 2 fatores", () => {
+    const rows = scoreFactors([
+      base({
+        ticker: "TWO",
+        ric: "TWO.SA",
+        sector: "Energy",
+        ret3m: null,
+        dyFwd: null,
+      }),
+      base({ ticker: "FULL", ric: "FULL.SA", sector: "Energy", dyFwd: 3 }),
+    ]);
+    const two = rows.find((r) => r.ticker === "TWO")!;
+    expect(two.eligible).toBe(true);
+    expect(two.quality).not.toBeNull();
+    expect(two.value).not.toBeNull();
+    expect(two.momentum).toBeNull();
+    expect(two.carry).toBeNull();
+    expect(two.score).not.toBeNull();
+  });
+
   it("empresa em carteira não cai por volume abaixo do mínimo", () => {
     const rows = scoreFactors(
       [

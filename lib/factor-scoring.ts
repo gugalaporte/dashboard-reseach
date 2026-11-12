@@ -10,7 +10,7 @@ export type FactorEligibility = {
 };
 
 export const DEFAULT_ELIGIBILITY: FactorEligibility = {
-  minDayVolume: 3_000_000,
+  minDayVolume: 2_000_000,
   maxNetDebtEbitda: 8,
 };
 
@@ -312,6 +312,17 @@ export function assignRanks(
   return out;
 }
 
+/** Precisa de pelo menos 2 entre quality, value, momentum e carry. */
+export const MIN_PRESENT_FACTORS = 2;
+
+export const FEW_FACTORS_REASON = "Menos de 2 fatores";
+
+export function presentFactorCount(
+  values: Array<number | null | undefined>
+): number {
+  return values.filter((v) => v != null && Number.isFinite(v)).length;
+}
+
 /** 1º vira a última posição do grupo, para o maior número valer mais. */
 export function pointsFromRank(rank: number | null, count: number): number | null {
   if (rank == null || count <= 0) return null;
@@ -473,6 +484,8 @@ export function scoreFactors(
     const momentum =
       typeof row.ret3m === "number" && Number.isFinite(row.ret3m) ? row.ret3m : null;
     const carry = carryPart.raw;
+    const enoughFactors =
+      presentFactorCount([quality, value, momentum, carry]) >= MIN_PRESENT_FACTORS;
 
     const breakdown: MetricBreakdown[] = [returnPart, valuePart];
     for (const m of MOMENTUM_METRICS) {
@@ -527,7 +540,8 @@ export function scoreFactors(
       score: null,
       percentile: null,
       factorClass: null,
-      eligible: true,
+      eligible: enoughFactors,
+      ineligibleReason: enoughFactors ? undefined : FEW_FACTORS_REASON,
       inPortfolio: Boolean(row.inPortfolio),
       breakdown,
       raw: row,
