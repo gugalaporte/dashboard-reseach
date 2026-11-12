@@ -34,6 +34,7 @@ describe("sectorForFilter", () => {
     expect(sectorForFilter("AZUL3", "Transportation", "bovespa")).toBe("Transporte");
     expect(sectorForFilter("CVCB3", "Consumer", "bovespa")).toBe("Serviços");
     expect(sectorForFilter("TEND3", null, "bovespa")).toBe("Construção civil");
+    expect(sectorForFilter("MDNE3", null, "bovespa")).toBe("Construção civil");
     expect(sectorForFilter("BMGB4", null, "bovespa")).toBe("Intermediários financeiros");
     expect(sectorForFilter("LIGT3", null, "finacap")).toBe("Utilities");
   });

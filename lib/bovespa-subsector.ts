@@ -49,7 +49,7 @@ const TICKERS_BY_SUBSECTOR: Record<BovespaSubsector, readonly string[]> = {
   Comércio: ["BHIA3", "RIAA3"],
   "Comércio e distribuição": ["GMAT3", "PGMN3"],
   "Computadores e equipamentos": ["MLAS3"],
-  "Construção civil": ["MRVE3", "CYRE3", "DIRR3", "CURY3", "PLPL3", "TEND3"],
+  "Construção civil": ["MRVE3", "CYRE3", "DIRR3", "CURY3", "PLPL3", "TEND3", "MDNE3"],
   Diversos: ["RENT3", "COGN3", "VAMO3", "RENT4", "ANIM3", "MOVI3", "VTRU3"],
   Educação: ["YDUQ3"],
   "Energia elétrica": [
