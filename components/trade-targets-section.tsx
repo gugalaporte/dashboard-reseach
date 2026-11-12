@@ -23,7 +23,7 @@ import {
 import { TickerSearch } from "@/components/ticker-search";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateShort, formatValue } from "@/lib/format";
-import { targetGoalValue } from "@/lib/trade-target-progress";
+import { navShare, targetGoalValue } from "@/lib/trade-target-progress";
 import {
   deskLabel,
   MAURITSSTAD_DESK,
@@ -42,6 +42,11 @@ type Props = { extraTickers?: string[] };
 function formatMoney(n: number | null | undefined): string {
   if (n == null) return "–";
   return formatValue(n, "money", "R$");
+}
+
+function formatNavShare(value: number | null, fundNav: number | null): string {
+  const share = navShare(value, fundNav);
+  return share == null ? "–" : formatValue(share, "pct");
 }
 
 const EMPTY = {
@@ -339,7 +344,14 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
                     )}
                   </TableCell>
                   <TableCell className="text-center tabular text-sm font-medium text-ink">
-                    {formatMoney(t.filledValue)}
+                    {t.amountType === "pct" ? (
+                      <>
+                        <div>{formatNavShare(t.filledValue, t.fundNav)}</div>
+                        <div className="text-[11px] font-normal text-ink/50">{formatMoney(t.filledValue)}</div>
+                      </>
+                    ) : (
+                      formatMoney(t.filledValue)
+                    )}
                   </TableCell>
                   <TableCell
                     className={cn(
@@ -347,7 +359,14 @@ export function TradeTargetsSection({ extraTickers = [] }: Props) {
                       t.remaining != null && t.remaining <= 0 ? "text-brand" : "text-ink"
                     )}
                   >
-                    {formatMoney(t.remaining)}
+                    {t.amountType === "pct" ? (
+                      <>
+                        <div>{formatNavShare(t.remaining, t.fundNav)}</div>
+                        <div className="text-[11px] font-normal text-ink/50">{formatMoney(t.remaining)}</div>
+                      </>
+                    ) : (
+                      formatMoney(t.remaining)
+                    )}
                   </TableCell>
                   <TableCell className="text-center tabular text-sm text-ink">
                     {t.avgPrice != null ? formatValue(t.avgPrice, "money", "R$") : "–"}

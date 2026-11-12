@@ -19,6 +19,12 @@ export function isMauritsstadDesk(desk: string): boolean {
   return desk.trim().toUpperCase() === MAURITSSTAD_DESK.toUpperCase();
 }
 
+/** Valor em reais como porcentagem do PL. */
+export function navShare(value: number | null, fundNav: number | null): number | null {
+  if (value == null || fundNav == null || !(fundNav > 0)) return null;
+  return (value / fundNav) * 100;
+}
+
 /** Meta em reais. Porcentagem vira (pct / 100) × PL. */
 export function targetGoalValue(
   target: Pick<TradeTarget, "amountType" | "amount">,

@@ -3,6 +3,7 @@ import {
   attachMarketMarks,
   attachTargetProgress,
   MAURITSSTAD_DESK,
+  navShare,
   targetPnl,
   targetProgress,
   type TargetFillTrade,
@@ -41,6 +42,15 @@ function target(partial: Partial<TradeTarget> = {}): TradeTarget {
     ...partial,
   };
 }
+
+describe("navShare", () => {
+  it("converte o valor executado em porcentagem do PL", () => {
+    expect(navShare(1_500_000, 100_000_000)).toBe(1.5);
+    expect(navShare(0, 100_000_000)).toBe(0);
+    expect(navShare(null, 100_000_000)).toBe(null);
+    expect(navShare(10, 0)).toBe(null);
+  });
+});
 
 describe("targetProgress", () => {
   it("soma compras do papel no intervalo e calcula restante e VWAP", () => {
