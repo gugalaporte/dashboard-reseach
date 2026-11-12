@@ -1,19 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-// Fraunces: display/serif editorial (titulos, numeros grandes, nome da empresa).
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+// Arquivos locais de propósito: o next/font/google quebra o build quando
+// o Google devolve a fonte sem extensão no nome do arquivo.
+const fraunces = localFont({
+  src: "./fonts/fraunces-latin.woff2",
+  weight: "400 600",
   variable: "--font-fraunces",
   display: "swap",
 });
 
-// Inter: UI/labels/celulas.
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+const inter = localFont({
+  src: "./fonts/inter-latin.woff2",
+  weight: "100 900",
   variable: "--font-inter",
   display: "swap",
 });
