@@ -7,6 +7,7 @@ import {
   isInsiderTrade,
   keepLatestVersion,
   monthRange,
+  tradeIso,
   portfolioIssuers,
   type InsiderTrade,
 } from "../insider-trades";
@@ -31,9 +32,9 @@ describe("isInsiderTrade", () => {
 describe("keepLatestVersion", () => {
   it("fica com a versão maior de cada companhia e data", () => {
     const rows = keepLatestVersion([
-      { cnpj: "1", date: "2026-01-01", versao: 1, id: "a" },
-      { cnpj: "1", date: "2026-01-01", versao: 2, id: "b" },
-      { cnpj: "2", date: "2026-01-01", versao: 1, id: "c" },
+      { cnpj: "1", refDate: "2026-01-01", versao: 1, id: "a" },
+      { cnpj: "1", refDate: "2026-01-01", versao: 2, id: "b" },
+      { cnpj: "2", refDate: "2026-01-01", versao: 1, id: "c" },
     ]);
     expect(rows.map((r) => r.id)).toEqual(["b", "c"]);
   });
@@ -41,6 +42,8 @@ describe("keepLatestVersion", () => {
 
 describe("mês e cargo", () => {
   it("formata o mês e o intervalo da consulta", () => {
+    expect(tradeIso("2026-10-08", "2026-10-01")).toBe("2026-10-08");
+    expect(tradeIso(null, "2026-10-01")).toBe("2026-10-01");
     expect(formatMonthLabel("2026-09")).toBe("setembro 2026");
     expect(monthRange("2026-09")).toEqual({
       start: "2026-09-01",

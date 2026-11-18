@@ -221,9 +221,9 @@ export function MercadoDashboard() {
               <div className="grid lg:grid-cols-2 gap-4">
                 <MercadoReturnTable rows={credit} />
                 <MercadoLineChart
-                  title="IDA-DI"
+                  title="IDA e LETO"
                   days={days}
-                  series={seriesOf(payload, [".ANBIIDADI"])}
+                  series={seriesOf(payload, [".ANBIIDADI", ".ANBIIDAIPCA", "LTMG11=SA"])}
                 />
               </div>
             </Section>

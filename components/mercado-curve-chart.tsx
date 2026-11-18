@@ -33,6 +33,9 @@ export function MercadoCurveChart({ board }: Props) {
         <h4 className="text-[10px] uppercase tracking-[0.14em] font-medium text-ink/70">
           {board.label}
         </h4>
+        {board.detail && (
+          <p className="text-[11px] text-ink/45 mt-0.5 leading-snug">{board.detail}</p>
+        )}
       </div>
       <div className="px-1 py-2 h-[240px]">
         {empty ? (

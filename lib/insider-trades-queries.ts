@@ -8,6 +8,7 @@ import {
   monthRange,
   portfolioIssuers,
   tickerByCvmName,
+  tradeIso,
   type InsiderPayload,
   type InsiderTrade,
 } from "./insider-trades";
@@ -15,7 +16,7 @@ import {
 const PAGE = 1000;
 
 const COLS =
-  "id,cnpj_companhia,nome_companhia,data_referencia,versao,tipo_cargo,tipo_movimentacao,caracteristica_valor_mobiliario,quantidade,preco_unitario,volume";
+  "id,cnpj_companhia,nome_companhia,data_referencia,data_movimentacao,versao,tipo_cargo,tipo_movimentacao,caracteristica_valor_mobiliario,quantidade,preco_unitario,volume";
 
 function num(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -64,7 +65,7 @@ async function pageAll(
       .in("nome_companhia", names)
       .order("id", { ascending: true });
     if (range) {
-      q = q.gte("data_referencia", range.start).lt("data_referencia", range.end);
+      q = q.gte("data_movimentacao", range.start).lt("data_movimentacao", range.end);
     }
     const { data, error } = await q.range(from, from + PAGE - 1);
     if (error) throw error;
@@ -79,7 +80,7 @@ async function pageAll(
 function monthsFrom(rows: Record<string, unknown>[]): string[] {
   return rows
     .filter((row) => isInsiderTrade(text(row.tipo_movimentacao)))
-    .map((row) => monthKey(isoDate(row.data_referencia)))
+    .map((row) => monthKey(tradeIso(row.data_movimentacao, row.data_referencia)))
     .filter((key) => key.length === 7);
 }
 
@@ -88,9 +89,9 @@ async function recentMonths(names: string[]): Promise<string[]> {
   const db = getResearchSupabase();
   const { data, error } = await db
     .from("vlmo_movimentacoes")
-    .select("data_referencia,tipo_movimentacao")
+    .select("data_movimentacao,data_referencia,tipo_movimentacao")
     .in("nome_companhia", names)
-    .order("data_referencia", { ascending: false })
+    .order("data_movimentacao", { ascending: false })
     .limit(PAGE);
   if (error) throw error;
   return monthsFrom((data ?? []) as unknown as Record<string, unknown>[]);
@@ -103,7 +104,7 @@ export async function loadInsiderTrades(month?: string | null): Promise<InsiderP
   if (names.length === 0) return { month: null, months: [], rows: [] };
 
   const [dateRows, fresh] = await Promise.all([
-    pageAll(names, null, "data_referencia,tipo_movimentacao"),
+    pageAll(names, null, "data_movimentacao,data_referencia,tipo_movimentacao"),
     recentMonths(names),
   ]);
   const months = [...new Set([...monthsFrom(dateRows), ...fresh])].sort((a, b) =>
@@ -122,12 +123,13 @@ export async function loadInsiderTrades(month?: string | null): Promise<InsiderP
       const company = text(row.nome_companhia) ?? "";
       const movimentacao = text(row.tipo_movimentacao) ?? "";
       if (!isInsiderTrade(movimentacao)) return null;
-      const trade: InsiderTrade & { cnpj: string } = {
+      const trade: InsiderTrade & { cnpj: string; refDate: string } = {
         id: num(row.id) ?? 0,
         cnpj: text(row.cnpj_companhia) ?? company,
         ticker: byName.get(company) ?? "",
         company,
-        date: isoDate(row.data_referencia),
+        date: tradeIso(row.data_movimentacao, row.data_referencia),
+        refDate: isoDate(row.data_referencia) || tradeIso(row.data_movimentacao, row.data_referencia),
         versao: num(row.versao) ?? 0,
         cargo: text(row.tipo_cargo),
         movimentacao,
@@ -138,7 +140,7 @@ export async function loadInsiderTrades(month?: string | null): Promise<InsiderP
       };
       return trade;
     })
-    .filter((row): row is InsiderTrade & { cnpj: string } => row != null && Boolean(row.ticker));
+    .filter((row): row is InsiderTrade & { cnpj: string; refDate: string } => row != null && Boolean(row.ticker));
 
   const rows = keepLatestVersion(parsed)
     .map((row) => ({

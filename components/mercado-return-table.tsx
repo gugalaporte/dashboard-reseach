@@ -42,6 +42,20 @@ function level(row: MarketRow): string {
   return n;
 }
 
+function AssetSpec({ row }: { row: MarketRow }) {
+  const spec =
+    row.tracks ??
+    (row.group === "credit" ||
+    row.group === "fi_anbima" ||
+    row.group === "commodity" ||
+    !row.enabled
+      ? row.notes
+      : null);
+  if (spec) return <div className="text-[10px] text-ink/40">{spec}</div>;
+  if (!row.enabled) return <div className="text-[10px] text-ink/40">Sem série</div>;
+  return null;
+}
+
 type Props = {
   rows: MarketRow[];
   emptyHint?: string;
@@ -84,15 +98,7 @@ export function MercadoReturnTable({ rows, emptyHint }: Props) {
             <TableRow key={row.ric} className="cursor-default hover:bg-line/40">
               <TableCell className="text-sm">
                 <div className="font-medium text-ink">{row.name}</div>
-                {row.tracks ? (
-                  <div className="text-[10px] text-ink/40">{row.tracks}</div>
-                ) : (
-                  !row.enabled && (
-                    <div className="text-[10px] text-ink/40">
-                      {row.notes ?? "Sem série"}
-                    </div>
-                  )
-                )}
+                <AssetSpec row={row} />
               </TableCell>
               <TableCell className="text-right font-mono text-sm tabular">
                 {level(row)}

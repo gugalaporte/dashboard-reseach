@@ -137,6 +137,19 @@ export function monthKey(iso: string): string {
   return iso.slice(0, 7);
 }
 
+function isoDay(value: unknown): string {
+  const day = String(value ?? "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "";
+}
+
+/**
+ * Dia da compra ou venda.
+ * data_referencia da CVM é o dia 1 do mês do informe. A data real está em data_movimentacao.
+ */
+export function tradeIso(movement: unknown, reference: unknown): string {
+  return isoDay(movement) || isoDay(reference);
+}
+
 /** Rótulo do mês, ex.: setembro 2026. */
 export function formatMonthLabel(month: string): string {
   const [year, raw] = month.split("-");
@@ -253,18 +266,18 @@ export function tickerByCvmName(
   return new Map(issuers.map((i) => [i.cvmName, i.ticker]));
 }
 
-type VersionRow = { cnpj: string; date: string; versao: number };
+type VersionRow = { cnpj: string; refDate: string; versao: number };
 
 /**
  * Em cada companhia e data de referência, fica só a versão maior.
- * Versão maior é a mais recente.
+ * Versão maior é a mais recente. A data da operação não entra nessa chave.
  */
 export function keepLatestVersion<T extends VersionRow>(rows: T[]): T[] {
   const max = new Map<string, number>();
   for (const row of rows) {
-    const key = `${row.cnpj}|${row.date}`;
+    const key = `${row.cnpj}|${row.refDate}`;
     const cur = max.get(key);
     if (cur == null || row.versao > cur) max.set(key, row.versao);
   }
-  return rows.filter((row) => row.versao === max.get(`${row.cnpj}|${row.date}`));
+  return rows.filter((row) => row.versao === max.get(`${row.cnpj}|${row.refDate}`));
 }

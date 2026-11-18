@@ -143,5 +143,76 @@ describe("buildMarketPayload", () => {
     expect(payload.series["B5P211=SA"]?.length).toBe(2);
     expect(payload.rows.some((r) => r.group === "curve")).toBe(false);
     expect(payload.curves[0]?.points[0]?.now).toBe(14.1);
+    expect(payload.curves[0]?.detail).toBeNull();
+  });
+
+  it("descreve cada curva e deixa o TIPS depois do Treasury", () => {
+    const curve = (
+      ric: string,
+      curveId: string,
+      notes: string
+    ): MarketInst => ({
+      ric,
+      name: curveId,
+      group_code: "curve",
+      quote_type: "yield_pct",
+      currency: curveId === "TIPS" || curveId === "UST" ? "USD" : "BRL",
+      curve_id: curveId,
+      tenor: "10Y",
+      enabled: true,
+      notes,
+    });
+    const payload = buildMarketPayload(
+      [
+        curve("US10YTIP=RR", "TIPS", "Juro real dos TIPS dos EUA, acima do CPI, % a.a."),
+        curve("BR10YT=RR", "BRBMK", "Juro prefixado nominal dos títulos públicos brasileiros, % a.a."),
+        curve("US10YT=RR", "UST", "Juro nominal dos Treasuries dos EUA, % a.a."),
+      ],
+      [
+        { ric: "US10YTIP=RR", trade_date: "2026-09-08", value: 1.8 },
+        { ric: "BR10YT=RR", trade_date: "2026-09-08", value: 13 },
+        { ric: "US10YT=RR", trade_date: "2026-09-08", value: 4.1 },
+      ]
+    );
+    expect(payload.curves.map((c) => c.id)).toEqual(["BRBMK", "UST", "TIPS"]);
+    expect(payload.curves[2]?.label).toBe("TIPS");
+    expect(payload.curves[2]?.detail).toMatch(/CPI/);
+    expect(payload.curves[2]?.points[0]?.now).toBe(1.8);
+  });
+
+  it("coloca o ETF Leto em crédito e descreve o IDA-IPCA", () => {
+    const payload = buildMarketPayload(
+      [
+        {
+          ric: "LTMG11=SA",
+          name: "LTMG11",
+          group_code: "fi_anbima",
+          quote_type: "price",
+          currency: "BRL",
+          curve_id: null,
+          tenor: null,
+          enabled: true,
+          notes: "Leto Idex CDI Margem (ex-JGP)",
+        },
+        {
+          ric: ".ANBIIDAIPCA",
+          name: "IDA-IPCA",
+          group_code: "credit",
+          quote_type: "index_level",
+          currency: "BRL",
+          curve_id: null,
+          tenor: null,
+          enabled: true,
+          notes: null,
+        },
+      ],
+      []
+    );
+    const leto = payload.rows.find((r) => r.ric === "LTMG11=SA");
+    const ipca = payload.rows.find((r) => r.ric === ".ANBIIDAIPCA");
+    expect(leto?.group).toBe("credit");
+    expect(leto?.notes).toBe("Leto Idex CDI Margem (ex-JGP)");
+    expect(ipca?.tracks).toBe("Debêntures IPCA");
+    expect(payload.rows.filter((r) => r.group === "fi_anbima")).toHaveLength(0);
   });
 });

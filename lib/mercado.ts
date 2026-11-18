@@ -47,6 +47,8 @@ export type CurveTenor = {
 export type CurveBoard = {
   id: string;
   label: string;
+  /** O que a curva mede, em uma linha. */
+  detail: string | null;
   points: CurveTenor[];
 };
 
@@ -62,6 +64,7 @@ export const CURVE_LABELS: Record<string, string> = {
   BRLPRE: "DI zero",
   BRNTNB: "NTN-B",
   UST: "Treasury",
+  TIPS: "TIPS",
 };
 
 const NAME_PT: Record<string, string> = {
@@ -89,6 +92,10 @@ const ETF_TRACKS: Record<string, string> = {
   B5MB11: "IMA-B 5+",
   IRFM11: "IRF-M",
   PACB11: "IPCA Ultra Longo",
+  ".ANBIIDAIPCA": "Debêntures IPCA",
+  ".ANBIIDADI": "Debêntures DI",
+  "IDA-IPCA": "Debêntures IPCA",
+  "IDA-DI": "Debêntures DI",
 };
 
 export function trackedIndex(ric: string, name: string): string | null {
@@ -197,7 +204,7 @@ function toRow(inst: MarketInst, series: MarketPoint[]): MarketRow {
   return {
     ric: inst.ric,
     name: displayName(inst.name),
-    group: inst.group_code,
+    group: inst.ric === "LTMG11=SA" || inst.name === "LTMG11" ? "credit" : inst.group_code,
     quoteType: inst.quote_type,
     currency: inst.currency,
     enabled: inst.enabled,
@@ -244,11 +251,16 @@ function buildCurves(
     boards.push({
       id,
       label: CURVE_LABELS[id] ?? id,
+      detail: insts.find((inst) => inst.notes)?.notes ?? null,
       points,
     });
   }
-  const order = ["BRBMK", "BRLPRE", "BRNTNB", "UST"];
-  boards.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+  const order = ["BRBMK", "BRLPRE", "BRNTNB", "UST", "TIPS"];
+  const rank = (id: string) => {
+    const i = order.indexOf(id);
+    return i === -1 ? order.length : i;
+  };
+  boards.sort((a, b) => rank(a.id) - rank(b.id));
   return boards;
 }
 
@@ -279,6 +291,8 @@ const RIC_ORDER = [
   "BRCDIACC6M=RR",
   "BRCDIACC1Y=RR",
   ".ANBIIDADI",
+  ".ANBIIDAIPCA",
+  "LTMG11=SA",
   "JGPIDEX",
   "BRL=",
   ".DXY",
