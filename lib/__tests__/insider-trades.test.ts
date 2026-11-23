@@ -9,6 +9,8 @@ import {
   monthRange,
   tradeIso,
   portfolioIssuers,
+  positionShare,
+  sumOpeningPositions,
   type InsiderTrade,
 } from "../insider-trades";
 
@@ -83,7 +85,15 @@ describe("mês e cargo", () => {
       row({ id: 1, volume: 100, movimentacao: "Venda à vista", cargo: "Controlador ou Vinculado" }),
       row({ id: 2, volume: 40 }),
       row({ id: 3, volume: 10, movimentacao: "Venda", cargo: "Diretor ou Vinculado" }),
-    ])).toEqual({ buys: 1, sells: 2, buyVolume: 40, sellVolume: 110, netVolume: -70 });
+    ])).toEqual({
+      buys: 1,
+      sells: 2,
+      buyVolume: 40,
+      sellVolume: 110,
+      buyQty: 10,
+      sellQty: 20,
+      netVolume: -70,
+    });
   });
 
   it("soma compras e vendas por empresa", () => {
@@ -121,6 +131,25 @@ describe("mês e cargo", () => {
       sellVolume: 5,
       netVolume: -5,
     });
+  });
+});
+
+describe("posição inicial", () => {
+  it("mede a quantidade negociada sobre o Saldo inicial", () => {
+    expect(positionShare(25, 100)).toBe(25);
+    expect(positionShare(10, 0)).toBeNull();
+  });
+
+  it("soma o saldo do mesmo cargo", () => {
+    const rows = sumOpeningPositions([
+      { ticker: "BPAC11", cargo: "Diretor ou Vinculado", quantidade: 10 },
+      { ticker: "BPAC11", cargo: "Diretor ou Vinculado", quantidade: 5 },
+      { ticker: "BPAC11", cargo: "Conselho de Administração ou Vinculado", quantidade: 7 },
+    ]);
+    expect(rows).toEqual([
+      { ticker: "BPAC11", cargo: "Diretor ou Vinculado", quantidade: 15 },
+      { ticker: "BPAC11", cargo: "Conselho de Administração ou Vinculado", quantidade: 7 },
+    ]);
   });
 });
 

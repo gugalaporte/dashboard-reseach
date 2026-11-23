@@ -49,10 +49,18 @@ export type InsiderTrade = {
   volume: number | null;
 };
 
+/** Posição do Saldo inicial, somada por empresa e cargo. */
+export type OpeningPosition = {
+  ticker: string;
+  cargo: string;
+  quantidade: number;
+};
+
 export type InsiderPayload = {
   month: string | null;
   months: string[];
   rows: InsiderTrade[];
+  opening: OpeningPosition[];
 };
 
 export type InsiderTotals = {
@@ -60,6 +68,8 @@ export type InsiderTotals = {
   sells: number;
   buyVolume: number;
   sellVolume: number;
+  buyQty: number;
+  sellQty: number;
   /** Compras menos vendas. */
   netVolume: number;
 };
@@ -71,16 +81,21 @@ export function tradeTotals(rows: InsiderTrade[]): InsiderTotals {
     sells: 0,
     buyVolume: 0,
     sellVolume: 0,
+    buyQty: 0,
+    sellQty: 0,
     netVolume: 0,
   };
   for (const row of rows) {
     const volume = row.volume ?? 0;
+    const qty = row.quantidade ?? 0;
     if (normMove(row.movimentacao).startsWith("compra")) {
       totals.buys += 1;
       totals.buyVolume += volume;
+      totals.buyQty += qty;
     } else if (normMove(row.movimentacao).startsWith("venda")) {
       totals.sells += 1;
       totals.sellVolume += volume;
+      totals.sellQty += qty;
     }
   }
   totals.netVolume = totals.buyVolume - totals.sellVolume;
@@ -102,11 +117,9 @@ export function totalsByCompany(rows: InsiderTrade[]): CompanyTotals[] {
     .sort((a, b) => a.ticker.localeCompare(b.ticker, "pt"));
 }
 
-export type InsiderCargoGroup = {
+export type InsiderCargoGroup = InsiderTotals & {
   cargo: string;
   rows: InsiderTrade[];
-  buyVolume: number;
-  sellVolume: number;
 };
 
 const MONTHS_PT = [
@@ -199,6 +212,30 @@ export function isInsiderTrade(tipo: string | null | undefined): boolean {
   return TRADES.has(normMove(tipo));
 }
 
+export function isOpeningBalance(tipo: string | null | undefined): boolean {
+  return normMove(tipo) === "saldo inicial";
+}
+
+/** Quantidade negociada sobre o Saldo inicial, em porcentagem. */
+export function positionShare(tradedQty: number, openingQty: number): number | null {
+  if (!(openingQty > 0)) return null;
+  return (tradedQty / openingQty) * 100;
+}
+
+/** Soma o Saldo inicial de cada empresa e cargo. */
+export function sumOpeningPositions(
+  rows: OpeningPosition[]
+): OpeningPosition[] {
+  const map = new Map<string, OpeningPosition>();
+  for (const row of rows) {
+    const key = `${row.ticker}|${row.cargo}`;
+    const current = map.get(key);
+    if (current) current.quantidade += row.quantidade;
+    else map.set(key, { ticker: row.ticker, cargo: row.cargo, quantidade: row.quantidade });
+  }
+  return [...map.values()];
+}
+
 function classRank(ticker: string): number {
   const m = displayTicker(ticker).match(/^[A-Z]{4}(\d+)/);
   const cls = m?.[1] ?? "999";
@@ -240,16 +277,7 @@ export function groupByCargo(rows: InsiderTrade[]): InsiderCargoGroup[] {
   }
 
   return [...byCargo.entries()]
-    .map(([cargo, list]) => {
-      let buyVolume = 0;
-      let sellVolume = 0;
-      for (const row of list) {
-        const volume = row.volume ?? 0;
-        if (normMove(row.movimentacao).startsWith("compra")) buyVolume += volume;
-        else if (normMove(row.movimentacao).startsWith("venda")) sellVolume += volume;
-      }
-      return { cargo, rows: list, buyVolume, sellVolume };
-    })
+    .map(([cargo, list]) => ({ cargo, rows: list, ...tradeTotals(list) }))
     .sort((a, b) => {
       const ai = CARGO_ORDER.indexOf(a.cargo);
       const bi = CARGO_ORDER.indexOf(b.cargo);

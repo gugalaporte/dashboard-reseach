@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ChevronRight } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateShort, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,7 @@ import {
   formatMonthLabel,
   groupByCargo,
   normMove,
+  positionShare,
   totalsByCompany,
   type CompanyTotals,
   type InsiderPayload,
@@ -92,38 +94,81 @@ function Rows({ rows, showTicker = false }: { rows: InsiderTrade[]; showTicker?:
 function sideCell(count: number, volume: number, tone: "buy" | "sell"): React.ReactNode {
   if (count === 0) return <span className="text-ink/30">–</span>;
   return (
-    <span className={tone === "buy" ? "text-emerald-800" : "text-rose-800"}>
-      {reais(volume)}
-      <span className="text-ink/40">
-        {" "}
-        · {count} {count === 1 ? "op." : "ops."}
-      </span>
-    </span>
+    <span className={tone === "buy" ? "text-emerald-800" : "text-rose-800"}>{reais(volume)}</span>
   );
 }
 
-function CompanyDetail({ rows }: { rows: InsiderTrade[] }) {
+/** Quantidade e preço médio (volume dividido pela quantidade). */
+function ShareCell({ traded, opening }: { traded: number; opening: number }) {
+  const pct = positionShare(traded, opening);
+  return (
+    <td className="px-4 py-2 tabular text-right">
+      {pct == null ? <span className="text-ink/30">–</span> : `${formatNumber(pct, 2)}%`}
+    </td>
+  );
+}
+
+function QtyPrice({ qty, volume }: { qty: number; volume: number }) {
+  const empty = qty <= 0;
+  return (
+    <>
+      <td className="px-4 py-2 tabular text-right">{empty ? "–" : formatNumber(qty, 0)}</td>
+      <td className="px-4 py-2 tabular text-right">
+        {empty ? "–" : formatNumber(volume / qty, 2)}
+      </td>
+    </>
+  );
+}
+
+function CargoRows({
+  ticker,
+  rows,
+  openingByCargo,
+  onOpen,
+}: {
+  ticker: string;
+  rows: InsiderTrade[];
+  openingByCargo: Map<string, number>;
+  onOpen: (cargo: string, rows: InsiderTrade[]) => void;
+}) {
   const groups = groupByCargo(rows);
   return (
-    <div className="bg-surface-soft/40 border-t border-line divide-y divide-line">
-      {groups.map((group) => (
-        <div key={group.cargo}>
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-2.5 bg-surface-soft">
-            <p className="text-sm font-medium text-ink">{group.cargo}</p>
-            <p className="text-[11px] text-ink/50 tabular">
-              {group.rows.length} {group.rows.length === 1 ? "operação" : "operações"}
-              {group.buyVolume > 0 && (
-                <span className="text-emerald-800"> · compra {reais(group.buyVolume)}</span>
+    <>
+      {groups.map((group) => {
+        const net = group.buyVolume - group.sellVolume;
+        return (
+          <tr
+            key={group.cargo}
+            className="text-[13px] border-t border-white cursor-pointer bg-white hover:bg-surface-soft"
+            onClick={() => onOpen(group.cargo, group.rows)}
+          >
+            <td className="px-4 py-2 pl-10 text-ink/80">{group.cargo}</td>
+            <td className="px-4 py-2 tabular text-right">
+              {sideCell(group.buys, group.buyVolume, "buy")}
+            </td>
+            <QtyPrice qty={group.buyQty} volume={group.buyVolume} />
+            <td className="px-4 py-2 tabular text-right">
+              {sideCell(group.sells, group.sellVolume, "sell")}
+            </td>
+            <QtyPrice qty={group.sellQty} volume={group.sellVolume} />
+            <td
+              className={cn(
+                "px-4 py-2 tabular text-right",
+                net > 0 && "text-emerald-800",
+                net < 0 && "text-rose-800",
+                net === 0 && "text-ink/30"
               )}
-              {group.sellVolume > 0 && (
-                <span className="text-rose-800"> · venda {reais(group.sellVolume)}</span>
-              )}
-            </p>
-          </div>
-          <Rows rows={group.rows} />
-        </div>
-      ))}
-    </div>
+            >
+              {net === 0 ? "–" : reais(net)}
+            </td>
+            <ShareCell
+              traded={group.buyQty + group.sellQty}
+              opening={openingByCargo.get(`${ticker}|${group.cargo}`) ?? 0}
+            />
+          </tr>
+        );
+      })}
+    </>
   );
 }
 
@@ -132,21 +177,43 @@ function CompanyTotalsTable({
   tradesByTicker,
   open,
   onToggle,
+  openingByTicker,
+  openingByCargo,
 }: {
   rows: CompanyTotals[];
   tradesByTicker: Map<string, InsiderTrade[]>;
   open: string | null;
   onToggle: (ticker: string) => void;
+  openingByTicker: Map<string, number>;
+  openingByCargo: Map<string, number>;
 }) {
+  const [detail, setDetail] = React.useState<{
+    ticker: string;
+    cargo: string;
+    rows: InsiderTrade[];
+  } | null>(null);
+  const detailRows = detail
+    ? [...detail.rows].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)
+    : [];
+
+  React.useEffect(() => {
+    setDetail(null);
+  }, [open]);
+
   return (
-    <div className="overflow-x-auto border border-line bg-white">
+    <div className="overflow-x-auto border border-navy/20 bg-white">
       <table className="w-full text-left min-w-[28rem]">
         <thead>
-          <tr className="text-[10px] uppercase tracking-[0.12em] text-ink/40">
+          <tr className="text-[10px] uppercase tracking-[0.12em] text-white/80 bg-navy">
             <th className="px-4 py-2 font-medium">Empresa</th>
             <th className="px-4 py-2 font-medium text-right">Compras</th>
+            <th className="px-4 py-2 font-medium text-right">Qtd</th>
+            <th className="px-4 py-2 font-medium text-right">Preço médio</th>
             <th className="px-4 py-2 font-medium text-right">Vendas</th>
+            <th className="px-4 py-2 font-medium text-right">Qtd</th>
+            <th className="px-4 py-2 font-medium text-right">Preço médio</th>
             <th className="px-4 py-2 font-medium text-right">Volume líquido</th>
+            <th className="px-4 py-2 font-medium text-right">% posição</th>
           </tr>
         </thead>
         <tbody>
@@ -155,7 +222,7 @@ function CompanyTotalsTable({
             return (
               <React.Fragment key={row.ticker}>
                 <tr
-                  className="text-[13px] border-t border-line cursor-pointer hover:bg-surface-soft"
+                  className="text-[13px] border-t border-white cursor-pointer bg-brand/10 hover:bg-brand/20"
                   onClick={() => onToggle(row.ticker)}
                 >
                   <td className="px-4 py-2 font-medium">
@@ -171,7 +238,9 @@ function CompanyTotalsTable({
                     </span>
                   </td>
                   <td className="px-4 py-2 tabular text-right">{sideCell(row.buys, row.buyVolume, "buy")}</td>
+                  <QtyPrice qty={row.buyQty} volume={row.buyVolume} />
                   <td className="px-4 py-2 tabular text-right">{sideCell(row.sells, row.sellVolume, "sell")}</td>
+                  <QtyPrice qty={row.sellQty} volume={row.sellVolume} />
                   <td
                     className={cn(
                       "px-4 py-2 tabular text-right",
@@ -182,19 +251,37 @@ function CompanyTotalsTable({
                   >
                     {row.netVolume === 0 ? "–" : reais(row.netVolume)}
                   </td>
+                  <ShareCell
+                    traded={row.buyQty + row.sellQty}
+                    opening={openingByTicker.get(row.ticker) ?? 0}
+                  />
                 </tr>
                 {expanded && (
-                  <tr className="border-t border-line">
-                    <td colSpan={4} className="p-0">
-                      <CompanyDetail rows={tradesByTicker.get(row.ticker) ?? []} />
-                    </td>
-                  </tr>
+                  <CargoRows
+                    ticker={row.ticker}
+                    rows={tradesByTicker.get(row.ticker) ?? []}
+                    openingByCargo={openingByCargo}
+                    onOpen={(cargo, cargoRows) =>
+                      setDetail({ ticker: row.ticker, cargo, rows: cargoRows })
+                    }
+                  />
                 )}
               </React.Fragment>
             );
           })}
         </tbody>
       </table>
+      <Dialog open={detail != null} onOpenChange={(next) => !next && setDetail(null)}>
+        <DialogContent>
+          <div className="px-5 py-4 border-b border-line pr-12">
+            <DialogTitle className="text-base font-medium text-ink">{detail?.ticker}</DialogTitle>
+            <p className="text-sm text-ink/55 mt-0.5">{detail?.cargo}</p>
+          </div>
+          <div className="overflow-auto">
+            <Rows rows={detailRows} />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -241,6 +328,14 @@ export function GovernancaInsider() {
     ? payload.rows.filter((row) => !company || row.ticker === company)
     : [];
   const companyTotals = totalsByCompany(visible);
+  const openingByTicker = new Map<string, number>();
+  const openingByCargo = new Map<string, number>();
+  for (const row of payload?.opening ?? []) {
+    if (company && row.ticker !== company) continue;
+    openingByTicker.set(row.ticker, (openingByTicker.get(row.ticker) ?? 0) + row.quantidade);
+    const key = `${row.ticker}|${row.cargo}`;
+    openingByCargo.set(key, (openingByCargo.get(key) ?? 0) + row.quantidade);
+  }
   const tradesByTicker = React.useMemo(() => {
     const map = new Map<string, InsiderTrade[]>();
     const rows = (payload?.rows ?? []).filter((row) => !company || row.ticker === company);
@@ -258,7 +353,7 @@ export function GovernancaInsider() {
         <div>
           <h2 className="font-display text-lg text-ink tracking-tight">Insider trade</h2>
           <p className="text-xs text-ink/45 mt-0.5">
-            Carteira · uma linha por empresa. Clique para ver as operações.
+            Carteira · uma linha por empresa. Clique no cargo para ver as operações.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -312,6 +407,8 @@ export function GovernancaInsider() {
           tradesByTicker={tradesByTicker}
           open={open}
           onToggle={(ticker) => setOpen((current) => (current === ticker ? null : ticker))}
+          openingByTicker={openingByTicker}
+          openingByCargo={openingByCargo}
         />
       )}
       {payload && companyTotals.length === 0 && (

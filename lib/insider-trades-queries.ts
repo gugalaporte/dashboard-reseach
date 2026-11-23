@@ -3,14 +3,17 @@ import "server-only";
 import { getResearchSupabase } from "./supabase-research";
 import {
   isInsiderTrade,
+  isOpeningBalance,
   keepLatestVersion,
   monthKey,
   monthRange,
   portfolioIssuers,
+  sumOpeningPositions,
   tickerByCvmName,
   tradeIso,
   type InsiderPayload,
   type InsiderTrade,
+  type OpeningPosition,
 } from "./insider-trades";
 
 const PAGE = 1000;
@@ -77,6 +80,33 @@ async function pageAll(
   return out;
 }
 
+/** Saldo inicial do mês. A data da operação vem vazia; vale a data de referência. */
+async function pageOpening(
+  names: string[],
+  range: { start: string; end: string }
+): Promise<Record<string, unknown>[]> {
+  const db = getResearchSupabase();
+  const out: Record<string, unknown>[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await db
+      .from("vlmo_movimentacoes")
+      .select("cnpj_companhia,nome_companhia,data_referencia,versao,tipo_cargo,tipo_movimentacao,quantidade")
+      .in("nome_companhia", names)
+      .ilike("tipo_movimentacao", "Saldo Inicial")
+      .gte("data_referencia", range.start)
+      .lt("data_referencia", range.end)
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as unknown as Record<string, unknown>[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
 function monthsFrom(rows: Record<string, unknown>[]): string[] {
   return rows
     .filter((row) => isInsiderTrade(text(row.tipo_movimentacao)))
@@ -101,7 +131,7 @@ async function recentMonths(names: string[]): Promise<string[]> {
 export async function loadInsiderTrades(month?: string | null): Promise<InsiderPayload> {
   const issuers = portfolioIssuers(await portfolioTickers());
   const names = issuers.map((i) => i.cvmName);
-  if (names.length === 0) return { month: null, months: [], rows: [] };
+  if (names.length === 0) return { month: null, months: [], rows: [], opening: [] };
 
   const [dateRows, fresh] = await Promise.all([
     pageAll(names, null, "data_movimentacao,data_referencia,tipo_movimentacao"),
@@ -114,10 +144,13 @@ export async function loadInsiderTrades(month?: string | null): Promise<InsiderP
   const asked = (month ?? "").trim().slice(0, 7);
   const selected = months.includes(asked) ? asked : (months[0] ?? null);
   const range = selected ? monthRange(selected) : null;
-  if (!selected || !range) return { month: null, months, rows: [] };
+  if (!selected || !range) return { month: null, months, rows: [], opening: [] };
 
   const byName = tickerByCvmName(issuers);
-  const raw = await pageAll(names, range, COLS);
+  const [raw, openingRaw] = await Promise.all([
+    pageAll(names, range, COLS),
+    pageOpening(names, range),
+  ]);
   const parsed = raw
     .map((row) => {
       const company = text(row.nome_companhia) ?? "";
@@ -158,5 +191,29 @@ export async function loadInsiderTrades(month?: string | null): Promise<InsiderP
     }))
     .sort((a, b) => a.ticker.localeCompare(b.ticker) || a.movimentacao.localeCompare(b.movimentacao));
 
-  return { month: selected, months, rows };
+  const opening = openingPositions(openingRaw, byName);
+  return { month: selected, months, rows, opening };
+}
+
+function openingPositions(
+  raw: Record<string, unknown>[],
+  byName: Map<string, string>
+): OpeningPosition[] {
+  const parsed = raw
+    .map((row) => {
+      const company = text(row.nome_companhia) ?? "";
+      if (!isOpeningBalance(text(row.tipo_movimentacao))) return null;
+      const ticker = byName.get(company) ?? "";
+      if (!ticker) return null;
+      return {
+        cnpj: text(row.cnpj_companhia) ?? company,
+        refDate: isoDate(row.data_referencia),
+        versao: num(row.versao) ?? 0,
+        ticker,
+        cargo: text(row.tipo_cargo)?.trim() || "Sem cargo",
+        quantidade: num(row.quantidade) ?? 0,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row != null);
+  return sumOpeningPositions(keepLatestVersion(parsed));
 }
