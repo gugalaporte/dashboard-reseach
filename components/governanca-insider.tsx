@@ -139,7 +139,7 @@ function CargoRows({
         return (
           <tr
             key={group.cargo}
-            className="text-[13px] border-t border-white cursor-pointer bg-white hover:bg-surface-soft"
+            className="text-[13px] border-t border-white cursor-pointer bg-surface hover:bg-line"
             onClick={() => onOpen(group.cargo, group.rows)}
           >
             <td className="px-4 py-2 pl-10 text-ink/80">{group.cargo}</td>
@@ -222,7 +222,7 @@ function CompanyTotalsTable({
             return (
               <React.Fragment key={row.ticker}>
                 <tr
-                  className="text-[13px] border-t border-white cursor-pointer bg-brand/10 hover:bg-brand/20"
+                  className="text-[13px] border-t border-line cursor-pointer bg-white hover:bg-surface-soft"
                   onClick={() => onToggle(row.ticker)}
                 >
                   <td className="px-4 py-2 font-medium">
