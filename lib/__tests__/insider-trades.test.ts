@@ -10,6 +10,7 @@ import {
   tradeIso,
   portfolioIssuers,
   positionShare,
+  formatPositionShare,
   sumOpeningPositions,
   type InsiderTrade,
 } from "../insider-trades";
@@ -137,7 +138,11 @@ describe("mês e cargo", () => {
 describe("posição inicial", () => {
   it("mede a quantidade negociada sobre o Saldo inicial", () => {
     expect(positionShare(25, 100)).toBe(25);
+    expect(positionShare(-25, 100)).toBe(25);
     expect(positionShare(10, 0)).toBeNull();
+    const bpac = positionShare(677_911, 7_473_561_197);
+    expect(bpac).toBeCloseTo(0.0090708, 5);
+    expect(formatPositionShare(bpac ?? 0)).toBe("0,01%");
   });
 
   it("soma o saldo do mesmo cargo", () => {

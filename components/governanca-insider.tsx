@@ -8,6 +8,7 @@ import { formatDateShort, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   formatMonthLabel,
+  formatPositionShare,
   groupByCargo,
   normMove,
   positionShare,
@@ -29,9 +30,13 @@ function price(v: number | null): string {
 
 function reais(v: number): string {
   const abs = Math.abs(v);
-  if (abs >= 1e9) return `R$ ${formatNumber(v / 1e9, 1)} bi`;
-  if (abs >= 1e6) return `R$ ${formatNumber(v / 1e6, 1)} mi`;
-  return `R$ ${formatNumber(v, 0)}`;
+  const body =
+    abs >= 1e9
+      ? `${formatNumber(abs / 1e9, 1)} bi`
+      : abs >= 1e6
+        ? `${formatNumber(abs / 1e6, 1)} mi`
+        : formatNumber(abs, 0);
+  return v < 0 ? `-R$ ${body}` : `R$ ${body}`;
 }
 
 function isBuy(mov: string): boolean {
@@ -94,25 +99,48 @@ function Rows({ rows, showTicker = false }: { rows: InsiderTrade[]; showTicker?:
 function sideCell(count: number, volume: number, tone: "buy" | "sell"): React.ReactNode {
   if (count === 0) return <span className="text-ink/30">–</span>;
   return (
-    <span className={tone === "buy" ? "text-emerald-800" : "text-rose-800"}>{reais(volume)}</span>
+    <span className={tone === "buy" ? "text-emerald-800" : "text-rose-800"}>
+      {reais(tone === "sell" ? -volume : volume)}
+    </span>
   );
 }
 
 /** Quantidade e preço médio (volume dividido pela quantidade). */
 function ShareCell({ traded, opening }: { traded: number; opening: number }) {
-  const pct = positionShare(traded, opening);
+  const qty = Math.abs(traded);
+  const pct = positionShare(qty, opening);
+  if (pct == null) {
+    return (
+      <td className="px-4 py-2 tabular text-right">
+        <span className="text-ink/30">–</span>
+      </td>
+    );
+  }
   return (
-    <td className="px-4 py-2 tabular text-right">
-      {pct == null ? <span className="text-ink/30">–</span> : `${formatNumber(pct, 2)}%`}
+    <td
+      className="px-4 py-2 tabular text-right"
+      title={`${formatNumber(qty, 0)} / ${formatNumber(opening, 0)}`}
+    >
+      {formatPositionShare(pct)}
     </td>
   );
 }
 
-function QtyPrice({ qty, volume }: { qty: number; volume: number }) {
+function QtyPrice({
+  qty,
+  volume,
+  negative = false,
+}: {
+  qty: number;
+  volume: number;
+  negative?: boolean;
+}) {
   const empty = qty <= 0;
   return (
     <>
-      <td className="px-4 py-2 tabular text-right">{empty ? "–" : formatNumber(qty, 0)}</td>
+      <td className="px-4 py-2 tabular text-right">
+        {empty ? "–" : formatNumber(negative ? -qty : qty, 0)}
+      </td>
       <td className="px-4 py-2 tabular text-right">
         {empty ? "–" : formatNumber(volume / qty, 2)}
       </td>
@@ -150,7 +178,7 @@ function CargoRows({
             <td className="px-4 py-2 tabular text-right">
               {sideCell(group.sells, group.sellVolume, "sell")}
             </td>
-            <QtyPrice qty={group.sellQty} volume={group.sellVolume} />
+            <QtyPrice qty={group.sellQty} volume={group.sellVolume} negative />
             <td
               className={cn(
                 "px-4 py-2 tabular text-right",
@@ -240,7 +268,7 @@ function CompanyTotalsTable({
                   <td className="px-4 py-2 tabular text-right">{sideCell(row.buys, row.buyVolume, "buy")}</td>
                   <QtyPrice qty={row.buyQty} volume={row.buyVolume} />
                   <td className="px-4 py-2 tabular text-right">{sideCell(row.sells, row.sellVolume, "sell")}</td>
-                  <QtyPrice qty={row.sellQty} volume={row.sellVolume} />
+                  <QtyPrice qty={row.sellQty} volume={row.sellVolume} negative />
                   <td
                     className={cn(
                       "px-4 py-2 tabular text-right",
@@ -328,13 +356,17 @@ export function GovernancaInsider() {
     ? payload.rows.filter((row) => !company || row.ticker === company)
     : [];
   const companyTotals = totalsByCompany(visible);
+  const tradedCargo = new Set(
+    visible.map((row) => `${row.ticker}|${row.cargo?.trim() || "Sem cargo"}`)
+  );
   const openingByTicker = new Map<string, number>();
   const openingByCargo = new Map<string, number>();
   for (const row of payload?.opening ?? []) {
     if (company && row.ticker !== company) continue;
-    openingByTicker.set(row.ticker, (openingByTicker.get(row.ticker) ?? 0) + row.quantidade);
     const key = `${row.ticker}|${row.cargo}`;
     openingByCargo.set(key, (openingByCargo.get(key) ?? 0) + row.quantidade);
+    if (!tradedCargo.has(key)) continue;
+    openingByTicker.set(row.ticker, (openingByTicker.get(row.ticker) ?? 0) + row.quantidade);
   }
   const tradesByTicker = React.useMemo(() => {
     const map = new Map<string, InsiderTrade[]>();

@@ -211,7 +211,7 @@ function openingPositions(
         versao: num(row.versao) ?? 0,
         ticker,
         cargo: text(row.tipo_cargo)?.trim() || "Sem cargo",
-        quantidade: num(row.quantidade) ?? 0,
+        quantidade: Math.abs(num(row.quantidade) ?? 0),
       };
     })
     .filter((row): row is NonNullable<typeof row> => row != null);

@@ -1,4 +1,5 @@
 import { displayTicker } from "./finacap-book";
+import { formatNumber } from "./format";
 import { issuerKey } from "./governanca-portfolio";
 
 /** Nome na CVM (vlmo_movimentacoes.nome_companhia) da empresa listada. */
@@ -87,7 +88,7 @@ export function tradeTotals(rows: InsiderTrade[]): InsiderTotals {
   };
   for (const row of rows) {
     const volume = row.volume ?? 0;
-    const qty = row.quantidade ?? 0;
+    const qty = Math.abs(row.quantidade ?? 0);
     if (normMove(row.movimentacao).startsWith("compra")) {
       totals.buys += 1;
       totals.buyVolume += volume;
@@ -216,10 +217,16 @@ export function isOpeningBalance(tipo: string | null | undefined): boolean {
   return normMove(tipo) === "saldo inicial";
 }
 
-/** Quantidade negociada sobre o Saldo inicial, em porcentagem. */
+/** |quantidade negociada| / soma dos saldos iniciais, em porcentagem. */
 export function positionShare(tradedQty: number, openingQty: number): number | null {
+  const traded = Math.abs(tradedQty);
   if (!(openingQty > 0)) return null;
-  return (tradedQty / openingQty) * 100;
+  return (traded / openingQty) * 100;
+}
+
+/** Percentual da posição, arredondado em duas casas. */
+export function formatPositionShare(pct: number): string {
+  return `${formatNumber(pct, 2)}%`;
 }
 
 /** Soma o Saldo inicial de cada empresa e cargo. */

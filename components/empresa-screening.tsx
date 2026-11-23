@@ -4,7 +4,6 @@ import * as React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomUpCharts } from "@/components/bottom-up-charts";
 import { BottomUpValuation } from "@/components/bottom-up-valuation";
-import { BottomUpIntrinsic } from "@/components/bottom-up-intrinsic";
 import { ClassCell, CompositeScoreCell, FactorScoreCell } from "@/components/factor-cell-tip";
 import { formatMetricRaw } from "@/lib/factor-display";
 import { DEFAULT_WEIGHT_PCT } from "@/lib/factor-scoring";
@@ -13,7 +12,7 @@ import type { BottomUpPayload } from "@/lib/bottom-up-types";
 
 type Props = { ticker: string; row: FactorRow | null };
 
-/** Screening: scores, snapshot, histórico, valuation e preço alvo. */
+/** Screening na página da empresa: scores, snapshot, histórico e valuation. */
 export function EmpresaScreening({ ticker, row }: Props) {
   const [payload, setPayload] = React.useState<BottomUpPayload | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -146,16 +145,6 @@ export function EmpresaScreening({ ticker, row }: Props) {
             bands={payload?.bands ?? []}
             peers={payload?.peers ?? []}
           />
-        )}
-      </div>
-
-      <div>
-        {loading ? (
-          <Skeleton className="h-40 w-full" />
-        ) : payload?.intrinsic ? (
-          <BottomUpIntrinsic estimate={payload.intrinsic} />
-        ) : (
-          <p className="text-sm text-ink/40">Sem estimativa.</p>
         )}
       </div>
     </div>
