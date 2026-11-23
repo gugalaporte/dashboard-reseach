@@ -11,6 +11,7 @@ import type {
 import {
   DEFAULT_ELIGIBILITY,
   DEFAULT_WEIGHT_PCT,
+  minVolumeForTop,
   scoreFactors,
   weightsFromPct,
   type FactorEligibility,
@@ -68,7 +69,8 @@ async function loadForward(db: ReturnType<typeof getResearchSupabase>) {
 /** Carrega dados LSEG e calcula ranking (somente leitura). */
 export async function loadFactorRanking(
   eligibility: FactorEligibility = DEFAULT_ELIGIBILITY,
-  weightPct: FactorWeightPct = DEFAULT_WEIGHT_PCT
+  weightPct: FactorWeightPct = DEFAULT_WEIGHT_PCT,
+  options?: { autoMinVolume?: boolean }
 ): Promise<FactorPayload> {
   if (!hasResearchServiceKey()) {
     throw new Error(
@@ -97,7 +99,10 @@ export async function loadFactorRanking(
   ]);
 
   const inputs = buildFactorInputs(companies, snapshots, forward, historical);
-  const rows = scoreFactors(inputs, eligibility, weightsFromPct(weightPct));
+  const applied = options?.autoMinVolume
+    ? { ...eligibility, minDayVolume: minVolumeForTop(inputs) }
+    : eligibility;
+  const rows = scoreFactors(inputs, applied, weightsFromPct(weightPct));
 
   let asOfDate: string | null = null;
   for (const r of rows) {
@@ -108,5 +113,5 @@ export async function loadFactorRanking(
     ...new Set(rows.map((r) => r.sector).filter((s): s is string => !!s?.trim())),
   ].sort();
 
-  return { asOfDate, eligibility, weights: weightPct, rows, sectors };
+  return { asOfDate, eligibility: applied, weights: weightPct, rows, sectors };
 }

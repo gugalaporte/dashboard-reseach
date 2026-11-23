@@ -14,6 +14,26 @@ export const DEFAULT_ELIGIBILITY: FactorEligibility = {
   maxNetDebtEbitda: 8,
 };
 
+/** Sem um volume mínimo digitado, a tela fica com as mais líquidas. */
+export const TOP_VOLUME_COUNT = 100;
+
+/**
+ * Volume da empresa na posição `count` (1 = maior volume).
+ * Menos empresas do que `count`: usa o menor volume positivo.
+ */
+export function minVolumeForTop(
+  rows: { dayVolume: number | null }[],
+  count = TOP_VOLUME_COUNT
+): number {
+  const vols = rows
+    .map((row) => row.dayVolume)
+    .filter((vol): vol is number => vol != null && Number.isFinite(vol) && vol > 0)
+    .sort((a, b) => b - a);
+  if (vols.length === 0) return 0;
+  const index = Math.min(count, vols.length) - 1;
+  return vols[index] ?? 0;
+}
+
 export const FACTOR_WEIGHTS = {
   quality: 0.3,
   value: 0.3,

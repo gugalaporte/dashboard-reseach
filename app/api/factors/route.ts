@@ -18,11 +18,13 @@ function readPct(params: URLSearchParams, key: string): number | undefined {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const minVol = Number(searchParams.get("minDayVolume"));
+    const rawMin = searchParams.get("minDayVolume");
+    const autoMinVolume = rawMin == null || rawMin.trim() === "" || rawMin === "auto";
+    const minVol = Number(rawMin);
     const maxNd = Number(searchParams.get("maxNetDebtEbitda"));
 
     const eligibility = {
-      minDayVolume: Number.isFinite(minVol) && minVol >= 0
+      minDayVolume: !autoMinVolume && Number.isFinite(minVol) && minVol >= 0
         ? minVol
         : DEFAULT_ELIGIBILITY.minDayVolume,
       maxNetDebtEbitda: Number.isFinite(maxNd) && maxNd > 0
@@ -37,7 +39,7 @@ export async function GET(req: Request) {
       momentum: readPct(searchParams, "wMomentum"),
     });
 
-    const payload = await loadFactorRanking(eligibility, weights);
+    const payload = await loadFactorRanking(eligibility, weights, { autoMinVolume });
     return NextResponse.json(payload, {
       headers: { "Cache-Control": "no-store" },
     });

@@ -108,7 +108,9 @@ export function FactorInvestingDashboard() {
   const [classFilter, setClassFilter] = React.useState<FactorClass | "all">("all");
   const [onlyEligible, setOnlyEligible] = React.useState(true);
   const [onlyPortfolio, setOnlyPortfolio] = React.useState(false);
-  const [minVol, setMinVol] = React.useState(String(DEFAULT_ELIGIBILITY.minDayVolume));
+  const [minVol, setMinVol] = React.useState("");
+  const [volEdited, setVolEdited] = React.useState(false);
+  const customVol = React.useRef(false);
   const [maxNd, setMaxNd] = React.useState(String(DEFAULT_ELIGIBILITY.maxNetDebtEbitda));
   const [weightInputs, setWeightInputs] = React.useState(defaultWeightInputs);
   const [sortKey, setSortKey] = React.useState<SortKey>("score");
@@ -117,21 +119,34 @@ export function FactorInvestingDashboard() {
   const router = useRouter();
   const openEmpresa = (row: FactorRow) => router.push(empresaHref(row.ticker));
 
-  const fetchData = React.useCallback(async () => {
+  const fetchData = React.useCallback(async (override?: {
+    volume?: "auto" | number;
+    maxNd?: string;
+    weights?: ReturnType<typeof defaultWeightInputs>;
+  }) => {
     setLoading(true);
     setError(null);
+    const volume = override?.volume ?? "auto";
+    const nd = override?.maxNd ?? maxNd;
+    const weights = override?.weights ?? weightInputs;
+    const minDayVolume = volume === "auto"
+      ? (customVol.current ? Number(minVol) || 0 : "auto")
+      : volume;
     try {
       const params = new URLSearchParams({
-        minDayVolume: String(Number(minVol) || DEFAULT_ELIGIBILITY.minDayVolume),
-        maxNetDebtEbitda: String(Number(maxNd) || DEFAULT_ELIGIBILITY.maxNetDebtEbitda),
-        wQuality: weightInputs.quality,
-        wValue: weightInputs.value,
-        wCarry: weightInputs.carry,
-        wMomentum: weightInputs.momentum,
+        maxNetDebtEbitda: String(Number(nd) || DEFAULT_ELIGIBILITY.maxNetDebtEbitda),
+        wQuality: weights.quality,
+        wValue: weights.value,
+        wCarry: weights.carry,
+        wMomentum: weights.momentum,
       });
+      if (minDayVolume !== "auto") params.set("minDayVolume", String(minDayVolume));
       const res = await fetch(`/api/factors?${params}`, { cache: "no-store" });
       const json = (await res.json()) as FactorPayload & { error?: string };
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      if (minDayVolume === "auto") {
+        setMinVol(String(json.eligibility.minDayVolume));
+      }
       setData(json);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao carregar");
@@ -142,7 +157,7 @@ export function FactorInvestingDashboard() {
 
   React.useEffect(() => {
     void fetchData();
-    // Primeira carga com defaults; Recalcular aplica os campos.
+    // Primeira carga calcula o volume das 100 mais líquidas. Recalcular aplica os campos.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -253,7 +268,7 @@ export function FactorInvestingDashboard() {
     classFilter !== "all" ||
     !onlyEligible ||
     onlyPortfolio ||
-    minVol !== String(DEFAULT_ELIGIBILITY.minDayVolume) ||
+    volEdited ||
     maxNd !== String(DEFAULT_ELIGIBILITY.maxNetDebtEbitda) ||
     weightInputs.quality !== String(DEFAULT_WEIGHT_PCT.quality) ||
     weightInputs.value !== String(DEFAULT_WEIGHT_PCT.value) ||
@@ -266,9 +281,14 @@ export function FactorInvestingDashboard() {
     setClassFilter("all");
     setOnlyEligible(true);
     setOnlyPortfolio(false);
-    setMinVol(String(DEFAULT_ELIGIBILITY.minDayVolume));
-    setMaxNd(String(DEFAULT_ELIGIBILITY.maxNetDebtEbitda));
-    setWeightInputs(defaultWeightInputs());
+    customVol.current = false;
+    setVolEdited(false);
+    setMinVol("");
+    const nd = String(DEFAULT_ELIGIBILITY.maxNetDebtEbitda);
+    const weights = defaultWeightInputs();
+    setMaxNd(nd);
+    setWeightInputs(weights);
+    void fetchData({ volume: "auto", maxNd: nd, weights });
   }
 
   async function savePdf() {
@@ -392,7 +412,11 @@ export function FactorInvestingDashboard() {
             <Input
               className="h-8 w-full sm:w-[7.5rem] text-xs tabular border-line bg-surface"
               value={minVol}
-              onChange={(e) => setMinVol(e.target.value)}
+              onChange={(e) => {
+                customVol.current = true;
+                setVolEdited(true);
+                setMinVol(e.target.value);
+              }}
               inputMode="numeric"
             />
           </label>
@@ -409,7 +433,7 @@ export function FactorInvestingDashboard() {
             type="button"
             size="sm"
             className="h-8 text-[11px] uppercase tracking-[0.08em] w-full sm:w-auto"
-            onClick={fetchData}
+            onClick={() => fetchData()}
             disabled={loading}
           >
             Recalcular

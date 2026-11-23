@@ -3,6 +3,7 @@ import {
   assignRanks,
   classifyByPercentile,
   percentileRank,
+  minVolumeForTop,
   scoreFactors,
   weightsFromPct,
   zScore,
@@ -94,6 +95,17 @@ describe("percentileRank / class", () => {
     expect(classifyByPercentile(percentileRank(scores, 4))).toBe("A");
     expect(classifyByPercentile(percentileRank(scores, 2.5))).toBe("B");
     expect(classifyByPercentile(percentileRank(scores, 1))).toBe("C");
+  });
+});
+
+describe("minVolumeForTop", () => {
+  it("usa o volume da 100ª empresa mais líquida", () => {
+    const rows = Array.from({ length: 150 }, (_, i) => ({ dayVolume: 150 - i }));
+    expect(minVolumeForTop(rows, 100)).toBe(51);
+  });
+
+  it("com menos de 100 empresas, usa o menor volume positivo", () => {
+    expect(minVolumeForTop([{ dayVolume: 10 }, { dayVolume: null }, { dayVolume: 4 }], 100)).toBe(4);
   });
 });
 
