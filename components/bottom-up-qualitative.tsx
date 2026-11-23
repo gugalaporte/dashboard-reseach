@@ -96,42 +96,44 @@ export function BottomUpQualitative({ ticker }: Props) {
     }
   };
 
-  const setStatus = (status: PipelineStatus) => {
-    setDraft((d) => ({
-      ...d,
-      status: d.status === status ? null : status,
-    }));
-  };
-
-  const setRating = (rating: NotesRating) => {
-    setDraft((d) => ({
-      ...d,
-      rating: d.rating === rating ? null : rating,
-    }));
-  };
-
-  const handleSave = async () => {
+  const saveDraft = async (current: Draft) => {
     const targetPrice =
-      draft.targetPrice.trim() === ""
+      current.targetPrice.trim() === ""
         ? null
-        : parseTargetPrice(draft.targetPrice);
-    if (draft.targetPrice.trim() !== "" && targetPrice == null) {
+        : parseTargetPrice(current.targetPrice);
+    if (current.targetPrice.trim() !== "" && targetPrice == null) {
       setError("Target Price inválido");
       return;
     }
     const next = await persist({
-      status: draft.status,
-      rating: draft.rating,
-      thesis: draft.thesis,
-      risk: draft.risk,
-      governance: draft.governance,
-      comments: draft.comments,
+      status: current.status,
+      rating: current.rating,
+      thesis: current.thesis,
+      risk: current.risk,
+      governance: current.governance,
+      comments: current.comments,
       targetPrice,
     });
     if (!next) return;
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2000);
   };
+
+  const setStatus = (status: PipelineStatus) => {
+    const next = draft.status === status ? null : status;
+    const current = { ...draft, status: next };
+    setDraft(current);
+    void saveDraft(current);
+  };
+
+  const setRating = (rating: NotesRating) => {
+    const next = draft.rating === rating ? null : rating;
+    const current = { ...draft, rating: next };
+    setDraft(current);
+    void saveDraft(current);
+  };
+
+  const handleSave = () => saveDraft(draft);
 
   if (error && !notes) {
     return <p className="text-xs text-destructive">{error}</p>;
