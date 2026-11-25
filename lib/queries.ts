@@ -903,13 +903,41 @@ export async function getPdfsEmpresa(empresa: string): Promise<PdfDoc[]> {
   const ids = Array.from(
     new Set((metricas ?? []).map((m) => m.pdf_id).filter((x): x is number => x != null))
   );
-  if (ids.length === 0) return [];
 
-  const { data: pdfs, error: e2 } = await supabase
+  // PDFs ligados por métricas (pdf_id).
+  const byMetrics =
+    ids.length === 0
+      ? []
+      : await supabase
+          .from("pdf_documents")
+          .select("id, file_name, pdf_date")
+          .in("id", ids)
+          .then(({ data, error: e2 }) => {
+            if (e2) throw e2;
+            return (data ?? []) as PdfDoc[];
+          });
+
+  // PDFs que citam o ticker, mesmo sem métricas extraídas ainda.
+  // "tickers" é texto ("PETR4, PRIO3"): o ilike é só pré-filtro, o match exato vem abaixo.
+  const { data: tagged, error: e3 } = await supabase
     .from("pdf_documents")
-    .select("id, file_name, pdf_date")
-    .in("id", ids)
-    .order("pdf_date", { ascending: false });
-  if (e2) throw e2;
-  return (pdfs ?? []) as PdfDoc[];
+    .select("id, file_name, pdf_date, tickers")
+    .ilike("tickers", `%${empresa}%`)
+    .order("pdf_date", { ascending: false, nullsFirst: false })
+    .limit(300);
+  if (e3) throw e3;
+  const byTicker = (tagged ?? [])
+    .filter((p) =>
+      String(p.tickers ?? "")
+        .split(",")
+        .some((t) => t.trim().toUpperCase() === empresa.toUpperCase())
+    )
+    .map(({ id, file_name, pdf_date }) => ({ id, file_name, pdf_date }) as PdfDoc);
+
+  // Junta sem repetir e deixa os mais novos primeiro (sem data vai para o fim).
+  const merged = new Map<number, PdfDoc>();
+  for (const p of [...byMetrics, ...byTicker]) merged.set(p.id, p);
+  return [...merged.values()].sort((a, b) =>
+    (b.pdf_date ?? "").localeCompare(a.pdf_date ?? "")
+  );
 }
