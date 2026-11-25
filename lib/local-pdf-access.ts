@@ -44,15 +44,21 @@ async function saveHandle(handle: DirHandle): Promise<void> {
   });
 }
 
+// Registro de etapas no console (F12) para achar onde o fluxo trava.
+const log = (...a: unknown[]) => console.log("[pdf]", ...a);
+
 async function ensureRead(handle: DirHandle): Promise<boolean> {
   try {
     const q = handle.queryPermission ? await handle.queryPermission({ mode: "read" }) : "granted";
+    log("permissão da pasta salva:", q);
     if (q === "granted") return true;
     const r = handle.requestPermission
       ? await handle.requestPermission({ mode: "read" })
       : "denied";
+    log("permissão depois de pedir:", r);
     return r === "granted";
-  } catch {
+  } catch (err) {
+    log("erro ao checar permissão:", err);
     return false;
   }
 }
@@ -129,9 +135,13 @@ export async function openLocalPdf(
   const names = pdfNamesToTry(fileName, filePath);
   if (names.length === 0) throw new Error("Este registro não tem nome de PDF.");
 
+  log("início; procurar:", names);
   let dir = repickNext ? null : await savedFolder();
+  log("pasta salva usável:", !!dir);
   if (!dir) {
+    log("abrindo seletor de pasta");
     dir = await pickFolder();
+    log("pasta escolhida:", dir.name);
     await saveHandle(dir);
     repickNext = false;
   }
@@ -139,6 +149,7 @@ export async function openLocalPdf(
   // A busca na pasta pode levar vários segundos. Abrir a aba só no fim é bloqueado
   // pelo navegador, então abrimos agora e preenchemos depois.
   const win = window.open("", "_blank");
+  log("aba aberta:", !!win);
   if (!win) {
     throw new Error(
       "O navegador bloqueou a nova aba.\n\nPermita pop-ups para este site (ícone na barra de endereço) e clique no PDF de novo. A pasta já ficou salva."
@@ -147,6 +158,7 @@ export async function openLocalPdf(
   win.document.write("<p style='font-family:sans-serif'>Procurando o PDF na pasta...</p>");
   try {
     const file = await searchNames(dir, names);
+    log("busca terminou; achou:", !!file);
     if (!file) {
       repickNext = true;
       throw new Error(`Não achei ${names.join(" / ")} na pasta escolhida.\n\nClique no PDF de novo. ${FOLDER_HINT}`);
