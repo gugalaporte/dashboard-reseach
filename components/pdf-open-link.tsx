@@ -47,6 +47,7 @@ export function PdfOpenLink({ className, title, children, ...props }: Props) {
       const names = await namesForPdf(props);
       await openLocalPdf(names.fileName, names.filePath);
     } catch (err) {
+      console.error("[pdf] falha ao abrir:", err); // ajuda a achar o motivo (F12 → Console)
       if (err instanceof DOMException && err.name === "AbortError") return;
       if (err instanceof Error && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "Não foi possível abrir o PDF.";
