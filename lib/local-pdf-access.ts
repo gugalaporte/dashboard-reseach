@@ -97,10 +97,6 @@ async function searchNames(dir: DirHandle, names: string[]): Promise<File | null
   return null;
 }
 
-function openBlob(file: File): void {
-  window.open(URL.createObjectURL(file), "_blank");
-}
-
 let serverHasPdfsCache: boolean | null = null;
 
 /** O servidor enxerga a pasta de PDFs? (só no PC local; no deploy não). */
@@ -140,10 +136,24 @@ export async function openLocalPdf(
     repickNext = false;
   }
 
-  const file = await searchNames(dir, names);
-  if (!file) {
-    repickNext = true;
-    throw new Error(`Não achei ${names.join(" / ")} na pasta escolhida.\n\nClique no PDF de novo. ${FOLDER_HINT}`);
+  // A busca na pasta pode levar vários segundos. Abrir a aba só no fim é bloqueado
+  // pelo navegador, então abrimos agora e preenchemos depois.
+  const win = window.open("", "_blank");
+  if (!win) {
+    throw new Error(
+      "O navegador bloqueou a nova aba.\n\nPermita pop-ups para este site (ícone na barra de endereço) e clique no PDF de novo. A pasta já ficou salva."
+    );
   }
-  openBlob(file);
+  win.document.write("<p style='font-family:sans-serif'>Procurando o PDF na pasta...</p>");
+  try {
+    const file = await searchNames(dir, names);
+    if (!file) {
+      repickNext = true;
+      throw new Error(`Não achei ${names.join(" / ")} na pasta escolhida.\n\nClique no PDF de novo. ${FOLDER_HINT}`);
+    }
+    win.location.href = URL.createObjectURL(file);
+  } catch (err) {
+    win.close();
+    throw err;
+  }
 }
