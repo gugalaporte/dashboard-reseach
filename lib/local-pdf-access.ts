@@ -55,9 +55,17 @@ const log = (...a: unknown[]) => console.log("[pdf]", ...a);
 
 async function ensureRead(handle: DirHandle): Promise<boolean> {
   try {
-    const q = handle.queryPermission ? await handle.queryPermission({ mode: "read" }) : "granted";
+    // A pergunta pode travar com uma pasta salva "presa": limite de tempo.
+    const q = handle.queryPermission
+      ? await withTimeout<PermissionState | "timeout">(
+          handle.queryPermission({ mode: "read" }),
+          1500,
+          "timeout"
+        )
+      : "granted";
     log("permissão da pasta salva:", q);
     if (q === "granted") return true;
+    if (q === "timeout") return false; // ignora a pasta salva e pede outra
     const r = handle.requestPermission
       ? await handle.requestPermission({ mode: "read" })
       : "denied";
