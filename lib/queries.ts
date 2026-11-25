@@ -810,8 +810,11 @@ export async function getSummaryStats(): Promise<SummaryStats> {
   }
 
   // Max dedicado (limit 1). O lote de 1000 linhas nao pega o report mais novo.
-  const [{ data: latestDe, error: eDe }, { data: latestSg, error: eSg }] =
-    await Promise.all([
+  const [
+    { data: latestDe, error: eDe },
+    { data: latestSg, error: eSg },
+    { data: latestPdf, error: ePdf },
+  ] = await Promise.all([
       supabase
         .from("dados_estruturados")
         .select("data_relatorio")
@@ -828,13 +831,24 @@ export async function getSummaryStats(): Promise<SummaryStats> {
         .order("report_date", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      // PDF mais recente processado: as tabelas acima podem ficar atrasadas.
+      supabase
+        .from("pdf_documents")
+        .select("pdf_date")
+        .not("pdf_date", "is", null)
+        .order("pdf_date", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
   if (eDe) throw eDe;
   if (eSg) throw eSg;
-  const deDate = (latestDe?.data_relatorio as string | null)?.slice(0, 10) ?? null;
-  const sgDate = (latestSg?.report_date as string | null)?.slice(0, 10) ?? null;
-  const lastDate =
-    deDate && sgDate ? (sgDate > deDate ? sgDate : deDate) : sgDate ?? deDate;
+  if (ePdf) throw ePdf;
+  const candidates = [
+    (latestDe?.data_relatorio as string | null)?.slice(0, 10),
+    (latestSg?.report_date as string | null)?.slice(0, 10),
+    (latestPdf?.pdf_date as string | null)?.slice(0, 10),
+  ].filter((d): d is string => !!d);
+  const lastDate = candidates.length > 0 ? candidates.sort().pop()! : null;
 
   // 2) Contagem de linhas em dados_estruturados dentro da whitelist.
   const { count, error: e3 } = await supabase

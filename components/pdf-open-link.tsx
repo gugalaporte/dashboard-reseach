@@ -36,16 +36,23 @@ export function PdfOpenLink({ className, title, children, ...props }: Props) {
     e.stopPropagation();
     if (busy) return;
     setBusy(true);
+    // Abre a aba já no clique, senão o Chrome bloqueia (a busca pode levar vários segundos).
+    const win = window.open("", "_blank");
+    let opened = false;
     try {
-      if (props.pdfId != null && (await tryOpenServerPdf(props.pdfId))) return;
+      if (props.pdfId != null && (await tryOpenServerPdf(props.pdfId, win))) {
+        opened = true;
+        return;
+      }
       const names = await namesForPdf(props);
-      await openLocalPdf(names.fileName, names.filePath);
+      opened = await openLocalPdf(names.fileName, names.filePath, win);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       if (err instanceof Error && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "Não foi possível abrir o PDF.";
       window.alert(msg);
     } finally {
+      if (!opened) win?.close(); // erro ou desistência: fecha a aba em branco
       setBusy(false);
     }
   }

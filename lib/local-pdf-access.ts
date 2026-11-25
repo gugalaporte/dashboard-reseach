@@ -97,25 +97,34 @@ async function searchNames(dir: DirHandle, names: string[]): Promise<File | null
   return null;
 }
 
-function openBlob(file: File): void {
-  window.open(URL.createObjectURL(file), "_blank", "noopener,noreferrer");
+/**
+ * Mostra o PDF na aba já aberta no clique (win).
+ * Abrir a aba só depois da busca é bloqueado pelo Chrome (passou de ~5s do clique).
+ */
+function showBlob(blob: Blob, win: Window | null): void {
+  const url = URL.createObjectURL(blob);
+  if (win && !win.closed) win.location.href = url;
+  else window.open(url, "_blank");
 }
 
 /** Se o servidor local achar o arquivo, abre sem seletor. */
-export async function tryOpenServerPdf(pdfId: number): Promise<boolean> {
+export async function tryOpenServerPdf(pdfId: number, win: Window | null): Promise<boolean> {
   const res = await fetch(`/api/revisions/pdf?pdf_id=${pdfId}`, { cache: "no-store" });
   const ct = res.headers.get("content-type") ?? "";
   if (!res.ok || !ct.includes("pdf")) return false;
-  const blob = await res.blob();
-  window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
+  showBlob(await res.blob(), win);
   return true;
 }
 
-/** Abre o PDF da pasta OneDrive já autorizada; pede a pasta só se ainda não houver. */
+/**
+ * Abre o PDF da pasta OneDrive já autorizada; pede a pasta só se ainda não houver.
+ * Retorna false se o usuário desistiu (nada foi aberto).
+ */
 export async function openLocalPdf(
-  fileName?: string | null,
-  filePath?: string | null
-): Promise<void> {
+  fileName: string | null | undefined,
+  filePath: string | null | undefined,
+  win: Window | null
+): Promise<boolean> {
   const names = pdfNamesToTry(fileName, filePath);
   if (names.length === 0) throw new Error("Este registro não tem nome de PDF.");
 
@@ -131,7 +140,7 @@ export async function openLocalPdf(
     const again = window.confirm(
       `Não achei ${names.join(" / ")} nessa pasta.\n\nSelecionar Sell Side_Reports agora?`
     );
-    if (!again) return;
+    if (!again) return false;
     dir = await pickFolder();
     await saveHandle(dir);
     file = await searchNames(dir, names);
@@ -141,5 +150,6 @@ export async function openLocalPdf(
       `Não achei ${names.join(" / ")}. A pasta certa é Sell Side_Reports (btg, bradesco, itaú, safra).`
     );
   }
-  openBlob(file);
+  showBlob(file, win);
+  return true;
 }
