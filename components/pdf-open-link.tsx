@@ -44,9 +44,13 @@ export function PdfOpenLink({ className, title, children, ...props }: Props) {
         opened = true;
         return;
       }
+      // Servidor não achou (ex.: deploy). Fecha a aba em branco antes do fluxo da pasta local.
+      // Com ela aberta, o alert e o seletor de pasta ficam presos numa aba oculta.
+      win?.close();
       const names = await namesForPdf(props);
-      opened = await openLocalPdf(names.fileName, names.filePath, win);
+      opened = await openLocalPdf(names.fileName, names.filePath, null);
     } catch (err) {
+      win?.close();
       if (err instanceof DOMException && err.name === "AbortError") return;
       if (err instanceof Error && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "Não foi possível abrir o PDF.";
