@@ -7,7 +7,7 @@ const STORE = "handles";
 const HANDLE_KEY = "sell-side";
 
 const FOLDER_HINT =
-  "Na primeira vez, selecione a pasta Sell Side_Reports:\nPesquisa - Documentos → 10_Dados_Primários → Sell Side_Reports\n(não use a pasta Documentos)";
+  "Selecione a pasta Sell Side_Reports:\nPesquisa - Documentos → 10_Dados_Primários → Sell Side_Reports\n(não use a pasta Documentos)";
 
 type DirHandle = FileSystemDirectoryHandle & {
   entries: () => AsyncIterableIterator<[string, FileSystemHandle]>;
@@ -97,59 +97,53 @@ async function searchNames(dir: DirHandle, names: string[]): Promise<File | null
   return null;
 }
 
-/**
- * Mostra o PDF na aba já aberta no clique (win).
- * Abrir a aba só depois da busca é bloqueado pelo Chrome (passou de ~5s do clique).
- */
-function showBlob(blob: Blob, win: Window | null): void {
-  const url = URL.createObjectURL(blob);
-  if (win && !win.closed) win.location.href = url;
-  else window.open(url, "_blank");
+function openBlob(file: File): void {
+  window.open(URL.createObjectURL(file), "_blank");
 }
 
-/** Se o servidor local achar o arquivo, abre sem seletor. */
-export async function tryOpenServerPdf(pdfId: number, win: Window | null): Promise<boolean> {
-  const res = await fetch(`/api/revisions/pdf?pdf_id=${pdfId}`, { cache: "no-store" });
-  const ct = res.headers.get("content-type") ?? "";
-  if (!res.ok || !ct.includes("pdf")) return false;
-  showBlob(await res.blob(), win);
-  return true;
+let serverHasPdfsCache: boolean | null = null;
+
+/** O servidor enxerga a pasta de PDFs? (só no PC local; no deploy não). */
+export async function serverHasPdfs(): Promise<boolean> {
+  if (serverHasPdfsCache != null) return serverHasPdfsCache;
+  try {
+    const res = await fetch("/api/revisions/pdf?check=1", { cache: "no-store" });
+    const json = (await res.json()) as { available?: boolean };
+    serverHasPdfsCache = res.ok && json.available === true;
+  } catch {
+    serverHasPdfsCache = false;
+  }
+  return serverHasPdfsCache;
 }
 
-/**
- * Abre o PDF da pasta OneDrive já autorizada; pede a pasta só se ainda não houver.
- * Retorna false se o usuário desistiu (nada foi aberto).
- */
+/** Endereço do PDF no servidor (só vale onde serverHasPdfs() é true). */
+export function serverPdfUrl(pdfId: number): string {
+  return `/api/revisions/pdf?pdf_id=${pdfId}`;
+}
+
+// Se true, o próximo clique abre o seletor de pasta na hora.
+// (alert/confirm antes do seletor gastam o "clique" e o Chrome recusa o seletor)
+let repickNext = false;
+
+/** Abre o PDF da pasta OneDrive já autorizada; pede a pasta só se ainda não houver. */
 export async function openLocalPdf(
-  fileName: string | null | undefined,
-  filePath: string | null | undefined,
-  win: Window | null
-): Promise<boolean> {
+  fileName?: string | null,
+  filePath?: string | null
+): Promise<void> {
   const names = pdfNamesToTry(fileName, filePath);
   if (names.length === 0) throw new Error("Este registro não tem nome de PDF.");
 
-  let dir = await savedFolder();
+  let dir = repickNext ? null : await savedFolder();
   if (!dir) {
-    window.alert(FOLDER_HINT);
     dir = await pickFolder();
     await saveHandle(dir);
+    repickNext = false;
   }
 
-  let file = await searchNames(dir, names);
+  const file = await searchNames(dir, names);
   if (!file) {
-    const again = window.confirm(
-      `Não achei ${names.join(" / ")} nessa pasta.\n\nSelecionar Sell Side_Reports agora?`
-    );
-    if (!again) return false;
-    dir = await pickFolder();
-    await saveHandle(dir);
-    file = await searchNames(dir, names);
+    repickNext = true;
+    throw new Error(`Não achei ${names.join(" / ")} na pasta escolhida.\n\nClique no PDF de novo. ${FOLDER_HINT}`);
   }
-  if (!file) {
-    throw new Error(
-      `Não achei ${names.join(" / ")}. A pasta certa é Sell Side_Reports (btg, bradesco, itaú, safra).`
-    );
-  }
-  showBlob(file, win);
-  return true;
+  openBlob(file);
 }

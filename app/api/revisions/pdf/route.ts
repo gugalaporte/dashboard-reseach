@@ -1,4 +1,4 @@
-import { createReadStream } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { NextResponse } from "next/server";
@@ -36,6 +36,13 @@ function escapeHtml(s: string): string {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    // Pergunta rápida: este servidor enxerga a pasta de PDFs? (no deploy, não)
+    if (searchParams.get("check") === "1") {
+      return NextResponse.json(
+        { available: existsSync(reportsRoot()) },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
     const pdfId = Number(searchParams.get("pdf_id") ?? "");
     const fonte = (searchParams.get("fonte") ?? "").trim() || null;
     if (!Number.isFinite(pdfId) || pdfId <= 0) {

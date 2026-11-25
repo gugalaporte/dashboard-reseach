@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { openLocalPdf, tryOpenServerPdf } from "@/lib/local-pdf-access";
+import { openLocalPdf, serverHasPdfs, serverPdfUrl } from "@/lib/local-pdf-access";
 import { pdfNamesToTry } from "@/lib/pdf-name";
 import { cn } from "@/lib/utils";
 
@@ -36,30 +36,30 @@ export function PdfOpenLink({ className, title, children, ...props }: Props) {
     e.stopPropagation();
     if (busy) return;
     setBusy(true);
-    // Abre a aba já no clique, senão o Chrome bloqueia (a busca pode levar vários segundos).
-    const win = window.open("", "_blank");
-    let opened = false;
     try {
-      if (props.pdfId != null && (await tryOpenServerPdf(props.pdfId, win))) {
-        opened = true;
+      // PC local: o servidor entrega o PDF. A aba abre direto no endereço dele,
+      // sem blob e sem bloqueio de pop-up (mesmo se a busca demorar).
+      if (props.pdfId != null && (await serverHasPdfs())) {
+        window.open(serverPdfUrl(props.pdfId), "_blank");
         return;
       }
-      // Servidor não achou (ex.: deploy). Fecha a aba em branco antes do fluxo da pasta local.
-      // Com ela aberta, o alert e o seletor de pasta ficam presos numa aba oculta.
-      win?.close();
+      // Deploy: o servidor não vê a pasta. Usa a pasta local do usuário.
       const names = await namesForPdf(props);
-      opened = await openLocalPdf(names.fileName, names.filePath, null);
+      await openLocalPdf(names.fileName, names.filePath);
     } catch (err) {
-      win?.close();
       if (err instanceof DOMException && err.name === "AbortError") return;
       if (err instanceof Error && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "Não foi possível abrir o PDF.";
       window.alert(msg);
     } finally {
-      if (!opened) win?.close(); // erro ou desistência: fecha a aba em branco
       setBusy(false);
     }
   }
+
+  // Pergunta ao servidor já ao montar: a resposta fica pronta antes do clique.
+  React.useEffect(() => {
+    void serverHasPdfs();
+  }, []);
 
   return (
     <span
