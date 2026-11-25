@@ -21,7 +21,13 @@ function openDb(): Promise<IDBDatabase> {
     req.onupgradeneeded = () => req.result.createObjectStore(STORE);
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
+    req.onblocked = () => reject(new Error("IndexedDB bloqueado"));
   });
+}
+
+/** Se o armazenamento do navegador não responder a tempo, segue sem ele. */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([p, new Promise<T>((r) => setTimeout(() => r(fallback), ms))]);
 }
 
 async function loadHandle(): Promise<DirHandle | null> {
@@ -90,7 +96,16 @@ async function findFile(dir: DirHandle, want: string, depth: number): Promise<Fi
 }
 
 async function savedFolder(): Promise<DirHandle | null> {
-  const saved = await loadHandle();
+  // O IndexedDB pode travar em alguns navegadores. Não deixa isso impedir o PDF.
+  const saved = await withTimeout(
+    loadHandle().catch((err) => {
+      log("erro ao ler a pasta salva:", err);
+      return null;
+    }),
+    1500,
+    null
+  );
+  log("pasta salva encontrada:", !!saved);
   if (saved && (await ensureRead(saved))) return saved;
   return null;
 }
@@ -142,7 +157,12 @@ export async function openLocalPdf(
     log("abrindo seletor de pasta");
     dir = await pickFolder();
     log("pasta escolhida:", dir.name);
-    await saveHandle(dir);
+    // Salvar é só conveniência: se falhar ou travar, o PDF abre mesmo assim.
+    await withTimeout(
+      saveHandle(dir).catch((err) => log("erro ao salvar a pasta:", err)),
+      1500,
+      undefined
+    );
     repickNext = false;
   }
 
