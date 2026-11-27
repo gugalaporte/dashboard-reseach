@@ -217,7 +217,7 @@ export function MercadoDashboard() {
               <CdiStrip rows={rates} />
             </Section>
 
-            <Section title="Crédito" hint="JGP IDEX não está na LSEG.">
+            <Section title="Crédito">
               <div className="grid lg:grid-cols-2 gap-4">
                 <MercadoReturnTable rows={credit} />
                 <MercadoLineChart
@@ -240,7 +240,7 @@ export function MercadoDashboard() {
             </Section>
 
             <Section title="Commodities">
-              <MercadoReturnTable rows={cmdty} />
+              <MercadoReturnTable rows={cmdty} large />
               <div className="grid lg:grid-cols-2 gap-4">
                 <MercadoLineChart
                   title="Energia e metais"

@@ -1,6 +1,6 @@
 "use client";
 
-import { pdfNamesToTry, samePdfName } from "@/lib/pdf-name";
+import { foldName, isPreferredFolder, pdfNamesToTry, samePdfName } from "@/lib/pdf-name";
 
 const DB_NAME = "finacap-pdf";
 const STORE = "handles";
@@ -89,11 +89,15 @@ async function pickFolder(): Promise<DirHandle> {
   return picker({ id: "finacap-sell-side", mode: "read" });
 }
 
-async function findFile(dir: DirHandle, want: string, depth: number): Promise<File | null> {
+async function findFile(
+  dir: DirHandle,
+  want: string,
+  depth: number
+): Promise<FileSystemFileHandle | null> {
   if (depth < 0) return null;
   for await (const [name, handle] of dir.entries()) {
     if (handle.kind === "file" && samePdfName(name, want)) {
-      return (handle as FileSystemFileHandle).getFile();
+      return handle as FileSystemFileHandle;
     }
     if (handle.kind === "directory") {
       const hit = await findFile(handle as DirHandle, want, depth - 1);
@@ -118,10 +122,49 @@ async function savedFolder(): Promise<DirHandle | null> {
   return null;
 }
 
-async function searchNames(dir: DirHandle, names: string[]): Promise<File | null> {
+// Para acelerar: arquivos já achados nesta sessão e a última pasta de banco usada.
+const foundCache = new Map<string, FileSystemFileHandle>();
+let lastBankFolder: string | null = null;
+
+async function searchNames(
+  dir: DirHandle,
+  names: string[],
+  fonte?: string | null
+): Promise<File | null> {
   for (const n of names) {
-    const file = await findFile(dir, n, 6);
-    if (file) return file;
+    const cached = foundCache.get(foldName(n));
+    if (!cached) continue;
+    try {
+      return await cached.getFile();
+    } catch {
+      foundCache.delete(foldName(n)); // arquivo mudou de lugar
+    }
+  }
+
+  // Pastas de primeiro nível: a do banco certo vai na frente, depois a última usada.
+  const subs: DirHandle[] = [];
+  for await (const [, h] of dir.entries()) {
+    if (h.kind === "directory") subs.push(h as DirHandle);
+  }
+  const rank = (d: DirHandle) =>
+    isPreferredFolder(d.name, fonte) ? 0 : d.name === lastBankFolder ? 1 : 2;
+  subs.sort((a, b) => rank(a) - rank(b));
+
+  for (const n of names) {
+    let hit = await findFile(dir, n, 0); // arquivos soltos na raiz
+    if (!hit) {
+      for (const sub of subs) {
+        hit = await findFile(sub, n, 5);
+        if (hit) {
+          lastBankFolder = sub.name;
+          break;
+        }
+      }
+    }
+    if (hit) {
+      foundCache.set(foldName(n), hit);
+      return hit.getFile();
+    }
   }
   return null;
 }
@@ -153,7 +196,8 @@ let repickNext = false;
 /** Abre o PDF da pasta OneDrive já autorizada; pede a pasta só se ainda não houver. */
 export async function openLocalPdf(
   fileName?: string | null,
-  filePath?: string | null
+  filePath?: string | null,
+  fonte?: string | null // dica: pasta do banco é procurada primeiro
 ): Promise<void> {
   const names = pdfNamesToTry(fileName, filePath);
   if (names.length === 0) throw new Error("Este registro não tem nome de PDF.");
@@ -185,7 +229,7 @@ export async function openLocalPdf(
   }
   win.document.write("<p style='font-family:sans-serif'>Procurando o PDF na pasta...</p>");
   try {
-    const file = await searchNames(dir, names);
+    const file = await searchNames(dir, names, fonte);
     log("busca terminou; achou:", !!file);
     if (!file) {
       repickNext = true;

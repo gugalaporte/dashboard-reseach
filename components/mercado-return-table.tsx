@@ -42,7 +42,8 @@ function level(row: MarketRow): string {
   return n;
 }
 
-function AssetSpec({ row }: { row: MarketRow }) {
+function AssetSpec({ row, large }: { row: MarketRow; large?: boolean }) {
+  const specCls = large ? "text-sm text-ink/50" : "text-[10px] text-ink/40";
   const spec =
     row.tracks ??
     (row.group === "credit" ||
@@ -51,18 +52,22 @@ function AssetSpec({ row }: { row: MarketRow }) {
     !row.enabled
       ? row.notes
       : null);
-  if (spec) return <div className="text-[10px] text-ink/40">{spec}</div>;
-  if (!row.enabled) return <div className="text-[10px] text-ink/40">Sem série</div>;
+  if (spec) return <div className={specCls}>{spec}</div>;
+  if (!row.enabled) return <div className={specCls}>Sem série</div>;
   return null;
 }
 
 type Props = {
   rows: MarketRow[];
   emptyHint?: string;
+  /** Fonte maior, na largura total (ex.: quadro de commodities). */
+  large?: boolean;
 };
 
 /** Tabela de nível e retornos 1D / 1S / 1M. */
-export function MercadoReturnTable({ rows, emptyHint }: Props) {
+export function MercadoReturnTable({ rows, emptyHint, large }: Props) {
+  const headCls = cn(large ? "text-xs" : "text-[9px]", "uppercase tracking-[0.14em]");
+  const textCls = large ? "text-lg" : "text-sm";
   if (rows.length === 0) {
     return (
       <p className="text-sm text-ink/45 border border-line bg-white px-4 py-6 text-center">
@@ -76,19 +81,19 @@ export function MercadoReturnTable({ rows, emptyHint }: Props) {
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-navy cursor-default">
-            <TableHead className="text-[9px] uppercase tracking-[0.14em] text-left">
+            <TableHead className={cn(headCls, "text-left")}>
               Ativo
             </TableHead>
-            <TableHead className="text-[9px] uppercase tracking-[0.14em] text-right">
+            <TableHead className={cn(headCls, "text-right")}>
               Último
             </TableHead>
-            <TableHead className="text-[9px] uppercase tracking-[0.14em] text-right">
+            <TableHead className={cn(headCls, "text-right")}>
               1D
             </TableHead>
-            <TableHead className="text-[9px] uppercase tracking-[0.14em] text-right">
+            <TableHead className={cn(headCls, "text-right")}>
               1S
             </TableHead>
-            <TableHead className="text-[9px] uppercase tracking-[0.14em] text-right">
+            <TableHead className={cn(headCls, "text-right")}>
               1M
             </TableHead>
           </TableRow>
@@ -96,16 +101,17 @@ export function MercadoReturnTable({ rows, emptyHint }: Props) {
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.ric} className="cursor-default hover:bg-line/40">
-              <TableCell className="text-sm">
+              <TableCell className={textCls}>
                 <div className="font-medium text-ink">{row.name}</div>
-                <AssetSpec row={row} />
+                <AssetSpec row={row} large={large} />
               </TableCell>
-              <TableCell className="text-right font-mono text-sm tabular">
+              <TableCell className={cn("text-right font-mono tabular", textCls)}>
                 {level(row)}
               </TableCell>
               <TableCell
                 className={cn(
-                  "text-right font-mono text-sm tabular",
+                  "text-right font-mono tabular",
+                  textCls,
                   pctClass(row.ret1d)
                 )}
               >
@@ -113,7 +119,8 @@ export function MercadoReturnTable({ rows, emptyHint }: Props) {
               </TableCell>
               <TableCell
                 className={cn(
-                  "text-right font-mono text-sm tabular",
+                  "text-right font-mono tabular",
+                  textCls,
                   pctClass(row.ret1w)
                 )}
               >
@@ -121,7 +128,8 @@ export function MercadoReturnTable({ rows, emptyHint }: Props) {
               </TableCell>
               <TableCell
                 className={cn(
-                  "text-right font-mono text-sm tabular",
+                  "text-right font-mono tabular",
+                  textCls,
                   pctClass(row.ret1m)
                 )}
               >

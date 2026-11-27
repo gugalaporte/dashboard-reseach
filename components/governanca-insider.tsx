@@ -229,9 +229,10 @@ function CompanyTotalsTable({
   }, [open]);
 
   return (
-    <div className="overflow-x-auto border border-navy/20 bg-white">
+    // Altura máxima + rolagem própria: assim o cabeçalho (sticky) fica fixo ao rolar.
+    <div className="max-h-[70vh] overflow-auto border border-navy/20 bg-white">
       <table className="w-full text-left min-w-[28rem]">
-        <thead>
+        <thead className="sticky top-0 z-10">
           <tr className="text-[10px] uppercase tracking-[0.12em] text-white/80 bg-navy">
             <th className="px-4 py-2 font-medium">Empresa</th>
             <th className="px-4 py-2 font-medium text-right">Compras</th>

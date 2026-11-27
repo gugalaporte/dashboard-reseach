@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { foldName, pdfBaseName, samePdfName } from "./pdf-name";
+import { foldName, isPreferredFolder, pdfBaseName, samePdfName } from "./pdf-name";
 
-export { pdfBaseName, samePdfName };
+export { isPreferredFolder, pdfBaseName, samePdfName };
 
 /** Trecho compartilhado no OneDrive de todo mundo. */
 export const SELL_SIDE_RELATIVE = path.join(
@@ -13,26 +13,12 @@ export const SELL_SIDE_RELATIVE = path.join(
   "Sell Side_Reports"
 );
 
-const FONTE_FOLDERS: Record<string, string[]> = {
-  "BTG Pactual": ["btg"],
-  "Bradesco BBI": ["bradesco"],
-  Safra: ["safra"],
-  "Itaú BBA": ["itaú", "itau"],
-};
-
 function existsDir(p: string): boolean {
   try {
     return fs.statSync(p).isDirectory();
   } catch {
     return false;
   }
-}
-
-export function isPreferredFolder(folderName: string, fonte: string | null | undefined): boolean {
-  if (!fonte) return false;
-  const aliases = FONTE_FOLDERS[fonte] ?? [];
-  const key = foldName(folderName);
-  return aliases.some((a) => foldName(a) === key);
 }
 
 /** Candidatos: {home}\FINACAP\... e uma pasta abaixo (OneDrive). */

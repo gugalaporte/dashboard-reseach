@@ -361,6 +361,7 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
                             <PdfOpenLink
                               pdfId={e.prev_pdf_id}
                               filePath={e.previous_file_path}
+                              fonte={e.fonte}
                               title={`Abrir PDF anterior (${formatDateLong(e.prev_report_date)})`}
                               className="opacity-0 group-hover:opacity-100 transition-opacity text-ink/50 hover:text-ink"
                             >
@@ -429,6 +430,7 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
                     <PdfOpenLink
                       pdfId={selected.pdf_id}
                       filePath={selected.current_file_path}
+                      fonte={selected.fonte}
                       className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-line text-sm hover:bg-surface"
                     >
                       PDF atual <ExternalLink className="h-3.5 w-3.5" />
@@ -438,6 +440,7 @@ export function ChangeFeed({ sectionId, portfolioTickers = [] }: ChangeFeedProps
                     <PdfOpenLink
                       pdfId={selected.prev_pdf_id}
                       filePath={selected.previous_file_path}
+                      fonte={selected.fonte}
                       className="inline-flex items-center gap-1 h-8 px-3 rounded-md border border-line text-sm hover:bg-surface"
                     >
                       PDF anterior <ExternalLink className="h-3.5 w-3.5" />

@@ -264,18 +264,6 @@ function buildCurves(
   return boards;
 }
 
-const IDEX_PLACEHOLDER: MarketInst = {
-  ric: "JGPIDEX",
-  name: "JGP IDEX",
-  group_code: "credit",
-  quote_type: "index_level",
-  currency: "BRL",
-  curve_id: null,
-  tenor: null,
-  enabled: false,
-  notes: "Não está na LSEG",
-};
-
 const RIC_ORDER = [
   ".BVSP",
   ".SPX",
@@ -293,7 +281,6 @@ const RIC_ORDER = [
   ".ANBIIDADI",
   ".ANBIIDAIPCA",
   "LTMG11=SA",
-  "JGPIDEX",
   "BRL=",
   ".DXY",
   "LCOc1",
@@ -334,9 +321,8 @@ export function buildMarketPayload(
   instruments: MarketInst[],
   prices: MarketPrice[]
 ): MarketPayload {
-  const list = instruments.some((i) => /idex/i.test(i.name) || /idex/i.test(i.ric))
-    ? instruments
-    : [...instruments, IDEX_PLACEHOLDER];
+  // JGP IDEX foi removido do painel (não está na LSEG).
+  const list = instruments.filter((i) => i.ric !== "JGPIDEX");
   const byPrice = byRic(prices);
   let asOf: string | null = null;
   for (const pts of byPrice.values()) {

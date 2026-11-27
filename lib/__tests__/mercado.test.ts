@@ -68,9 +68,9 @@ describe("buildMarketPayload", () => {
       { ric: ".BVSP", trade_date: "2026-09-08", value: 110 },
     ]);
     const ibov = payload.rows.find((r) => r.ric === ".BVSP");
-    const idex = payload.rows.find((r) => r.ric === "JGPIDEX");
     expect(ibov?.ret1m).toBeCloseTo(10, 5);
-    expect(idex?.enabled).toBe(false);
+    // JGP IDEX foi removido do painel.
+    expect(payload.rows.some((r) => r.ric === "JGPIDEX")).toBe(false);
     expect(payload.series[".BVSP"]?.length).toBe(2);
   });
 

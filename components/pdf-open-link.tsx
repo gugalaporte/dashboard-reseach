@@ -9,6 +9,8 @@ type PdfRef = {
   pdfId?: number | null;
   fileName?: string | null;
   filePath?: string | null;
+  /** Banco do relatório (ex.: "Itaú BBA"). Acelera a busca na pasta local. */
+  fonte?: string | null;
 };
 
 type Props = PdfRef & {
@@ -45,7 +47,7 @@ export function PdfOpenLink({ className, title, children, ...props }: Props) {
       }
       // Deploy: o servidor não vê a pasta. Usa a pasta local do usuário.
       const names = await namesForPdf(props);
-      await openLocalPdf(names.fileName, names.filePath);
+      await openLocalPdf(names.fileName, names.filePath, props.fonte);
     } catch (err) {
       console.error("[pdf] falha ao abrir:", err); // ajuda a achar o motivo (F12 → Console)
       if (err instanceof DOMException && err.name === "AbortError") return;
